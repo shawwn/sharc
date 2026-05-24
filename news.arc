@@ -434,7 +434,7 @@
 (mac fulltop (lid label title whence . body)
   (w/uniq (gi gl gt gw)
     `(with (,gi ,lid ,gl ,label ,gt ,title ,gw ,whence)
-       (npage (+ this-site* (if ,gt (+ bar* ,gt) ""))
+       (npage (+ (if ,gt (+ ,gt bar*) "") this-site*)
          (if (check-procrast)
              (do (pagetop 'full ,gi ,gl ,gt ,gw)
                  (hook 'page ,gl)
