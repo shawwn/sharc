@@ -55,7 +55,7 @@
 (def opcolor (key val) 
   (w/uniq gv
     `(whenlet ,gv ,val
-       (pr ,(string " " key "=#") (hexrep ,gv)))))
+       (pr ,(string " " key "=\"#") (hexrep ,gv) #\"))))
 
 (def opstring (key val)
   `(aif ,val (pr ,(+ " " key "=\"") it #\")))
