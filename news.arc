@@ -1016,7 +1016,7 @@ function vote(node) {
                       nil)
             rel  (unless (or toself (> (realscore s) follow-threshold*))
                    'nofollow)) 
-      (pr s!title))))
+      (pr:eschtml s!title))))
       
 (def pseudo-text (i)
   (if (flagged i) "[flagged]"
