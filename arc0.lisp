@@ -492,7 +492,7 @@
              ((string= tname "char")   (code-char x))
              ((string= tname "string")
               (if radix
-                  (format nil (format nil "~~~DR" radix) x)
+                  (string-downcase (format nil (format nil "~~~DR" radix) x))
                   (format nil "~D" x)))
              (t (error "Can't coerce int ~S to ~S" x type))))
       ((numberp x)
