@@ -37,6 +37,7 @@
         (class style src) opstring
         (onclick onfocus) opstring
         (width height)    opnum
+        (tabindex)        opnum
         (color bgcolor)   opcolor)))
 
 (mac attribute (tag opt f)
