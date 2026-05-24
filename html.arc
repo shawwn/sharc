@@ -61,10 +61,10 @@
   `(aif ,val (pr ,(+ " " key "=\"") it #\")))
 
 (def opnum (key val)
-  `(aif ,val (pr ,(+ " " key "=") it)))
+  `(aif ,val (pr ,(+ " " key "=\"") it #\")))
 
 (def opsym (key val)
-  `(aif ,val (pr ,(+ " " key "=") it)))
+  `(aif ,val (pr ,(+ " " key "=\"") it #\")))
 
 (def opsel (key val)
   `(if ,val (pr " selected")))
