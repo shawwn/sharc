@@ -635,8 +635,12 @@ function vote(node) {
 (def topright (whence (o showkarma t))
   (when (me)
     (userlink (me) nil)
-    (when showkarma (pr  "&nbsp;(@(karma))"))
-    (pr "&nbsp;|&nbsp;"))
+    (when showkarma
+      (pr " (")
+      (tag (span id 'karma)
+        (pr (karma)))
+      (pr ")"))
+    (pr " | "))
   (if (me)
       (urlink 'logout (logout-user) whence)
       (onlink "login"
