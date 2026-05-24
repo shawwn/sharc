@@ -1123,7 +1123,8 @@ function vote(node) {
 
 (def itemline (i)
   (when (cansee i)
-    (when (news-type i) (itemscore i))
+    (when (and (news-type i) (admin))
+      (itemscore i))
     (byline i)))
 
 (def itemscore (i)
@@ -1135,7 +1136,10 @@ function vote(node) {
 ; redefined later
 
 (def byline (i)
-  (pr " by @(tostring (userlink i!by)) @(text-age:item-age i) "))
+  (when (admin) (pr " by "))
+  (userlink i!by)
+  (pr " ")
+  (link (text-age:item-age i) (item-url i!id)))
 
 (def user-url (user) (+ "user?id=" user))
 
@@ -1306,11 +1310,6 @@ function vote(node) {
                  (prn "Do you want this to @(if i!deleted 'stay 'be) deleted?")
                  (br2)
                  (but "Yes" "b") (sp) (but "No" "b")))))))
-
-(def permalink (story)
-  (when (cansee story)
-    (pr bar*)
-    (link "link" (item-url story!id))))
 
 (def logvote (story)
   (newslog 'vote (story 'id) (list (story 'title))))
@@ -2090,7 +2089,6 @@ function vote(node) {
       (tag (div style "margin-top:2px; margin-bottom:-10px; ")
         (spanclass comhead
           (itemline c)
-          (permalink c)
           (when parent
             (when (cansee c) (pr bar*))
             (link "parent" (item-url ((item parent) 'id))))
