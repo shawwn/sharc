@@ -364,10 +364,9 @@
 
 (def nbsp () (pr "&nbsp;"))
 
-(def link (text (o dest text) (o color))
-  (tag (a href dest) 
-    (tag-if color (font color color)
-      (pr text))))
+(def link (text (o dest text) (o id))
+  (tag (a id id href dest)
+    (pr text)))
 
 (def underlink (text (o dest text))
   (tag (a href dest) (tag u (pr text))))

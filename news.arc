@@ -1142,7 +1142,7 @@ function vote(node) {
 (= show-avg* nil)
 
 (def userlink (user (o show-avg t))
-  (link (user-name user) (user-url user))
+  (link (user-name user) (user-url user) (if (me user) 'me))
   (awhen (and show-avg* (admin) show-avg (uvar user avg))
     (pr " (@(num it 1 t t))")))
 
