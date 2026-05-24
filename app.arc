@@ -317,11 +317,8 @@
                         name id)
            (prn) ; needed or 1 initial newline gets chopped off
            (pr text))
-         (when (and formatdoc-url* (in typ 'mdtext 'mdtext2))
-           (pr " ")
-           (tag (a href formatdoc-url* tabindex -1)
-             (tag (font size -2 color (gray 175))
-               (pr "help")))))
+         (when (in typ 'mdtext 'mdtext2)
+           (formatdoc-link)))
       (caris typ 'choice)
        (menu id (cddr typ) val)
       (is typ 'yesno)
@@ -333,6 +330,13 @@
       (is typ 'date)
        (gentag input type 'text name id value (if val (english-date val) ""))
        (err "unknown varfield type" typ)))
+
+(def formatdoc-link ()
+  (when formatdoc-url*
+    (pr " ")
+    (tag (a href formatdoc-url* tabindex -1)
+      (tag (font size -2 color (gray 175))
+        (pr "help")))))
 
 (def text-rows (text wid (o pad 3))
   (+ (trunc (/ (len text) (* wid .8))) pad))

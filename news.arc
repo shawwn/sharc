@@ -1973,6 +1973,7 @@ function vote(node) {
              (process-comment parent arg!text whence))
     (textarea "text" 6 60
       (aif text (prn (unmarkdown it))))
+    (formatdoc-link)
     (when (and noob-comment-msg* (noob user))
       (br2)
       (spanclass subtext (pr noob-comment-msg*)))
