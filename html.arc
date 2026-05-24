@@ -29,8 +29,15 @@
 
 (= opmeths* (table))
 
-(mac opmeth args
-  `(opmeths* (list ,@args)))
+(def opmeth (spec opt)
+  (or (opmeths* (list spec opt))
+      (case opt
+        (id align valign) opsym
+        (name type)       opstring
+        (class style src) opstring
+        (onclick onfocus) opstring
+        (width height)    opnum
+        (color bgcolor)   opcolor)))
 
 (mac attribute (tag opt f)
   `(= (opmeths* (list ',tag ',opt)) ,f))
@@ -178,17 +185,16 @@
   (if (no options)
       '()
       (let ((opt val) . rest) options
-        (let meth (if (is opt 'style) opstring (opmeth spec opt))
-          (if meth
-              (if val
-                  (cons (if (precomputable-tagopt val)
-                            (tostring (eval (meth opt val)))
-                            (meth opt val))
-                        (tag-options spec rest))
-                  (tag-options spec rest))
-              (do
-                (pr "<!-- ignoring " opt " for " spec "-->")
-                (tag-options spec rest)))))))
+        (iflet meth (opmeth spec opt)
+          (if val
+              (cons (if (precomputable-tagopt val)
+                        (tostring (eval (meth opt val)))
+                        (meth opt val))
+                    (tag-options spec rest))
+              (tag-options spec rest))
+          (do
+            (pr "<!-- ignoring " opt " for " spec "-->")
+            (tag-options spec rest))))))
 
 (def precomputable-tagopt (val)
   (and (literal val) 
