@@ -1854,7 +1854,6 @@ function vote(node) {
 (def display-item-text (s)
   (when (and (cansee s)
              (in s!type 'story 'poll)
-             (blank s!url)
              (~blank s!text))
     (spacerow 2)
     (row "" s!text)))
