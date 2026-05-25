@@ -243,6 +243,9 @@
 (= dc-usernames* (table))
 
 (def username-taken (user)
+  (hpasswords* user))
+
+(def username-conflicts (user)
   (when (empty dc-usernames*)
     (each (k v) hpasswords*
       (set (dc-usernames* (downcase k)))))
@@ -255,6 +258,9 @@
         Please choose another."
       (username-taken user)
        "That username is taken. Please choose another."
+      (username-conflicts user)
+       "That username conflicts with an existing one.  Names are
+        case-insensitive.  Please choose another."
       (or (no pw) (< (len pw) 4))
        "Passwords should be a least 4 characters long.  Please 
         choose another."
