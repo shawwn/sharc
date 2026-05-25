@@ -126,8 +126,32 @@ errors out clearly rather than polluting (often locked) CL packages."
                       (if (numberp v) v nil)))))))
        (or n (arc-sym str))))))
 
+(defun arc-copy-balanced-paren (stream buf)
+  "Copy a balanced parenthesised expression (including the opening
+   `(` already at STREAM's head and the matching `)`) into BUF, treating
+   inner double-quoted strings as opaque so their `\"` chars do not affect
+   balancing. Used to capture `@(...)` forms inside atstrings without
+   requiring the inner quotes to be escaped."
+  (let ((depth 0))
+    (loop
+      (let ((c (read-char stream t nil)))
+        (write-char c buf)
+        (case c
+          (#\( (incf depth))
+          (#\) (decf depth)
+               (when (zerop depth) (return)))
+          (#\\ (write-char (read-char stream t nil) buf))
+          (#\" (loop
+                  (let ((sc (read-char stream t nil)))
+                    (write-char sc buf)
+                    (cond ((char= sc #\") (return))
+                          ((char= sc #\\)
+                           (write-char (read-char stream t nil) buf)))))))))))
+
 (defun arc-read-string (stream)
-  "Read a double-quoted string, handling backslash escapes."
+  "Read a double-quoted string, handling backslash escapes.
+   When atstrings is enabled, `@(...)` is captured as a balanced
+   parenthesised form so inner quotes need not be escaped."
   (with-output-to-string (buf)
     (loop
       (let ((c (read-char stream t nil)))
@@ -139,6 +163,11 @@ errors out clearly rather than polluting (often locked) CL packages."
                            (#\n #\newline) (#\t #\tab) (#\r #\return)
                            (t next))
                          buf)))
+          ((and *arc-atstrings*
+                (char= c #\@)
+                (eql (peek-char nil stream nil nil) #\())
+           (write-char #\@ buf)
+           (arc-copy-balanced-paren stream buf))
           (t (write-char c buf)))))))
 
 (defun arc-read-char-literal (stream)
