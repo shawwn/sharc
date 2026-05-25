@@ -194,7 +194,13 @@ c"
     (test? "" "@(list)")
     (test? "T" "@t")
     ;(test? "false" "@false")
-    ))
+    )
+  ; nested strings inside @(...): bare and backslash-escaped quotes
+  ; both work, and \" inside a nested string is preserved for arc-read.
+  (test? "3" "@(len "abc")")
+  (test? "3" "@(len \"abc\")")
+  (test? "ab" "@(+ "a" "b")")
+  (test? "a\"b" "@(+ "a\"b" "")"))
 
 (define-test quote
   (test? 7 (quote 7))

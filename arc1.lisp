@@ -128,25 +128,42 @@ errors out clearly rather than polluting (often locked) CL packages."
 
 (defun arc-copy-balanced-paren (stream buf)
   "Copy a balanced parenthesised expression (including the opening
-   `(` already at STREAM's head and the matching `)`) into BUF, treating
-   inner double-quoted strings as opaque so their `\"` chars do not affect
-   balancing. Used to capture `@(...)` forms inside atstrings without
-   requiring the inner quotes to be escaped."
+   `(` at STREAM's head and the matching `)`) into BUF. Outside any
+   nested string, backslash escapes are processed like the surrounding
+   atstring reader would. Inside a nested `\"...\"`, characters and
+   `\\X` escapes are preserved verbatim so arc-read can later parse
+   the string with its own escape handling. This lets `@(...)` capture
+   either bare or backslash-escaped inner quotes."
   (let ((depth 0))
     (loop
       (let ((c (read-char stream t nil)))
-        (write-char c buf)
-        (case c
-          (#\( (incf depth))
-          (#\) (decf depth)
-               (when (zerop depth) (return)))
-          (#\\ (write-char (read-char stream t nil) buf))
-          (#\" (loop
-                  (let ((sc (read-char stream t nil)))
-                    (write-char sc buf)
-                    (cond ((char= sc #\") (return))
-                          ((char= sc #\\)
-                           (write-char (read-char stream t nil) buf)))))))))))
+        (cond
+          ((char= c #\\)
+           (let ((next (read-char stream t nil)))
+             (write-char (case next
+                           (#\n #\newline) (#\t #\tab) (#\r #\return)
+                           (t next))
+                         buf)))
+          ((char= c #\()
+           (write-char c buf)
+           (incf depth))
+          ((char= c #\))
+           (write-char c buf)
+           (decf depth)
+           (when (zerop depth) (return)))
+          ((char= c #\")
+           (write-char c buf)
+           (loop
+              (let ((sc (read-char stream t nil)))
+                (cond
+                  ((char= sc #\\)
+                   (write-char sc buf)
+                   (write-char (read-char stream t nil) buf))
+                  ((char= sc #\")
+                   (write-char sc buf)
+                   (return))
+                  (t (write-char sc buf))))))
+          (t (write-char c buf)))))))
 
 (defun arc-read-string (stream)
   "Read a double-quoted string, handling backslash escapes.
