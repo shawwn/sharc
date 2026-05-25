@@ -766,7 +766,7 @@ function vote(node) {
                (fn () (save-prof user)
                       (user-page user)))))
 
-(= topcolor-threshold* 250)
+(= topcolor-threshold* 0)
 
 (def user-fields (user)
   (withs (e (editor)
