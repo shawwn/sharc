@@ -1962,7 +1962,15 @@ function vote(node) {
       (spacerow 10)
       (row "" (comment-form parent whence text)))))
 
-(= noob-comment-msg* nil)
+(= noob-comment-msg*
+   "If you haven't already, would you mind reading about HN's
+ @(tostring:underlink
+    "approach to comments"
+    "https://news.ycombinator.com/newswelcome.html")
+ and
+ @(tostring:underlink
+    "site guidelines"
+    "https://news.ycombinator.com/newsguidelines.html#comments")?")
 
 ; Comment forms last for 30 min (- cache time)
 
@@ -1975,7 +1983,7 @@ function vote(node) {
     (formatdoc-link)
     (when (and noob-comment-msg* (noob user))
       (br2)
-      (spanclass subtext (pr noob-comment-msg*)))
+      (pr noob-comment-msg*))
     (br2)
     (submit (if (acomment parent) "reply" "add comment"))))
 
