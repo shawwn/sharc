@@ -612,13 +612,18 @@
       `(atwiths ,(+ (list g test) binds)
          (,setter (rem ,g ,val))))))
 
+(mac setmem (test x place . args)
+  (w/uniq (gt gx)
+    (let (binds val setter) (setforms place)
+      `(atwiths ,(+ (list gt test gx x) binds)
+         (,setter (if ,gt
+                      (pushnew ,gx ,val)
+                      (pull ,gx ,val ,@args)))))))
+
 (mac togglemem (x place . args)
   (w/uniq gx
-    (let (binds val setter) (setforms place)
-      `(atwiths ,(+ (list gx x) binds)
-         (,setter (if (mem ,gx ,val)
-                      (rem ,gx ,val)
-                      (adjoin ,gx ,val ,@args)))))))
+    `(let ,gx ,x
+       (setmem (~mem ,gx ,place) ,gx ,place ,@args))))
 
 (mac ++ (place (o i 1))
   (if (isa place 'sym)
