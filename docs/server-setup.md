@@ -179,6 +179,30 @@ cat > /etc/cron.d/rsnapshot << 'EOF'
 EOF
 ```
 
+## Service User [DONE]
+
+All services run as `deploy` (uid 1000), not root. Root is only for
+system administration and rsnapshot backups.
+
+```bash
+useradd -m -s /bin/bash -d /home/deploy deploy
+
+# Transfer ownership of app directories
+chown -R deploy:deploy /mnt/sda/private/wiki /mnt/sda/private/wiki-private \
+  /mnt/sda/private/.ghcup /mnt/sda/private/cabal \
+  /mnt/sda/public /mnt/sdb/public /opt/sharc
+
+# Copy GitHub deploy keys to deploy user
+mkdir -p /home/deploy/.ssh
+cp /root/.ssh/id_ed25519* /root/.ssh/id_ed25519_wiki* /root/.ssh/config /home/deploy/.ssh/
+chown -R deploy:deploy /home/deploy/.ssh
+chmod 700 /home/deploy/.ssh
+chmod 600 /home/deploy/.ssh/id_ed25519 /home/deploy/.ssh/id_ed25519_wiki /home/deploy/.ssh/config
+ssh-keyscan github.com >> /home/deploy/.ssh/known_hosts
+```
+
+Cron jobs run as deploy (wiki-rebuild) or root (rsnapshot backups).
+
 ## Phase 3: Deploy Lambda News [TODO]
 
 ```bash
@@ -203,36 +227,108 @@ Domains:
 - shawwn.net / www.shawwn.net -> serve /mnt/sda/private/wiki/_site/
 - the.shawwn.net -> autoindex (/mnt/sda/public/ and /mnt/sdb/public/)
 
-## Phase 5: Blog (shawwn.net) [TODO]
+## Phase 5: Blog (shawwn.net) [DONE]
 
 All Haskell tooling lives on HDD (/mnt/sda) to save SSD space.
+Total HDD usage: ~5.4GB (GHC 2.9GB, cabal 2.2GB, wiki 390MB).
+
+### Haskell environment
 
 ```bash
-# Set up Haskell environment on HDD
-ssh hetzner "cat > /etc/profile.d/haskell.sh << 'HEOF'
+# /etc/profile.d/haskell.sh
 export GHCUP_INSTALL_BASE_PREFIX=/mnt/sda/private
 export CABAL_DIR=/mnt/sda/private/cabal
-[ -f /mnt/sda/private/ghcup/.ghcup/env ] && source /mnt/sda/private/ghcup/.ghcup/env
-HEOF"
+export TMPDIR=/mnt/sda/private/wiki/tmp
+[ -f /mnt/sda/private/.ghcup/env ] && source /mnt/sda/private/.ghcup/env
+```
 
-# Install ghcup (will install to /mnt/sda/private/ghcup/.ghcup/)
-ssh hetzner "source /etc/profile.d/haskell.sh && \
-  curl --proto '=https' --tlsv1.2 -sSf https://get-ghcup.haskell.org | sh"
+TMPDIR must be on the HDD (same filesystem as the wiki) because
+LinkMetadata.hs uses renameFile from /tmp to static/metadata/auto.hs,
+which fails across filesystems.
 
-# Install GHC and cabal
-ssh hetzner "source /etc/profile.d/haskell.sh && \
-  ghcup install ghc 9.6.6 && ghcup set ghc 9.6.6 && \
-  ghcup install cabal latest"
+### Install steps (already executed)
 
-# Install system deps (small, fine on SSD)
-ssh hetzner "DEBIAN_FRONTEND=noninteractive apt install -y \
-  imagemagick tidy parallel ripgrep nodejs npm"
+```bash
+# Install ghcup non-interactively
+export GHCUP_INSTALL_BASE_PREFIX=/mnt/sda/private
+export CABAL_DIR=/mnt/sda/private/cabal
+curl --proto '=https' --tlsv1.2 -sSf https://get-ghcup.haskell.org | \
+  BOOTSTRAP_HASKELL_NONINTERACTIVE=1 \
+  BOOTSTRAP_HASKELL_GHC_VERSION=9.6.6 \
+  BOOTSTRAP_HASKELL_INSTALL_NO_STACK=1 sh
 
-# Clone wiki repo
-ssh hetzner "git clone https://github.com/shawwn/wiki.git /mnt/sda/private/wiki"
+# System deps
+apt install -y imagemagick tidy parallel ripgrep nodejs npm \
+  zlib1g-dev libffi-dev libgmp-dev
 
-# Build (wiki repo needs shawwn.com -> shawwn.net update first)
-ssh hetzner "cd /mnt/sda/private/wiki && source /etc/profile.d/haskell.sh && ./build.sh"
+# Clone and build
+git clone https://github.com/shawwn/wiki.git /mnt/sda/private/wiki
+cd /mnt/sda/private/wiki
+mkdir -p tmp
+export TMPDIR=/mnt/sda/private/wiki/tmp
+source /mnt/sda/private/.ghcup/env
+cabal update
+cabal build wiki
+cabal run wiki -- clean
+cabal run wiki -- build
+```
+
+### wiki-private overlay
+
+Private content lives in a sibling repo (github.com/shawwn/wiki-private,
+private). overlay.sh symlinks private files into the wiki at build time.
+
+```bash
+# Clone wiki-private next to wiki
+git clone git@github-wiki-private:shawwn/wiki-private.git /mnt/sda/private/wiki-private
+```
+
+Server uses two deploy keys (one per repo) with SSH host aliases:
+- github-wiki -> ~/.ssh/id_ed25519_wiki (wiki repo)
+- github-wiki-private -> ~/.ssh/id_ed25519 (wiki-private repo)
+
+### Auto-rebuild cron (every 5 minutes)
+
+Checks both repos for changes; rebuilds with overlay if either updated.
+
+```bash
+# /usr/local/bin/wiki-rebuild.sh
+#!/bin/bash
+set -e
+export GHCUP_INSTALL_BASE_PREFIX=/mnt/sda/private
+export CABAL_DIR=/mnt/sda/private/cabal
+export TMPDIR=/mnt/sda/private/wiki/tmp
+source /mnt/sda/private/.ghcup/env
+
+WIKI=/mnt/sda/private/wiki
+PRIVATE=/mnt/sda/private/wiki-private
+CHANGED=0
+
+cd $WIKI
+git fetch origin
+if ! git diff --quiet HEAD origin/main; then
+  git pull origin main
+  CHANGED=1
+fi
+
+cd $PRIVATE
+git fetch origin
+if ! git diff --quiet HEAD origin/main; then
+  git pull origin main
+  CHANGED=1
+fi
+
+if [ $CHANGED -eq 1 ]; then
+  cd $WIKI
+  ./overlay.sh link
+  cabal run wiki -- build 2>&1 | logger -t wiki-build
+  echo "$(date): wiki rebuilt" >> /var/log/wiki-build.log
+fi
+```
+
+```bash
+# /etc/cron.d/wiki-rebuild
+*/5 * * * * root /usr/local/bin/wiki-rebuild.sh 2>&1 | logger -t wiki-rebuild
 ```
 
 ## Phase 6: Search (search.ycombinator.lol) [TODO]
