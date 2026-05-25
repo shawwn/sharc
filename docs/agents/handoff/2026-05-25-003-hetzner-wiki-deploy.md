@@ -1,6 +1,6 @@
 ---
 name: hetzner-wiki-deploy
-description: Continued Hetzner server setup (from 002). Installed Haskell toolchain on HDD, built the wiki, set up wiki-private overlay, created deploy user, configured auto-rebuild cron.
+description: Continued Hetzner server setup (from 002). Installed Haskell toolchain, built wiki, set up wiki-private overlay, deploy user, nginx + TLS for all domains, Route 53 DNS.
 type: project
 ---
 
@@ -73,10 +73,55 @@ Transferred ownership of all app directories. SSH deploy keys copied.
 Wiki rebuild cron runs as `deploy`. rsnapshot backups still run as
 root.
 
+### ImageMagick remote URL fix (committed to wiki repo)
+
+`staticImg` in Main.hs was running ImageMagick's `identify` on remote
+image URLs (e.g. `https://i.imgur.com/...`), which fails because
+`identify` can't fetch HTTP. This caused `error` to be called, Hakyll
+caught the exception, and wrote 0-byte output files for memorybox.page
+and swarm.page. Fixed by adding http/https prefix checks to the
+`vector` guard so remote URLs are skipped (same as SVGs and data URIs).
+
+Wiki commit: `a8a5556`
+
+### wiki-private GitHub repo created
+
+Created `github.com/shawwn/wiki-private` (private). Initialized from
+the test content produced by the overlay session (test-private.page,
+docs/private/test.txt). Committed and pushed.
+
+### Nginx + TLS + DNS
+
+Set up nginx vhosts and Let's Encrypt TLS for all domains:
+
+| Domain | Behavior |
+|---|---|
+| `https://shawwn.net` | serves wiki from /mnt/sda/private/wiki/_site/ |
+| `https://www.shawwn.net` | 301 -> shawwn.net |
+| `https://the.shawwn.net` | autoindex of /srv/the.shawwn.net/ (sda/, sdb/ symlinks) |
+| `https://news.ycombinator.lol` | proxy to localhost:8080 (502 until Lambda News deployed) |
+| `https://ycombinator.lol` | 301 -> news.ycombinator.lol |
+| `https://www.ycombinator.lol` | 301 -> news.ycombinator.lol |
+| all HTTP | 301 -> HTTPS |
+
+DNS: installed AWS CLI, updated Route 53 ycombinator.lol zone with
+A + AAAA records for ycombinator.lol, www.ycombinator.lol, and
+news.ycombinator.lol (all pointing to 88.198.62.84 / 2a01:4f8:222:642::2).
+`docs.ycombinator.lol` left untouched (delegated to Vercel via NS records).
+
+shawwn.net DNS is managed at Namecheap (not Route 53) and was already
+pointing to the server.
+
+Certbot auto-renewal is enabled for all certs. Certs expire 2026-08-23.
+
+nginx `default_type text/html` added for the wiki vhost because Hakyll
+generates extensionless HTML files (e.g. `_site/index` not `_site/index.html`).
+
 ### Plan documents updated
 
 - `docs/server-setup.md`: updated with all executed commands, marked
-  Phase 5 (blog) as DONE, added service user section
+  Phase 5 (blog) as DONE, added service user section, wiki-private
+  overlay, and deploy user setup
 - `docs/agents/plans/2026-05-25-001-hetzner-server-setup.md`: updated
   with wiki-private overlay details
 
@@ -101,6 +146,18 @@ root.
 - **Pushed overlay.sh from local**: the overlay commit existed locally
   but hadn't been pushed to GitHub. Pushed it so the server could pull.
 
+- **default_type text/html in nginx**: Hakyll outputs extensionless
+  HTML files (e.g. `_site/index`). Without this, nginx serves them as
+  `application/octet-stream`.
+
+- **the.shawwn.net uses symlinks**: `/srv/the.shawwn.net/sda` and `sdb`
+  are symlinks to `/mnt/sda/public` and `/mnt/sdb/public`. This keeps
+  the nginx root clean and decoupled from the mount paths.
+
+- **Single cert per domain group**: one cert covers ycombinator.lol +
+  www + news; another covers shawwn.net + www; the.shawwn.net has its
+  own. This matches the nginx vhost structure.
+
 ## Important context for future sessions
 
 ### Server state summary
@@ -114,8 +171,9 @@ root.
 | Wiki auto-rebuild | DONE | /etc/cron.d/wiki-rebuild (as deploy) |
 | wiki-private overlay | DONE | /mnt/sda/private/wiki-private/ |
 | Service user | DONE | deploy (uid 1000) |
+| Nginx + TLS | DONE | all domains serving with Let's Encrypt |
+| DNS (Route 53) | DONE | ycombinator.lol A/AAAA records updated |
 | Lambda News | TODO | /opt/sharc/ (dir exists, not cloned) |
-| Nginx + TLS | TODO | blocked on DNS (Route 53) |
 | Search (Algolia) | TODO | |
 | HN API / Firebase | TODO | |
 | Email (password reset) | TODO | |
@@ -144,17 +202,37 @@ root.
 /etc/profile.d/haskell.sh         # GHCUP/CABAL/TMPDIR env vars
 /etc/rsnapshot-sda.conf           # backup config for sda
 /etc/rsnapshot-sdb.conf           # backup config for sdb
+
+/etc/nginx/sites-available/
+  shawwn.net             # wiki site
+  the.shawwn.net         # directory listing (HDD public dirs)
+  ycombinator.lol        # Lambda News proxy + redirects
+
+/etc/letsencrypt/live/
+  shawwn.net/            # cert for shawwn.net + www.shawwn.net
+  the.shawwn.net/        # cert for the.shawwn.net
+  ycombinator.lol/       # cert for ycombinator.lol + www + news
+
+/srv/the.shawwn.net/
+  sda -> /mnt/sda/public   # symlink
+  sdb -> /mnt/sdb/public   # symlink
 ```
 
 ### Known issues
 
-- Wiki build has non-fatal errors: failed imgur image downloads for
-  link metadata (LinkMetadata.hs tries to curl external URLs). These
-  produce `[ERROR]` lines but don't block the build.
-- `swarm.page` throws an exception during persist ("An exception was
-  thrown when persisting the compiler result"). Non-fatal.
+- Some non-fatal `[ERROR]` lines from LinkMetadata.hs when it fails to
+  fetch external URLs for link popup metadata. These don't block the
+  build after the ImageMagick fix, but metadata for those links will
+  be missing from popups.
+
+### AWS CLI
+
+Installed on local Mac (`brew install awscli`), configured with root
+access key for Route 53 management. Credentials in `~/.aws/credentials`.
+Route 53 hosted zone for ycombinator.lol: `Z09137391LCSEX2EUZFAM`.
 
 ### Next steps
 
-Phase 3 (Lambda News) and Phase 4 (Nginx + TLS) are next. DNS
-records in Route 53 need to be created before TLS can work.
+Phase 3 (Lambda News deployment) is the main remaining task. The
+nginx proxy to localhost:8080 is already configured and returns 502
+until the app is running.

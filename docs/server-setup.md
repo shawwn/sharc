@@ -216,16 +216,62 @@ ssh hetzner "mkdir -p /opt/sharc/arc && echo 'shawn' > /opt/sharc/arc/admins"
 # Test: ssh hetzner "cd /opt/sharc && ./news.arc"
 ```
 
-## Phase 4: Nginx + TLS [TODO]
+## Phase 4: Nginx + TLS + DNS [DONE]
 
-Requires DNS A/AAAA records pointing to 88.198.62.84 first.
-DNS is managed in AWS Route 53.
+### DNS (Route 53)
 
-Domains:
-- news.ycombinator.lol -> proxy to localhost:8080
-- search.ycombinator.lol -> search app
-- shawwn.net / www.shawwn.net -> serve /mnt/sda/private/wiki/_site/
-- the.shawwn.net -> autoindex (/mnt/sda/public/ and /mnt/sdb/public/)
+ycombinator.lol hosted zone: Z09137391LCSEX2EUZFAM
+
+```bash
+# Updated via AWS CLI (aws route53 change-resource-record-sets)
+# A + AAAA records for ycombinator.lol, www, news -> 88.198.62.84 / 2a01:4f8:222:642::2
+# docs.ycombinator.lol left untouched (delegated to Vercel via NS records)
+```
+
+shawwn.net DNS is at Namecheap (not Route 53), already pointed to server.
+
+### TLS certificates (Let's Encrypt)
+
+```bash
+certbot certonly --webroot -w /var/www/html \
+  -d shawwn.net -d www.shawwn.net --non-interactive --agree-tos --email shawnpresser@gmail.com
+
+certbot certonly --webroot -w /var/www/html \
+  -d the.shawwn.net --non-interactive --agree-tos --email shawnpresser@gmail.com
+
+certbot certonly --webroot -w /var/www/html \
+  -d ycombinator.lol -d www.ycombinator.lol -d news.ycombinator.lol \
+  --non-interactive --agree-tos --email shawnpresser@gmail.com
+```
+
+Auto-renewal enabled by certbot. Certs expire 2026-08-23.
+
+### Nginx vhosts
+
+```bash
+# /etc/nginx/sites-available/shawwn.net
+# - http -> https redirect
+# - www.shawwn.net -> shawwn.net redirect
+# - serves /mnt/sda/private/wiki/_site/ with default_type text/html
+#   (Hakyll outputs extensionless HTML files)
+
+# /etc/nginx/sites-available/the.shawwn.net
+# - http -> https redirect
+# - autoindex of /srv/the.shawwn.net/ (sda/ and sdb/ symlinks)
+
+# /etc/nginx/sites-available/ycombinator.lol
+# - http -> https redirect
+# - ycombinator.lol and www -> news.ycombinator.lol redirect
+# - news.ycombinator.lol -> proxy to localhost:8080
+```
+
+### the.shawwn.net directory structure
+
+```bash
+mkdir -p /srv/the.shawwn.net
+ln -sf /mnt/sda/public /srv/the.shawwn.net/sda
+ln -sf /mnt/sdb/public /srv/the.shawwn.net/sdb
+```
 
 ## Phase 5: Blog (shawwn.net) [DONE]
 
