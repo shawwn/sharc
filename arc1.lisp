@@ -480,47 +480,49 @@ errors out clearly rather than polluting (often locked) CL packages."
 ;;;; Arc compiler  (ac)
 ;;;; ============================================================
 
+(defvar *env* nil)
+
 (defun literal-p (x)
   (or (eq x t) (characterp x) (stringp x) (numberp x) (null x)
       (keywordp x)))
 
-(defun ac (s &optional (env nil))
+(defun ac (s)
   (cond
-    ((stringp s)   (ac-string s env))
+    ((stringp s)   (ac-string s))
     ((literal-p s)  s)
     ;; Arc nil/t with preserved case from arc-read
-    ((and (arc-sym= s "nil") (not (lex-p s env))) nil)
+    ((and (arc-sym= s "nil") (not (lex-p s))) nil)
     ;; Free reference to t -> cl:t; lex-bound t falls through to ac-var-ref
-    ((and (arc-sym= s "t") (not (lex-p s env))) t)
-    ((ssyntax-p s) (ac (expand-ssyntax s) env))
-    ((symbolp s)   (ac-var-ref s env))
-    ((arc-car? s #'ssyntax-p) (ac (cons (expand-ssyntax (car s)) (cdr s)) env))
+    ((and (arc-sym= s "t") (not (lex-p s))) t)
+    ((ssyntax-p s) (ac (expand-ssyntax s)))
+    ((symbolp s)   (ac-var-ref s))
+    ((arc-car? s #'ssyntax-p) (ac (cons (expand-ssyntax (car s)) (cdr s))))
     ((arc-sym= (arc-car? s) "function") (cl-quoted (cadr s)))
-    ((arc-sym= (arc-caar? s) "function") (mapcar (lambda (x) (ac x env)) s))
+    ((arc-sym= (arc-caar? s) "function") (mapcar #'ac s))
     ;; (pkg::fn args...) compiles to a direct CL call -- same path as
     ;; ((function fn) args...) above, but lets you drop the #'.
-    ((foreign-cl-call-p s env)
-     (cons (car s) (mapcar (lambda (x) (ac x env)) (cdr s))))
+    ((foreign-cl-call-p s)
+     (cons (car s) (mapcar #'ac (cdr s))))
     ((arc-sym= (arc-car? s) "quote") (list 'quote (ac-quoted (cadr s))))
-    ((arc-sym= (arc-car? s) "quasiquote") (ac-qq (cadr s) env))
-    ((arc-sym= (arc-car? s) "quasisyntax") (ac-qs (cadr s) env))
+    ((arc-sym= (arc-car? s) "quasiquote") (ac-qq (cadr s)))
+    ((arc-sym= (arc-car? s) "quasisyntax") (ac-qs (cadr s)))
     ((arc-sym= (arc-car? s) "unsyntax")
      (error "unsyntax outside quasisyntax: ~S" s))
     ((arc-sym= (arc-car? s) "unsyntax-splicing")
      (error "unsyntax-splicing outside quasisyntax: ~S" s))
-    ((arc-sym= (arc-car? s) "%do") `(progn ,@(ac-body* (cdr s) env)))
-    ((arc-sym= (arc-car? s) "if") (ac-if (cdr s) env))
-    ((arc-sym= (arc-car? s) "fn") (ac-fn (cadr s) (cddr s) env))
-    ((arc-sym= (arc-car? s) "assign") (ac-set (cdr s) env))
+    ((arc-sym= (arc-car? s) "%do") `(progn ,@(ac-body* (cdr s))))
+    ((arc-sym= (arc-car? s) "if") (ac-if (cdr s)))
+    ((arc-sym= (arc-car? s) "fn") (ac-fn (cadr s) (cddr s)))
+    ((arc-sym= (arc-car? s) "assign") (ac-set (cdr s)))
     ;; the next three clauses could be removed without changing semantics
     ;; ... except that they work for macros (so prob should do this for
     ;; every elt of s, not just the car)
-    ((arc-sym= (arc-caar? s) "compose") (ac (decompose (cdar s) (cdr s)) env))
+    ((arc-sym= (arc-caar? s) "compose") (ac (decompose (cdar s) (cdr s))))
     ((arc-sym= (arc-caar? s) "complement")
      (ac `(,(intern "no" (sym-pkg (caar s)))
-           (,(cadar s) ,@(cdr s))) env))
-    ((arc-sym= (arc-caar? s) "andf") (ac-andf s env))
-    ((consp s) (ac-call (car s) (cdr s) env))
+           (,(cadar s) ,@(cdr s)))))
+    ((arc-sym= (arc-caar? s) "andf") (ac-andf s))
+    ((consp s) (ac-call (car s) (cdr s)))
     (t (error "Bad object in expression: ~S" s))))
 
 ;;;; ---- Atstring expansion ----
@@ -556,14 +558,13 @@ errors out clearly rather than polluting (often locked) CL packages."
                 (cons expr (codestring (subseq rest pos)))))
         (list s))))
 
-(defun ac-string (s env)
+(defun ac-string (s)
   (if *arc-atstrings*
       (let ((pos (atpos s 0)))
         (if pos
             (ac (cons (arc-sym 'string)
                       (mapcar (lambda (x) (if (stringp x) (unescape-ats x) x))
-                              (codestring s)))
-                env)
+                              (codestring s))))
             (copy-seq (unescape-ats s))))
       (copy-seq s)))
 
@@ -587,12 +588,12 @@ because Arc-side names resolve to them through find-symbol."
               (not (eq pkg (find-package :arc)))
               (not (eq (find-symbol (symbol-name s) :arc) s))))))
 
-(defun foreign-cl-call-p (s env)
+(defun foreign-cl-call-p (s)
   "True if S is a call form whose head is a foreign CL symbol that
 isn't shadowed by a lexical binding."
   (and (consp s)
        (foreign-cl-symbol-p (car s))
-       (not (lex-p (car s) env))))
+       (not (lex-p (car s)))))
 
 (defun cl-quoted (x)
   (cond ((null x) nil)
@@ -614,14 +615,14 @@ isn't shadowed by a lexical binding."
 ;;; The Arc readtable produces (quasiquote ...) / (unquote ...) / (unquote-splicing ...)
 ;;; as plain s-expression lists.
 
-(defun ac-qq (x env)
+(defun ac-qq (x)
   "Entry: compile Arc (quasiquote x) to list-building CL code."
-  (ac-qq1 1 x env))
+  (ac-qq1 1 x))
 
-(defun ac-qq1 (level x env)
+(defun ac-qq1 (level x)
   (cond
     ;; Level 0: compile as normal Arc expression
-    ((= level 0) (ac x env))
+    ((= level 0) (ac x))
     ;; nil -> CL nil
     ((null x) nil)
     ;; Non-cons atoms -> quoted literal
@@ -629,30 +630,30 @@ isn't shadowed by a lexical binding."
     ;; (quasiquote inner) -> increase level
     ((arc-sym= (car x) "quasiquote")
      `(cons ',(arc-sym 'quasiquote)
-              (cons ,(ac-qq1 (1+ level) (cadr x) env) nil)))
+              (cons ,(ac-qq1 (1+ level) (cadr x)) nil)))
     ;; (unquote expr) at level 1 -> compile expr
     ((and (= level 1) (arc-sym= (car x) "unquote"))
-     (ac (cadr x) env))
+     (ac (cadr x)))
     ;; (unquote expr) at level > 1 -> wrap, reducing level
     ((arc-sym= (car x) "unquote")
      `(cons ',(arc-sym 'unquote)
-              (cons ,(ac-qq1 (1- level) (cadr x) env) nil)))
+              (cons ,(ac-qq1 (1- level) (cadr x)) nil)))
     ;; Check car for unquote-splicing at level 1
     ((and (= level 1) (consp (car x)) (arc-sym= (caar x) "unquote-splicing"))
-     `(append ,(ac (cadar x) env) ,(ac-qq1 1 (cdr x) env)))
+     `(append ,(ac (cadar x)) ,(ac-qq1 1 (cdr x))))
     ;; (unquote-splicing expr) at level > 1 -> wrap, reducing level
     ((and (> level 1) (arc-sym= (car x) "unquote-splicing"))
      `(cons ',(arc-sym 'unquote-splicing)
-              (cons ,(ac-qq1 (1- level) (cadr x) env) nil)))
+              (cons ,(ac-qq1 (1- level) (cadr x)) nil)))
     ;; Normal cons cell
     (t
-     `(cons ,(ac-qq1 level (car x) env)
-            ,(ac-qq1 level (cdr x) env)))))
+     `(cons ,(ac-qq1 level (car x))
+            ,(ac-qq1 level (cdr x))))))
 
 ;;;; ---- quasisyntax ----
 ;;; Unlike quasiquote (which builds a list at runtime via cons/list/append),
 ;;; quasisyntax produces a literal CL form at compile time. (unsyntax e)
-;;; holes are replaced by (ac e env). The result is suitable as input to
+;;; holes are replaced by (ac e). The result is suitable as input to
 ;;; CL macroexpansion, so #`(cl-macro #,arc-expr ...) lets you call CL
 ;;; macros from arc with arc subexpressions in selected slots.
 ;;;
@@ -661,32 +662,33 @@ isn't shadowed by a lexical binding."
 ;;; "literal form for the macroexpander" purpose. To inject a body, use
 ;;; #,(do ,@body) and rely on do -> progn.
 
-(defun ac-qs (x env)
+(defun ac-qs (x)
   (cond
     ((not (consp x)) x)
-    ((arc-sym= (car x) "unsyntax") (ac (cadr x) env))
+    ((arc-sym= (car x) "unsyntax") (ac (cadr x)))
     ((arc-sym= (car x) "unsyntax-splicing")
      (error "unsyntax-splicing inside quasisyntax not supported: ~S" x))
-    (t (cons (ac-qs (car x) env) (ac-qs (cdr x) env)))))
+    (t (cons (ac-qs (car x)) (ac-qs (cdr x))))))
 
 ;;;; ---- if ----
 
-(defun ac-if (args env)
+(defun ac-if (args)
   (cond
     ((null args) nil)
-    ((null (cdr args)) (ac (car args) env))
-    (t `(if ,(ac (car args) env)
-            ,(ac (cadr args) env)
-            ,(ac-if (cddr args) env)))))
+    ((null (cdr args)) (ac (car args)))
+    (t `(if ,(ac (car args))
+            ,(ac (cadr args))
+            ,(ac-if (cddr args))))))
 
 ;;;; ---- fn ----
 
-(defun ac-fn (args body env)
-  (if (ac-complex-args-p args)
-      (ac-complex-fn args body env)
-      (let ((largs (ac-arglist-cl args)))
-        `(lambda ,largs
-           ,@(ac-body* body (append (ac-arglist args) env))))))
+(defun ac-fn (args body)
+  (let ((*env* *env*))
+    (if (ac-complex-args-p args)
+        (ac-complex-fn args body)
+        (let ((largs (ac-arglist-cl args)))
+          (setf *env* (append (ac-arglist args) *env*))
+          `(lambda ,largs ,@(ac-body* body))))))
 
 ;;; Convert Arc arglist to CL lambda list (handles rest params)
 (defun ac-arglist-cl (args)
@@ -711,14 +713,15 @@ isn't shadowed by a lexical binding."
     ((and (consp args) (symbolp (car args))) (ac-complex-args-p (cdr args)))
     (t t)))
 
-(defun ac-complex-fn (args body env)
+(defun ac-complex-fn (args body)
   (let* ((ra (gensym "RA"))
-         (z  (ac-complex-args args env ra t)))
+         (z  (ac-complex-args args ra t)))
+    (setf *env* (append (ac-complex-getargs z) *env*))
     `(lambda (&rest ,ra)
        (let* ,z
-         ,@(ac-body* body (append (ac-complex-getargs z) env))))))
+         ,@(ac-body* body)))))
 
-(defun ac-complex-args (args env ra is-params)
+(defun ac-complex-args (args ra is-params)
   (cond
     ((or (null args) (arc-sym= args "nil")) nil)
     ((symbolp args) (list (list args ra)))
@@ -729,11 +732,11 @@ isn't shadowed by a lexical binding."
                  ;; (checked before (o ...) since `(o :keyword ...)` is a
                  ;; table entry, not a positional optional)
                  ((and (consp (car args)) (ac-table-pattern-p (car args)))
-                  (ac-table-args (car args) env slot-ra))
+                  (ac-table-args (car args) slot-ra))
                  ((and (consp (car args)) (arc-sym= (caar args) "o"))
                   (ac-complex-opt (cadar args)
                                   (if (consp (cddar args)) (caddar args) nil)
-                                  env ra))
+                                  ra))
                  ;; (t var)         => (o var (the var))
                  ;; (t local var)   => (o local (the var))
                  ;; thread-local fallback: arg defaults to (the var) if
@@ -745,17 +748,16 @@ isn't shadowed by a lexical binding."
                     (ac-complex-opt local
                                     (list (intern "the" (sym-pkg (caar args)))
                                           key)
-                                    env ra)))
-                 (t (ac-complex-args (car args) env slot-ra nil))))
-            (xa (ac-complex-getargs x)))
+                                    ra)))
+                 (t (ac-complex-args (car args) slot-ra nil)))))
+       (setf *env* (append (ac-complex-getargs x) *env*))
        (append x (ac-complex-args (cdr args)
-                                  (append xa env)
                                   `(arc-xcdr ,ra)
                                   is-params))))
     (t (error "Can't understand fn arg list: ~S" args))))
 
-(defun ac-complex-opt (var expr env ra)
-  (list (list var `(if (consp ,ra) (car ,ra) ,(ac expr env)))))
+(defun ac-complex-opt (var expr ra)
+  (list (list var `(if (consp ,ra) (car ,ra) ,(ac expr)))))
 
 ;;; Table destructuring: (:a :b :c) at a param position binds locals
 ;;; a, b, c to the corresponding table entries.  Sub-forms supported:
@@ -783,14 +785,14 @@ isn't shadowed by a lexical binding."
    table key by `obj`."
   (arc-sym kw))
 
-(defun ac-table-args (pat env ra)
+(defun ac-table-args (pat ra)
   "Generate let* bindings that destructure RA as a table according to
    the keyword pattern PAT."
   (let ((tbl (gensym "TBL")))
     (cons (list tbl ra)
-          (ac-table-args-loop pat env tbl))))
+          (ac-table-args-loop pat tbl))))
 
-(defun ac-table-args-loop (pat env tbl)
+(defun ac-table-args-loop (pat tbl)
   (cond
     ((null pat) nil)
     ((keywordp (car pat))
@@ -803,43 +805,43 @@ isn't shadowed by a lexical binding."
                              (not (keywordp next))
                              (not (ac-table-opt-form-p next)))))
        (if has-target
-           (append (ac-table-slot key-sym next nil env tbl)
-                   (ac-table-args-loop (cdr rest) env tbl))
-           (append (ac-table-slot key-sym key-sym nil env tbl)
-                   (ac-table-args-loop rest env tbl)))))
+           (append (ac-table-slot key-sym next nil tbl)
+                   (ac-table-args-loop (cdr rest) tbl))
+           (append (ac-table-slot key-sym key-sym nil tbl)
+                   (ac-table-args-loop rest tbl)))))
     ((ac-table-opt-form-p (car pat))
      ;; (o :k)         -- bind k to (tbl 'k), no default
      ;; (o :k default) -- bind k with default if absent
      (let* ((entry   (car pat))
             (key-sym (ac-keyword->arc-sym (cadr entry)))
             (default (if (consp (cddr entry)) (caddr entry) nil)))
-       (append (ac-table-slot key-sym key-sym default env tbl)
-               (ac-table-args-loop (cdr pat) env tbl))))
+       (append (ac-table-slot key-sym key-sym default tbl)
+               (ac-table-args-loop (cdr pat) tbl))))
     (t (error "Bad table-destructure element: ~S" (car pat)))))
 
-(defun ac-table-lookup (tbl key-sym default env)
+(defun ac-table-lookup (tbl key-sym default)
   "CL expression that fetches KEY-SYM from TBL.  If DEFAULT is given,
    it's an arc expression evaluated lazily when the key is missing."
   (if default
       (let ((v (gensym "V")))
         `(let ((,v (gethash ',key-sym ,tbl :arc/missing)))
-           (if (eq ,v :arc/missing) ,(ac default env) ,v)))
+           (if (eq ,v :arc/missing) ,(ac default) ,v)))
       `(arc-call1 ,tbl ',key-sym)))
 
-(defun ac-table-slot (key-sym target default env tbl)
+(defun ac-table-slot (key-sym target default tbl)
   "Bindings for one table slot: key KEY-SYM, value bound according to
    TARGET (a symbol or sub-pattern), with optional DEFAULT expression
    used lazily when the key is missing.  Sub-patterns dispatch back
    through ac-complex-args."
   (cond
     ((symbolp target)
-     (list (list target (ac-table-lookup tbl key-sym default env))))
+     (list (list target (ac-table-lookup tbl key-sym default))))
     ((consp target)
      (let ((val (gensym "VAL")))
-       (cons (list val (ac-table-lookup tbl key-sym default env))
+       (cons (list val (ac-table-lookup tbl key-sym default))
              (if (ac-table-pattern-p target)
-                 (ac-table-args target env val)
-                 (ac-complex-args target env val nil)))))
+                 (ac-table-args target val)
+                 (ac-complex-args target val nil)))))
     (t (error "Bad table-destructure target: ~S" target))))
 
 (defun ac-complex-getargs (a) (mapcar #'car a))
@@ -852,58 +854,58 @@ isn't shadowed by a lexical binding."
     ((symbolp (cdr a)) (list (car a) (cdr a)))
     (t (cons (car a) (ac-arglist (cdr a))))))
 
-(defun ac-body  (body env) (mapcar (lambda (x) (ac x env)) body))
-(defun ac-body* (body env) (if (null body) '(nil) (ac-body body env)))
+(defun ac-body  (body) (mapcar #'ac body))
+(defun ac-body* (body) (if (null body) '(nil) (ac-body body)))
 
 ;;;; ---- assign / set ----
 
-(defun ac-set (x env)
-  `(progn ,@(ac-setn x env)))
+(defun ac-set (x)
+  `(progn ,@(ac-setn x)))
 
-(defun ac-setn (x env)
+(defun ac-setn (x)
   (if (null x) nil
-      (cons (ac-set1 (ac-macex (car x)) (cadr x) env)
-            (ac-setn (cddr x) env))))
+      (cons (ac-set1 (ac-macex (car x)) (cadr x))
+            (ac-setn (cddr x)))))
 
-(defun ac-set1 (a b1 env)
+(defun ac-set1 (a b1)
   (if (symbolp a)
-      (let ((b (ac b1 env)))
+      (let ((b (ac b1)))
         `(let ((zz ,b))
            ,(cond
               ((arc-sym= a "nil") (error "Can't rebind nil"))
               ((arc-sym= a "t")   (error "Can't rebind t"))
-              ((lex-p a env)      `(setq ,a zz))
+              ((lex-p a)          `(setq ,a zz))
               (t `(setf (arc-global ',a) zz)))
            zz))
       (error "First arg to assign must be a symbol: ~S" a)))
 
 ;;;; ---- call / macros ----
 
-(defun ac-var-ref (s env)
-  (if (lex-p s env) s `(arc-global-ref ',s)))
+(defun ac-var-ref (s)
+  (if (lex-p s) s `(arc-global-ref ',s)))
 
-(defun lex-p (v env) (member v env :test #'eq))
+(defun lex-p (v) (member v *env* :test #'eq))
 
-(defun ac-call (fn args env)
+(defun ac-call (fn args)
   (let ((macfn (ac-macro-p fn)))
     (cond
-      (macfn (ac-mac-call macfn args env))
+      (macfn (ac-mac-call macfn args))
       ((and (consp fn) (arc-sym= (car fn) "fn"))
-       `(,(ac fn env) ,@(mapcar (lambda (x) (ac x env)) args)))
+       `(,(ac fn) ,@(mapcar #'ac args)))
       ((= (length args) 0)
-       `(arc-call0 ,(ac fn env)))
+       `(arc-call0 ,(ac fn)))
       ((= (length args) 1)
-       `(arc-call1 ,(ac fn env) ,(ac (car args) env)))
+       `(arc-call1 ,(ac fn) ,(ac (car args))))
       ((= (length args) 2)
-       `(arc-call2 ,(ac fn env) ,(ac (car args) env) ,(ac (cadr args) env)))
+       `(arc-call2 ,(ac fn) ,(ac (car args)) ,(ac (cadr args))))
       ((= (length args) 3)
-       `(arc-call3 ,(ac fn env) ,(ac (car args) env)
-                   ,(ac (cadr args) env) ,(ac (caddr args) env)))
-      (t `(ar-apply ,(ac fn env)
-                    (list ,@(mapcar (lambda (x) (ac x env)) args)))))))
+       `(arc-call3 ,(ac fn) ,(ac (car args))
+                   ,(ac (cadr args)) ,(ac (caddr args))))
+      (t `(ar-apply ,(ac fn)
+                    (list ,@(mapcar #'ac args)))))))
 
-(defun ac-mac-call (m args env)
-  (ac (apply m args) env))
+(defun ac-mac-call (m args)
+  (ac (apply m args)))
 
 (defun ac-macro-p (fn)
   (when (symbolp fn)
@@ -930,12 +932,11 @@ isn't shadowed by a lexical binding."
     ((null (cdr fns)) (cons (car fns) args))
     (t (list (car fns) (decompose (cdr fns) args)))))
 
-(defun ac-andf (s env)
+(defun ac-andf (s)
   (let ((gs (mapcar (lambda (x) (declare (ignore x)) (gensym)) (cdr s))))
     (ac `((fn ,gs
             (and ,@(mapcar (lambda (f) `(,f ,@gs)) (cdar s))))
-          ,@(cdr s))
-        env)))
+          ,@(cdr s)))))
 
 ;;;; ============================================================
 ;;;; Gensym
@@ -953,7 +954,7 @@ isn't shadowed by a lexical binding."
 ;;;; ============================================================
 
 (defun arc-eval (expr)
-  (eval (ac expr nil)))
+  (eval (ac expr)))
 
 (xdef eval #'arc-eval)
 
