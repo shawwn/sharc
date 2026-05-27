@@ -1075,7 +1075,7 @@ function vote(node) {
 (def vote-url (i dir whence)
   (+ "vote?" "for=" i!id
              "&dir=" dir
-             (aif (me) (+ "&by=" it "&auth=" (user->cookie* it)))
+             (aif (me) (+ "&by=" it "&auth=" (urlencode:user->cookie* it)))
              "&whence=" (urlencode whence)))
 
 (= lowest-score* -4)
@@ -1105,7 +1105,7 @@ function vote(node) {
          (pr "No such item.")
         (no (in dir 'up 'down))
          (pr "Can't make that vote.")
-        (and by (or (isnt by user) (isnt (sym auth) (user->cookie* user))))
+        (and by (or (isnt by user) (isnt auth (user->cookie* user))))
          (pr "User mismatch.")
         (no user)
          (login-page 'both "You have to be logged in to vote."
