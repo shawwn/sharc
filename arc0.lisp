@@ -608,6 +608,366 @@
 (xdef client-ip (port) (declare (ignore port)) "unknown")
 
 ;;;; ============================================================
+;;;; HTTP client  (sb-alien + OpenSSL)
+;;;; ============================================================
+;;;
+;;; Arc API:
+;;;
+;;;   (socket-connect host port [opts])
+;;;     Open a TCP connection, return a bidirectional stream.
+;;;     SSL is auto-enabled for port 443.
+;;;     Works with readc, writec, disp, write, close, flushout.
+;;;     opts is an optional table:
+;;;       ssl      -- force SSL on any port
+;;;       noverify -- skip certificate verification
+;;;
+;;;   (http-fetch url [opts])
+;;;     HTTP request; returns the response body as a string.
+;;;     Signals an error on non-2xx status.
+;;;     opts is an optional table:
+;;;       method   -- HTTP method (default "GET")
+;;;       headers  -- alist of ("Header-Name" "value") pairs
+;;;       body     -- request body string
+;;;       noverify -- skip certificate verification
+;;;
+;;;   (flushout [stream])
+;;;     Flush a stream (defaults to stdout).
+;;;
+;;; SSL requires OpenSSL installed on the system. On macOS, Homebrew's
+;;; OpenSSL is loaded from /opt/homebrew/lib or /usr/local/lib.
+;;; If OpenSSL is not found, *ssl-available* is nil and http/https
+;;; requests to SSL hosts signal an error; startup is not affected.
+
+(defvar *ssl-available* nil)
+
+(defvar *libssl* nil)
+(defvar *libcrypto* nil)
+
+(defun try-load-ssl ()
+  "Try to load OpenSSL shared libraries. Sets *ssl-available* on success.
+   On macOS, only tries explicit Homebrew paths to avoid Apple's restricted
+   system libcrypto which causes a fatal SIGABRT."
+  (flet ((try-load (paths)
+           (dolist (p paths)
+             (when (or (not (find #\/ p))         ; bare name (linux/win)
+                       (probe-file p))            ; full path must exist
+               (ignore-errors
+                 (sb-alien:load-shared-object p)
+                 (return-from try-load p))))))
+    (handler-case
+        (let ((crypto (try-load #+darwin '("/opt/homebrew/lib/libcrypto.dylib"
+                                           "/usr/local/lib/libcrypto.dylib")
+                                #+linux '("libcrypto.so" "libcrypto.so.3"
+                                          "libcrypto.so.1.1")
+                                #+win32 '("libcrypto-3-x64.dll"
+                                          "libcrypto-1_1-x64.dll")
+                                #-(or darwin linux win32) '("libcrypto.so")))
+              (ssl    (try-load #+darwin '("/opt/homebrew/lib/libssl.dylib"
+                                           "/usr/local/lib/libssl.dylib")
+                                #+linux '("libssl.so" "libssl.so.3"
+                                          "libssl.so.1.1")
+                                #+win32 '("libssl-3-x64.dll"
+                                          "libssl-1_1-x64.dll")
+                                #-(or darwin linux win32) '("libssl.so"))))
+          (when (and crypto ssl)
+            (setf *libcrypto* crypto *libssl* ssl *ssl-available* t)))
+      (error () nil))))
+
+(try-load-ssl)
+
+(when *ssl-available*
+  ;; Only define FFI bindings when the libraries loaded successfully.
+  (sb-alien:define-alien-routine "TLS_client_method" (* t))
+  (sb-alien:define-alien-routine "SSL_CTX_new" (* t) (method (* t)))
+  (sb-alien:define-alien-routine "SSL_CTX_free" sb-alien:void (ctx (* t)))
+  (sb-alien:define-alien-routine "SSL_new" (* t) (ctx (* t)))
+  (sb-alien:define-alien-routine "SSL_free" sb-alien:void (ssl (* t)))
+  (sb-alien:define-alien-routine "SSL_set_fd" sb-alien:int
+    (ssl (* t)) (fd sb-alien:int))
+  (sb-alien:define-alien-routine "SSL_connect" sb-alien:int (ssl (* t)))
+  (sb-alien:define-alien-routine "SSL_read" sb-alien:int
+    (ssl (* t)) (buf (* t)) (num sb-alien:int))
+  (sb-alien:define-alien-routine "SSL_write" sb-alien:int
+    (ssl (* t)) (buf (* t)) (num sb-alien:int))
+  (sb-alien:define-alien-routine "SSL_shutdown" sb-alien:int (ssl (* t)))
+  (sb-alien:define-alien-routine "SSL_ctrl" sb-alien:long
+    (ssl (* t)) (cmd sb-alien:int) (larg sb-alien:long) (parg (* t)))
+  (sb-alien:define-alien-routine "SSL_get_error" sb-alien:int
+    (ssl (* t)) (ret sb-alien:int))
+  ;; Certificate verification
+  (sb-alien:define-alien-routine "SSL_CTX_set_default_verify_paths" sb-alien:int
+    (ctx (* t)))
+  (sb-alien:define-alien-routine "SSL_CTX_set_verify" sb-alien:void
+    (ctx (* t)) (mode sb-alien:int) (callback (* t)))
+  (sb-alien:define-alien-routine "SSL_set1_host" sb-alien:int
+    (ssl (* t)) (hostname sb-alien:c-string))
+  (sb-alien:define-alien-routine "SSL_get_verify_result" sb-alien:long
+    (ssl (* t)))
+  (sb-alien:define-alien-routine "X509_verify_cert_error_string" sb-alien:c-string
+    (n sb-alien:long))
+  ;; Error reporting
+  (sb-alien:define-alien-routine "ERR_get_error" sb-alien:unsigned-long)
+  (sb-alien:define-alien-routine "ERR_error_string" sb-alien:c-string
+    (e sb-alien:unsigned-long) (buf (* t)))
+  (sb-alien:define-alien-routine "ERR_clear_error" sb-alien:void))
+
+(defun ssl-error-string ()
+  "Return the earliest queued OpenSSL error as a human-readable string,
+   or nil if the error queue is empty."
+  (let ((code (err-get-error)))
+    (when (plusp code)
+      (err-error-string code (sb-alien:sap-alien (sb-sys:int-sap 0) (* t))))))
+
+(defun ssl-set-tlsext-host-name (ssl hostname)
+  "Set SNI hostname on an SSL connection (required by most servers)."
+  ;; SSL_CTRL_SET_TLSEXT_HOSTNAME = 55, TLSEXT_NAMETYPE_host_name = 0
+  (sb-sys:with-pinned-objects (hostname)
+    (let ((buf (sb-ext:string-to-octets hostname :external-format :ascii)))
+      (sb-sys:with-pinned-objects (buf)
+        (ssl-ctrl ssl 55 0 (sb-sys:vector-sap buf))))))
+
+;;; Gray stream that wraps an SSL connection for transparent I/O.
+;;; Supports character read/write so Arc's readc/writec/disp/write
+;;; work directly on SSL-connected streams.
+
+(defclass arc-ssl-stream (sb-gray:fundamental-character-input-stream
+                          sb-gray:fundamental-character-output-stream)
+  ((ssl-ptr  :initarg :ssl  :reader ssl-stream-ssl)
+   (ctx-ptr  :initarg :ctx  :reader ssl-stream-ctx)
+   (sock     :initarg :sock :reader ssl-stream-sock)
+   ;; Read buffering: SSL_read returns bytes, we decode to characters.
+   (read-buf :initform "" :accessor ssl-stream-read-buf)
+   (read-pos :initform 0  :accessor ssl-stream-read-pos)
+   ;; Write buffering: accumulate characters, flush as bytes.
+   (write-buf :initform (make-array 1024 :element-type '(unsigned-byte 8)
+                                         :adjustable t :fill-pointer 0)
+              :accessor ssl-stream-write-buf)))
+
+(defmethod sb-gray:stream-read-char ((s arc-ssl-stream))
+  (when (>= (ssl-stream-read-pos s) (length (ssl-stream-read-buf s)))
+    ;; Refill from SSL_read
+    (let ((buf (make-array 8192 :element-type '(unsigned-byte 8))))
+      (sb-sys:with-pinned-objects (buf)
+        (let ((n (ssl-read (ssl-stream-ssl s) (sb-sys:vector-sap buf) 8192)))
+          (if (<= n 0)
+              (progn (setf (ssl-stream-read-buf s) ""
+                           (ssl-stream-read-pos s) 0)
+                     (return-from sb-gray:stream-read-char :eof))
+              (setf (ssl-stream-read-buf s)
+                    (sb-ext:octets-to-string (subseq buf 0 n)
+                                             :external-format :utf-8)
+                    (ssl-stream-read-pos s) 0))))))
+  (prog1 (char (ssl-stream-read-buf s) (ssl-stream-read-pos s))
+    (incf (ssl-stream-read-pos s))))
+
+(defmethod sb-gray:stream-unread-char ((s arc-ssl-stream) c)
+  (declare (ignore c))
+  (when (> (ssl-stream-read-pos s) 0)
+    (decf (ssl-stream-read-pos s))))
+
+(defmethod sb-gray:stream-read-char-no-hang ((s arc-ssl-stream))
+  (sb-gray:stream-read-char s))
+
+(defmethod sb-gray:stream-write-char ((s arc-ssl-stream) c)
+  (let ((bytes (sb-ext:string-to-octets (string c) :external-format :utf-8)))
+    (loop for b across bytes
+          do (vector-push-extend b (ssl-stream-write-buf s))))
+  c)
+
+(defmethod sb-gray:stream-write-string ((s arc-ssl-stream) string &optional start end)
+  (let ((bytes (sb-ext:string-to-octets (subseq string (or start 0) end)
+                                        :external-format :utf-8)))
+    (loop for b across bytes
+          do (vector-push-extend b (ssl-stream-write-buf s)))))
+
+(defmethod sb-gray:stream-force-output ((s arc-ssl-stream))
+  (let ((buf (ssl-stream-write-buf s)))
+    (when (> (length buf) 0)
+      (let ((arr (make-array (length buf) :element-type '(unsigned-byte 8)
+                                          :initial-contents buf)))
+        (sb-sys:with-pinned-objects (arr)
+          (ssl-write (ssl-stream-ssl s) (sb-sys:vector-sap arr) (length arr))))
+      (setf (fill-pointer buf) 0))))
+
+(defmethod sb-gray:stream-finish-output ((s arc-ssl-stream))
+  (sb-gray:stream-force-output s))
+
+(defmethod sb-gray:stream-line-column ((s arc-ssl-stream)) nil)
+
+(defmethod cl:close ((s arc-ssl-stream) &key abort)
+  (declare (ignore abort))
+  (sb-gray:stream-force-output s)
+  (ignore-errors (ssl-shutdown (ssl-stream-ssl s)))
+  (ssl-free (ssl-stream-ssl s))
+  (ssl-ctx-free (ssl-stream-ctx s))
+  (sb-bsd-sockets:socket-close (ssl-stream-sock s)))
+
+(defun tcp-connect (host port)
+  "Open a TCP connection, return the raw socket."
+  (let* ((addr (sb-bsd-sockets:host-ent-address
+                (sb-bsd-sockets:get-host-by-name host)))
+         (sock (make-instance 'sb-bsd-sockets:inet-socket
+                              :type :stream :protocol :tcp)))
+    (sb-bsd-sockets:socket-connect sock addr port)
+    sock))
+
+(defun arc-opt (opts key)
+  "Look up KEY (a string) in an Arc options table. Returns the value
+   or nil if the table is nil or the key is absent."
+  (when (hash-table-p opts)
+    (gethash (arc-sym key) opts)))
+
+(defun arc-socket-connect (host port &optional opts)
+  "Connect to host:port, return a bidirectional stream.
+   OPTS is an Arc table with optional keys:
+     ssl      -- force SSL (default: auto for port 443)
+     noverify -- skip certificate verification"
+  (let* ((ssl-p (or (arc-opt opts "ssl") (= port 443)))
+         (noverify (arc-opt opts "noverify"))
+         (sock (tcp-connect host port)))
+    (if ssl-p
+        (progn
+          (unless *ssl-available*
+            (error "SSL not available (OpenSSL libraries not found)"))
+          (err-clear-error)
+          (let* ((fd (sb-bsd-sockets:socket-file-descriptor sock))
+                 (ctx (ssl-ctx-new (tls-client-method))))
+            (unless noverify
+              (ssl-ctx-set-default-verify-paths ctx)
+              ;; SSL_VERIFY_PEER = 1
+              (ssl-ctx-set-verify ctx 1
+                (sb-alien:sap-alien (sb-sys:int-sap 0) (* t))))
+            (let ((ssl (ssl-new ctx)))
+              (ssl-set-fd ssl fd)
+              (ssl-set-tlsext-host-name ssl host)
+              (unless noverify
+                (ssl-set1-host ssl host))
+              (let ((ret (ssl-connect ssl)))
+                (when (<= ret 0)
+                  (let* ((code (ssl-get-error ssl ret))
+                         (vr   (ssl-get-verify-result ssl))
+                         (vmsg (when (plusp vr)
+                                 (x509-verify-cert-error-string vr)))
+                         (msg  (or vmsg (ssl-error-string))))
+                    (ssl-free ssl)
+                    (ssl-ctx-free ctx)
+                    (sb-bsd-sockets:socket-close sock)
+                    (error "SSL connect to ~A:~D failed: ~A"
+                           host port (or msg (format nil "SSL_get_error=~D" code))))))
+              (make-instance 'arc-ssl-stream :ssl ssl :ctx ctx :sock sock))))
+        (sb-bsd-sockets:socket-make-stream
+         sock :input t :output t
+         :element-type :default
+         :external-format :utf-8
+         :buffering :full))))
+
+(xdef socket-connect (host port &rest args)
+  (arc-socket-connect host port (car args)))
+
+;;; ---- HTTP convenience layer ----
+
+(defun parse-url (url)
+  "Parse URL into (values host port path use-ssl)."
+  (let* ((ssl (cond ((and (>= (length url) 8)
+                          (string-equal url "https://" :end1 8))
+                     t)
+                    ((and (>= (length url) 7)
+                          (string-equal url "http://" :end1 7))
+                     nil)
+                    (t (error "Unsupported URL scheme: ~A" url))))
+         (rest (subseq url (if ssl 8 7)))
+         (slash-pos (position #\/ rest))
+         (host-port (if slash-pos (subseq rest 0 slash-pos) rest))
+         (path (if slash-pos (subseq rest slash-pos) "/"))
+         (colon-pos (position #\: host-port))
+         (host (if colon-pos (subseq host-port 0 colon-pos) host-port))
+         (port (if colon-pos
+                   (parse-integer (subseq host-port (1+ colon-pos)))
+                   (if ssl 443 80))))
+    (values host port path ssl)))
+
+(defun http-parse-response (raw)
+  "Split an HTTP response into (values status-code headers body)."
+  (let* ((header-end (search (format nil "~C~C~C~C"
+                                     #\return #\newline #\return #\newline)
+                             raw))
+         (header-str (subseq raw 0 header-end))
+         (body (subseq raw (+ header-end 4)))
+         (first-line-end (position #\return header-str))
+         (status-line (subseq header-str 0 first-line-end))
+         ;; "HTTP/1.1 200 OK" -> 200
+         (status-code (parse-integer status-line :start 9 :end 12)))
+    (values status-code header-str body)))
+
+(defun arc-http-fetch (url &optional opts)
+  "Fetch URL via HTTP. Returns the response body as a string.
+   OPTS is an Arc table with optional keys:
+     method   -- HTTP method (default \"GET\")
+     headers  -- alist of (name value) string pairs
+     body     -- request body string
+     noverify -- skip SSL certificate verification"
+  (multiple-value-bind (host port path use-ssl) (parse-url url)
+    (let* ((method  (or (arc-opt opts "method") "GET"))
+           (hdrs    (arc-opt opts "headers"))
+           (reqbody (arc-opt opts "body"))
+           (sock-opts (when (arc-opt opts "noverify")
+                        (let ((h (make-hash-table :test #'equal :synchronized t)))
+                          (setf (gethash (arc-sym "noverify") h) t)
+                          h)))
+           (stream  (arc-socket-connect host port
+                      (if use-ssl
+                          (or sock-opts
+                              (let ((h (make-hash-table :test #'equal :synchronized t)))
+                                (setf (gethash (arc-sym "ssl") h) t)
+                                h))
+                          sock-opts))))
+      (unwind-protect
+           (progn
+             ;; Request line
+             (write-string (format nil "~A ~A HTTP/1.1~C~C"
+                                   method path #\return #\newline)
+                           stream)
+             ;; Required headers
+             (write-string (format nil "Host: ~A~C~C" host #\return #\newline)
+                           stream)
+             (write-string (format nil "Connection: close~C~C"
+                                   #\return #\newline)
+                           stream)
+             ;; User headers (alist of (name value) pairs)
+             (dolist (pair hdrs)
+               (write-string
+                (format nil "~A: ~A~C~C"
+                        (car pair) (cadr pair) #\return #\newline)
+                stream))
+             ;; Content-Length for body
+             (when reqbody
+               (write-string
+                (format nil "Content-Length: ~D~C~C"
+                        (length (sb-ext:string-to-octets reqbody
+                                  :external-format :utf-8))
+                        #\return #\newline)
+                stream))
+             ;; End of headers
+             (write-string (format nil "~C~C" #\return #\newline) stream)
+             ;; Body
+             (when reqbody (write-string reqbody stream))
+             (force-output stream)
+             ;; Read response
+             (let ((raw (with-output-to-string (buf)
+                          (loop for c = (read-char stream nil nil)
+                                while c do (write-char c buf)))))
+               (multiple-value-bind (code headers body)
+                   (http-parse-response raw)
+                 (declare (ignore headers))
+                 (unless (<= 200 code 299)
+                   (error "HTTP ~D from ~A" code url))
+                 body)))
+        (close stream)))))
+
+(xdef http-fetch (url &rest args)
+  (arc-http-fetch url (car args)))
+
+;;;; ============================================================
 ;;;; Threading  (sb-thread)
 ;;;; ============================================================
 
@@ -804,7 +1164,8 @@
 (xdef atan #'atan)
 (xdef log  #'log)
 
-(xdef flushout () (force-output *standard-output*) t)
+(xdef flushout (&optional (s *standard-output*))
+  (force-output s) t)
 
 (xdef ssyntax  (x) (tnil (ssyntax-p x)))
 (xdef ssexpand (x) (if (ssyntax-p x) (expand-ssyntax x) x))
