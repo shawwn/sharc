@@ -183,9 +183,10 @@ Connection: close"))
   `(= (redirector* ',name) t
       (srvops* ',name)     (fn ,parms ,@body)))
 
-; Body has access to the request via (the req). Use arg!key to
+; body has access to the request via (the req). Use arg!key to
 ; pull request args, (the me) for the logged-in user, (the ip)
-; for the source IP --- all without explicit parameter threading.
+; for the source ip.
+
 (mac defop (name . body)
   (w/uniq (gs gr)
     `(do (wipe (redirector* ',name))
