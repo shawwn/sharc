@@ -28,7 +28,7 @@
 (= cookie->user* (table) user->cookie* (table) logins* (table))
 
 (def get-user (req)
-  (let u (aand (alref req!cooks "user") (cookie->user* (sym it)))
+  (let u (aand (alref req!cooks "user") (cookie->user* it))
     (when u (= (logins* u) req!ip))
     u))
 
@@ -118,17 +118,15 @@
         (pwfields "create (server) account")))))
 
 (def cook-user (user)
-  (let id (new-user-cookie)
+  (let id (new-user-cookie user)
     (= (cookie->user*   id) user
        (user->cookie* user)   id)
     (save-table cookie->user* cookfile*)
     id))
 
-; Unique-ids are only unique per server invocation.
-
-(def new-user-cookie ()
-  (let id (unique-id)
-    (if (cookie->user* id) (new-user-cookie) id)))
+(def new-user-cookie (user)
+  (let id (+ user "&" (rand-string 32))
+    (if (cookie->user* id) (new-user-cookie user) id)))
 
 (def logout-user ((t user me))
   (wipe (logins* user))
@@ -180,7 +178,7 @@
           (acons afterward)))
 
 (def login-handler (switch afterward)
-  (logout-user)
+  (unless (me arg!u) (logout-user))
   (aif (good-login arg!u arg!p (ip))
        (login it (ip) (user->cookie* it) afterward)
        (failed-login switch "Bad login." afterward)))
@@ -211,7 +209,9 @@
           (login-page switch msg afterward))))
 
 (def prcookie (cook)
-  (prn "Set-Cookie: user=" cook "; expires=Sun, 17-Jan-2038 19:14:07 GMT"))
+  (prn "Set-Cookie: user=" cook
+       "; Path=/; expires=Sun, 17-Jan-2038 19:14:07 GMT"
+       "; SameSite=Lax; Secure; HttpOnly"))
 
 (def pwfields ((o label "login"))
   (inputs u username 20 nil
