@@ -23,3 +23,4 @@ you can use arc's `whenlet`:
 
 Use + to join lists together. E.g. `(+ '(a b c) '(d e f))` gives `(a b c d e f)`
 
+Don't strip informative comments or docstrings when refactoring code unless explicitly asked to.
