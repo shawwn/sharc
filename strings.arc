@@ -71,13 +71,17 @@
               (++ i 2))
           (writec c)))))
 
+(def unreserved (c)
+  (or (alphadig c) (in c #\- #\. #\_ #\~)))
+
 (def urlencode (s)
   (tostring 
     (each c s 
-      (writec #\%)
-      (let i (int c)
-        (if (< i 16) (writec #\0))
-        (pr (coerce i 'string 16))))))
+      (if (unreserved c) (writec c)
+        (do (writec #\%)
+            (let i (int c)
+              (if (< i 16) (writec #\0))
+              (pr (coerce i 'string 16))))))))
 
 (mac litmatch (pat string (o start 0))
   (w/uniq (gstring gstart)
