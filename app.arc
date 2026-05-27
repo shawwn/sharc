@@ -144,7 +144,7 @@
   (logout-user user))
   
 (def set-pw (user pw)
-  (= (hpasswords* user) (and pw (shash pw)))
+  (= (hpasswords* user) (and pw (bhash pw)))
   (save-table hpasswords* hpwfile*))
 
 (def hello-page ()
@@ -223,7 +223,7 @@
 
 (def good-login (user pw ip)
   (let record (list (seconds) ip user)
-    (if (and user pw (aand (shash pw) (is it (hpasswords* user))))
+    (if (and user pw (aand (hpasswords* user) (bcheckpw pw it)))
         (do (unless (user->cookie* user) (cook-user user))
             (enq-limit record good-logins*)
             user)
@@ -233,12 +233,15 @@
 ; Create a file in case people have quote chars in their pws.  I can't 
 ; believe there's no way to just send the chars.
 
-; SHA-1 hex digest. Was a fork+exec to `openssl dgst -sha1` per call;
-; with a large SBCL heap the fork overhead dominated page renders.
-; Now in-process via vendored sha1.lisp. Lowercased to match the
-; previous output format (existing on-disk hashes were lowercase).
 (def shash (str)
   (downcase (sha1::sha1-hex str)))
+
+; bcrypt password hashing (cost 10, matching HN's $2b$10$ format).
+(def bhash (pw)
+  (bcrypt::hashpw pw 10))
+
+(def bcheckpw (pw hash)
+  (bcrypt::checkpw pw hash))
 
 (= dc-usernames* (table))
 
@@ -261,8 +264,8 @@
       (username-conflicts user)
        "That username conflicts with an existing one.  Names are
         case-insensitive.  Please choose another."
-      (or (no pw) (< (len pw) 4))
-       "Passwords should be a least 4 characters long.  Please 
+      (or (no pw) (no (<= 8 (len pw) 72)))
+       "Passwords should be between 8 and 72 characters long. Please
         choose another."
        nil))
 

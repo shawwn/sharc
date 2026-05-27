@@ -2417,8 +2417,8 @@ first asterisk isn't whitespace.
       (single-input "New password: " 'p 20 "reset" t))))
 
 (def try-resetpw (newpw)
-  (if (len< newpw 4)
-      (resetpw-page "Passwords should be a least 4 characters long.
+  (if (no (<= 8 (len newpw) 72))
+      (resetpw-page "Passwords should be between 8 and 72 characters long.
                      Please choose another.")
       (do (set-pw (me) newpw)
           (newspage))))
