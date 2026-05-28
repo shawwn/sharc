@@ -1136,7 +1136,11 @@ function vote(node) {
   (when (admin) (pr " by "))
   (userlink i!by)
   (pr " ")
-  (link (text-age:item-age i) (item-url i!id)))
+  (let (s m h D M Y) (map [+ (if (< _ 10) "0" "") _]
+                          (timedate i!time))
+    (let title (+ "" Y "-" M "-" D "T" h ":" m ":" s " " i!time)
+      (tag (span class "age" title title)
+        (link (text-age:item-age i) (item-url i!id))))))
 
 (def user-url (user) (+ "user?id=" user))
 
