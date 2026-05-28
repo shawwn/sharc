@@ -558,12 +558,20 @@ errors out clearly rather than polluting (often locked) CL packages."
                 (cons expr (codestring (subseq rest pos)))))
         (list s))))
 
+(defun ac-codestring (x)
+  (cond
+    ((arc-sym= (arc-car? x) "%braces")
+     (ac-codestring (cadr x)))
+    ((stringp x)
+     (unescape-ats x))
+    (t x)))
+
 (defun ac-string (s)
   (if *arc-atstrings*
       (let ((pos (atpos s 0)))
         (if pos
             (ac (cons (arc-sym 'string)
-                      (mapcar (lambda (x) (if (stringp x) (unescape-ats x) x))
+                      (mapcar #'ac-codestring
                               (codestring s))))
             (copy-seq (unescape-ats s))))
       (copy-seq s)))
