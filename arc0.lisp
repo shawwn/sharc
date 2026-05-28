@@ -1198,7 +1198,7 @@
 
 (defvar *arc-last-err* nil)
 
-(defun arc-report-error (c &optional (stream *standard-output*))
+(defun arc-report-error (c &optional (stream *error-output*))
   (setf *arc-last-err* c)
   (format stream "Error: ~A~%" c)
   (format stream "Backtrace for: ~A~%" sb-thread:*current-thread*)
