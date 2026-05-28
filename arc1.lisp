@@ -571,8 +571,7 @@ errors out clearly rather than polluting (often locked) CL packages."
       (let ((pos (atpos s 0)))
         (if pos
             (ac (cons (arc-sym 'string)
-                      (mapcar #'ac-codestring
-                              (codestring s))))
+                      (mapcar #'ac-codestring (codestring s))))
             (copy-seq (unescape-ats s))))
       (copy-seq s)))
 
