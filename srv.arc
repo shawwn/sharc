@@ -219,17 +219,17 @@ Connection: close"))
              ;; / (the ip) / (the req) without explicit threading.
              ;; Each request runs on its own thread (see handle-
              ;; request-thread) so these are naturally isolated.
-             (w/the req req
-               (w/the ip ip
-                 (w/the me (errsafe (get-user req))
-                   (if (redirector* op)
-                       (do (prn rdheader*)
-                           (prn "Location: " (f str req))
-                           (prn))
-                       (do (prn header*)
-                           (awhen (max-age* op)
-                             (prn "Cache-Control: max-age=" it))
-                           (f str req)))))))
+             (= (the req) req
+                (the ip)  ip
+                (the me)  (errsafe (get-user req)))
+             (if (redirector* op)
+                 (do (prn rdheader*)
+                     (prn "Location: " (f str req))
+                     (prn))
+                 (do (prn header*)
+                     (awhen (max-age* op)
+                       (prn "Cache-Control: max-age=" it))
+                     (f str req))))
            (let filetype (static-filetype op)
              (aif (and filetype (file-exists (string staticdir* op)))
                   (do (prn (type-header* filetype))
