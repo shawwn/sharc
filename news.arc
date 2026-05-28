@@ -645,9 +645,8 @@ function vote(node) {
       (urlink 'logout (logout-user) whence)
       (onlink "login"
         (login-page 'both nil
-                    (list (fn ()
-                            (ensure-news-user)
-                            (newslog 'top-login))
+                    (list {do (ensure-news-user)
+                              (newslog 'top-login)}
                           whence)))))
 
 (def noob ((t user me))
@@ -661,7 +660,7 @@ function vote(node) {
      (if (,test (me))
          (do ,@body)
          (login-page 'both (+ "Please log in" ,msg ".")
-                     (list (fn () (ensure-news-user))
+                     (list {ensure-news-user}
                            (string ',name (reassemble-args (the req))))))))
 
 (mac defopg (name . body) `(defopt ,name idfn   ""                     ,@body))
@@ -723,7 +722,7 @@ function vote(node) {
                    comment-kill       (todisk comment-kill* val)
                    comment-ignore     (todisk comment-ignore* val)
                    lightweights       (todisk lightweights* (memtable val))))
-               (fn () (newsadmin-page)))
+               {newsadmin-page})
 
     (br2)
     (aform (let subject arg!id
@@ -763,8 +762,8 @@ function vote(node) {
                  (when (and (is name 'ignore) val (no prof!ignore))
                    (log-ignore user 'profile))
                  (= (prof name) val))
-               (fn () (save-prof user)
-                      (user-page user)))))
+               {do (save-prof user)
+                   (user-page user)})))
 
 (= topcolor-threshold* 0)
 
@@ -827,8 +826,8 @@ function vote(node) {
 
 (mac newscache (name time . body)
   (w/uniq gc
-    `(let ,gc (cache (fn () (* caching* ,time))
-                     (fn () (tostring (w/me nil ,@body))))
+    `(let ,gc (cache {* caching* ,time}
+                     {tostring (w/me nil ,@body)})
        (def ,name ()
          (if (me)
              (do ,@body)
@@ -954,12 +953,11 @@ function vote(node) {
 (def morelink (f items label title . args)
   (tag (a href
           (url-for
-            (afnid (fn ()
-                     (prn)
-                     (let url (url-for it)     ; it bound by afnid
-                       (newslog 'more label)
-                       (longpage (msec) nil label title url
-                         (apply f items label title url args))))))
+            (afnid {do (prn)
+                       (let url (url-for it)     ; it bound by afnid
+                         (newslog 'more label)
+                         (longpage (msec) nil label title url
+                           (apply f items label title url args)))}))
           rel 'nofollow)
     (pr "More")))
 
@@ -1109,12 +1107,11 @@ function vote(node) {
          (pr "User mismatch.")
         (no user)
          (login-page 'both "You have to be logged in to vote."
-                     (list (fn ()
-                             (ensure-news-user)
-                             (newslog 'vote-login)
-                             (when (canvote i dir)
-                               (vote-for i dir)
-                               (logvote i)))
+                     (list {do (ensure-news-user)
+                               (newslog 'vote-login)
+                               (when (canvote i dir)
+                                 (vote-for i dir)
+                                 (logvote i))}
                            whence))
         (canvote i dir)
          (do (vote-for i dir)
@@ -1300,7 +1297,7 @@ function vote(node) {
   (minipage "Confirm"
     (tab
       ; link never used so not testable but think correct
-      (display-item nil i (flink [del-confirm-page i whence]))
+      (display-item nil i (flink {del-confirm-page i whence}))
       (spacerow 20)
       (tr (td)
           (td (urform (do (when (candelete i)
@@ -1423,10 +1420,9 @@ function vote(node) {
 
 (def submit-login-warning ((o url) (o title) (o showtext) (o text))
   (login-page 'both "You have to be logged in to submit."
-              (fn ()
-                (ensure-news-user)
-                (newslog 'submit-login)
-                (submit-page url title showtext text))))
+              {do (ensure-news-user)
+                  (newslog 'submit-login)
+                  (submit-page url title showtext text)}))
 
 (def submit-page ((o url) (o title) (o showtext) (o text "") (o msg))
   (minipage "Submit"
@@ -1482,19 +1478,19 @@ function vote(node) {
        (do (vote-for it)
            (item-url it!id))
        (if (no (me))
-            (flink [submit-login-warning url title showtext text])
+            (flink {submit-login-warning url title showtext text})
            (no (and (or (blank url) (valid-url url))
                     (~blank title)))
-            (flink [submit-page url title showtext text retry*])
+            (flink {submit-page url title showtext text retry*})
            (len> title title-limit*)
-            (flink [submit-page url title showtext text toolong*])
+            (flink {submit-page url title showtext text toolong*})
            (and (blank url) (blank text))
-            (flink [submit-page url title showtext text bothblank*])
+            (flink {submit-page url title showtext text bothblank*})
            (let site (sitename url)
              (or (big-spamsites* site) (recent-spam site)))
-            (flink [msgpage spammage*])
+            (flink {msgpage spammage*})
            (oversubmitting 'story url)
-            (flink [msgpage toofast*])
+            (flink {msgpage toofast*})
            (let s (create-story url (process-title title) text)
              (story-ban-test s url)
              (when (ignored (me)) (kill s 'ignored))
@@ -1697,11 +1693,11 @@ function vote(node) {
 
 (def process-poll (title text opts)
   (if (or (blank title) (blank opts))
-       (flink [newpoll-page title text opts retry*])
+       (flink {newpoll-page title text opts retry*})
       (len> title title-limit*)
-       (flink [newpoll-page title text opts toolong*])
+       (flink {newpoll-page title text opts toolong*})
       (len< (paras opts) 2)
-       (flink [newpoll-page title text opts fewopts*])
+       (flink {newpoll-page title text opts fewopts*})
       (atlet p (create-poll (multisubst scrubrules* title) text opts)
         (ip-ban-test p)
         (when (ignored) (kill p 'ignored))
@@ -1931,11 +1927,11 @@ function vote(node) {
                      (when (and (is name 'dead) val (no i!dead))
                        (log-kill i))
                      (= (i name) val)))
-                 (fn () (if (admin) (pushnew 'locked i!keys))
-                        (save-item i)
-                        (metastory&adjust-rank i)
-                        (wipe (comment-cache* i!id))
-                        (edit-page i)))
+                 {do (if (admin) (pushnew 'locked i!keys))
+                     (save-item i)
+                     (metastory&adjust-rank i)
+                     (wipe (comment-cache* i!id))
+                     (edit-page i)})
       (hook 'edit i))))
 
 (def ignore-edit (i name val)
@@ -1947,16 +1943,15 @@ function vote(node) {
 
 (def comment-login-warning (parent whence (o text))
   (login-page 'both "You have to be logged in to comment."
-              (fn ()
-                (ensure-news-user)
-                (newslog 'comment-login)
-                (addcomment-page parent whence text))))
+              {do (ensure-news-user)
+                  (newslog 'comment-login)
+                  (addcomment-page parent whence text)}))
 
 (def addcomment-page (parent whence (o text) (o msg))
   (minipage "Add Comment"
     (pagemessage msg)
     (tab
-      (let here (flink [addcomment-page parent whence text msg])
+      (let here (flink {addcomment-page parent whence text msg})
         (display-item nil parent here))
       (spacerow 10)
       (row "" (comment-form parent whence text)))))
@@ -1994,11 +1989,11 @@ function vote(node) {
 
 (def process-comment (parent text whence)
   (if (~me)
-       (flink [comment-login-warning parent whence text])
+       (flink {comment-login-warning parent whence text})
       (empty text)
-       (flink [addcomment-page parent whence text retry*])
+       (flink {addcomment-page parent whence text retry*})
       (oversubmitting 'comment)
-       (flink [msgpage toofast*])
+       (flink {msgpage toofast*})
        (atlet c (create-comment parent (md-from-form text))
          (comment-ban-test c text comment-kill* comment-ignore*)
          (if (bad-user) (kill c 'ignored/karma))
@@ -2149,10 +2144,9 @@ function vote(node) {
         (if user
             (addcomment-page i whence)
             (login-page 'both "You have to be logged in to comment."
-                        (fn ()
-                          (ensure-news-user)
-                          (newslog 'comment-login)
-                          (addcomment-page i whence))))
+                        {do (ensure-news-user)
+                            (newslog 'comment-login)
+                            (addcomment-page i whence)}))
         (pr "No such item."))))
 
 (def comment-color (c)

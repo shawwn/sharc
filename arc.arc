@@ -26,7 +26,7 @@
                     (fn args `(fn (_) ,args))))
 
 (assign %braces (annotate 'mac
-                  (fn args `(do ,@args))))
+                  (fn args `(fn () ,args))))
 
 (assign do (annotate 'mac
              (fn args `(%do ,@args))))
@@ -315,7 +315,7 @@
   (disp #\newline))
 
 (mac atomic body
-  `(atomic-invoke (fn () ,@body)))
+  `(atomic-invoke {do ,@body}))
 
 (mac atlet args
   `(atomic (let ,@args)))
@@ -775,7 +775,7 @@
 (def odd (n) (no (even n)))
 
 (mac after (x . ys)
-  `(protect (fn () ,x) (fn () ,@ys)))
+  `(protect {do ,x} {do ,@ys}))
 
 (let expander 
      (fn (f var name body)
@@ -811,10 +811,10 @@
 ; rename this simply "to"?  - prob not; rarely use
 
 (mac w/stdout (str . body)
-  `(call-w/stdout ,str (fn () ,@body)))
+  `(call-w/stdout ,str {do ,@body}))
 
 (mac w/stdin (str . body)
-  `(call-w/stdin ,str (fn () ,@body)))
+  `(call-w/stdin ,str {do ,@body}))
 
 (mac tostring body
   (w/uniq gv
@@ -1235,13 +1235,13 @@
   (withs (name (carif tem) includes (if (acons tem) (cdr tem)))
     `(= (templates* ',name) 
         (+ (mappend templates* ',(rev includes))
-           (list ,@(map (fn ((k v)) `(list ',k (fn () ,v)))
+           (list ,@(map (fn ((k v)) `(list ',k {do ,v}))
                         (pair fields)))))))
 
 (mac addtem (name . fields)
   `(= (templates* ',name) 
       (union (fn (x y) (is (car x) (car y)))
-             (list ,@(map (fn ((k v)) `(list ',k (fn () ,v)))
+             (list ,@(map (fn ((k v)) `(list ',k {do ,v}))
                           (pair fields)))
              (templates* ',name))))
 
@@ -1288,19 +1288,18 @@
 
 (def cache (timef valf)
   (with (cached nil gentime nil)
-    (fn ()
-      (unless (and cached (< (since gentime) (timef)))
-        (= cached  (valf)
-           gentime (seconds)))
-      cached)))
+    {do (unless (and cached (< (since gentime) (timef)))
+          (= cached  (valf)
+             gentime (seconds)))
+        cached}))
 
 (mac defcache (name lasts . body)
-  `(safeset ,name (cache (fn () ,lasts)
-                         (fn () ,@body))))
+  `(safeset ,name (cache {do ,lasts}
+                         {do ,@body})))
 
 (mac errsafe (expr)
   `(on-err (fn (c) nil)
-           (fn () ,expr)))
+           {do ,expr}))
 
 (def saferead (arg) (errsafe:read arg))
 
@@ -1593,7 +1592,7 @@
 (def len> (x n) (> (len x) n))
 
 (mac thread body 
-  `(new-thread (fn () ,@body)))
+  `(new-thread {do ,@body}))
 
 (mac trav (x . fs)
   (w/uniq g

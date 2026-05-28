@@ -90,8 +90,7 @@
 (def admin-gate ()
   (if (admin)
       (admin-page)
-      (login-page 'login nil
-                  (fn () (admin-gate)))))
+      (login-page 'login nil {admin-gate})))
 
 (def admin ((t u me)) (and u (mem u admins*)))
 
@@ -173,8 +172,8 @@
 (def login-form (label switch handler afterward)
   (prbold label)
   (br2)
-  (fnform (fn () (handler switch afterward))
-          (fn () (pwfields (downcase label)))
+  (fnform {handler switch afterward}
+          {pwfields (downcase label)}
           (acons afterward)))
 
 (def login-handler (switch afterward)
@@ -204,7 +203,7 @@
 
 (def failed-login (switch msg afterward)
   (if (acons afterward)
-      (flink (fn ignore (login-page switch msg afterward)))
+      (flink {login-page switch msg afterward})
       (do (prn)
           (login-page switch msg afterward))))
 
@@ -700,6 +699,5 @@
          (do ,@body)
          (login-page 'both
                      "You need to be logged in to do that."
-                     (list (fn ())
-                           (string ',name (reassemble-args (the req))))))))
+                     (list {} (string ',name (reassemble-args (the req))))))))
 

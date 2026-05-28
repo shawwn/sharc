@@ -410,17 +410,17 @@ Connection: close"))
 ; generated page starts after a blank line; rflink just stores it
 ; (its return value is the redirect URL).
 (def flink (f)
-  (string fnurl* "?fnid=" (fnid (fn () (prn) (f)))))
+  (string fnurl* "?fnid=" (fnid {do (prn) (f)})))
 
 (def rflink (f)
   (string rfnurl* "?fnid=" (fnid f)))
 
 (mac w/link (expr . body)
-  `(tag (a href (flink (fn () ,expr)))
+  `(tag (a href (flink {do ,expr}))
      ,@body))
 
 (mac w/rlink (expr . body)
-  `(tag (a href (rflink (fn () ,expr)))
+  `(tag (a href (rflink {do ,expr}))
      ,@body))
 
 (mac onlink (text . body)
@@ -432,17 +432,17 @@ Connection: close"))
 ; bad to have both flink and linkf; rename flink something like fnid-link
 
 (mac linkf (text . body)
-  `(tag (a href (flink (fn () ,@body))) (pr ,text)))
+  `(tag (a href (flink {do ,@body})) (pr ,text)))
 
 (mac rlinkf (text . body)
-  `(tag (a href (rflink (fn () ,@body))) (pr ,text)))
+  `(tag (a href (rflink {do ,@body})) (pr ,text)))
 
 ;(defop top req (linkf 'whoami? (req) (pr "I am " (get-user req))))
 
 ;(defop testf req (w/link (pr "ha ha ha") (pr "laugh")))
 
 (mac w/link-if (test expr . body)
-  `(tag-if ,test (a href (flink (fn (,(uniq)) ,expr)))
+  `(tag-if ,test (a href (flink {do ,expr}))
      ,@body))
 
 (def fnid-field (id)
@@ -466,26 +466,26 @@ Connection: close"))
 
 (mac aform (handler . body)
   `(tag (form method 'post action fnurl*)
-     (fnid-field (fnid (fn () (prn) ,handler)))
+     (fnid-field (fnid {do (prn) ,handler}))
      ,@body))
 
 (mac arform (handler . body)
   `(tag (form method 'post action rfnurl*)
-     (fnid-field (fnid (fn () ,handler)))
+     (fnid-field (fnid {do ,handler}))
      ,@body))
 
 ; aform / arform variants with a fnid lifetime in seconds.
 
 (mac taform (lasts handler . body)
   (w/uniq gh
-    `(let ,gh (fn () (prn) ,handler)
+    `(let ,gh {do (prn) ,handler}
        (tag (form method 'post action fnurl*)
          (fnid-field (if ,lasts (timed-fnid ,lasts ,gh) (fnid ,gh)))
          ,@body))))
 
 (mac tarform (lasts handler . body)
   (w/uniq gh
-    `(let ,gh (fn () ,handler)
+    `(let ,gh {do ,handler}
        (tag (form method 'post action rfnurl*)
          (fnid-field (if ,lasts (timed-fnid ,lasts ,gh) (fnid ,gh)))
          ,@body))))
@@ -495,12 +495,12 @@ Connection: close"))
 
 (mac aformh (handler . body)
   `(tag (form method 'post action fnurl*)
-     (fnid-field (fnid (fn () ,handler)))
+     (fnid-field (fnid {do ,handler}))
      ,@body))
 
 (mac arformh (handler . body)
   `(tag (form method 'post action rfnurl2*)
-     (fnid-field (fnid (fn () ,handler)))
+     (fnid-field (fnid {do ,handler}))
      ,@body))
 
 ; only unique per server invocation
@@ -570,16 +570,13 @@ Connection: close"))
 
 (def new-bgthread (id f sec)
   (aif (bgthreads* id) (break-thread it))
-  (= (bgthreads* id) (new-thread (fn () 
-                                   (while t
-                                     (sleep sec)
-                                     (f))))))
+  (= (bgthreads* id) (new-thread {while t (sleep sec) (f)})))
 
 ; should be a macro for this?
 
 (mac defbg (id sec . body)
   `(do (pull [caris _ ',id] pending-bgthreads*)
-       (push (list ',id (fn () ,@body) ,sec) 
+       (push (list ',id {do ,@body} ,sec) 
              pending-bgthreads*)))
 
 

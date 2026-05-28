@@ -70,8 +70,8 @@
   (whitepage
     (vars-form `((string title ,p!title t t) (text text ,p!text t t))
                (fn (name val) (= (p name) val))
-               (fn () (save-post p)
-                      (post-page p)))))
+               {do (save-post p)
+                   (post-page p)})))
 
 (defop archive
   (blogpage
