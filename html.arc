@@ -33,7 +33,7 @@
   (or (opmeths* (list spec opt))
       (case opt
         (id align valign) opsym
-        (name type)       opstring
+        (name type title) opstring
         (class style src) opstring
         (onclick onfocus) opstring
         (width height)    opnum
