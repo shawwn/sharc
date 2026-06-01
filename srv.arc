@@ -76,7 +76,7 @@
 (= req-times* (table) req-limit* 30 req-window* 10 dos-window* 2)
 
 (def abusive-ip (ip)
-  (and (only.> (requests/ip* ip) 250)
+  (and (> (requests/ip* ip 0) 250)
        (let now (seconds)
          (do1 (if (req-times* ip)
                   (and (>= (qlen (req-times* ip)) 
