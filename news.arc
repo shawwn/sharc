@@ -1118,10 +1118,16 @@ function vote(node) {
              (logvote i))
          (pr "Can't make that vote."))))
 
+(def cansee-score (i)
+  (or (me i!by)
+      (admin)
+      (isnt i!type 'comment)))
+
 (def itemline (i)
   (when (cansee i)
-    (when (and (news-type i) (admin))
-      (itemscore i))
+    (when (cansee-score i)
+      (itemscore i)
+      (pr " by "))
     (byline i)))
 
 (def itemscore (i)
@@ -1133,7 +1139,6 @@ function vote(node) {
 ; redefined later
 
 (def byline (i)
-  (when (admin) (pr " by "))
   (userlink i!by)
   (pr " ")
   (let (s m h D M Y) (map [+ (if (< _ 10) "0" "") _]
