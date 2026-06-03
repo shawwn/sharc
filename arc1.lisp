@@ -522,6 +522,9 @@ errors out clearly rather than polluting (often locked) CL packages."
      (ac `(,(intern "no" (sym-pkg (caar s)))
            (,(cadar s) ,@(cdr s)))))
     ((arc-sym= (arc-caar? s) "andf") (ac-andf s))
+    ;; uncomment this next line to see which expression is causing a
+    ;; crash due to a function call on non-function (e.g. nil/num/sym)
+    ;((consp s) (ac-safe-call (car s) (cdr s)))
     ((consp s) (ac-call (car s) (cdr s)))
     (t (error "Bad object in expression: ~S" s))))
 
@@ -910,6 +913,15 @@ isn't shadowed by a lexical binding."
                    ,(ac (cadr args)) ,(ac (caddr args))))
       (t `(ar-apply ,(ac fn)
                     (list ,@(mapcar #'ac args)))))))
+
+(defun ac-safe-call (fn args)
+  (let ((macfn (ac-macro-p fn))
+        (expr (cons fn args)))
+    (cond
+      (macfn (ac-mac-call macfn args))
+      ((and (consp fn) (arc-sym= (car fn) "fn"))
+       `(,(ac fn) ,@(mapcar #'ac args)))
+      (t `(ar-safe-apply ',expr ,(ac fn) (list ,@(mapcar #'ac args)))))))
 
 (defun ac-mac-call (m args)
   (ac (apply m args)))

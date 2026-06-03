@@ -137,6 +137,14 @@
 (defun arc-call3 (fn a b c)
   (if (functionp fn) (funcall fn a b c) (ar-apply fn (list a b c))))
 
+(defun ar-safe-apply (expr fn args)
+  (if (or (null fn) (symbolp fn) (numberp fn))
+      (error "Function call on non-function: ~S ~S" fn expr)
+      (ar-apply fn args)))
+
+(defun arc-safe-apply (expr fn &rest args)
+  (ar-safe-apply expr fn (ar-apply-args args)))
+
 ;;;; ============================================================
 ;;;; Core primitives
 ;;;; ============================================================
