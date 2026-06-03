@@ -740,7 +740,7 @@ function vote(node) {
 ; Users
 
 (newsop user (id)
-  (if (only.profile id)
+  (if (only&profile id)
       (user-page id)
       (pr "No such user.")))
 
@@ -912,7 +912,7 @@ function vote(node) {
 (def saved-url (user) (+ "saved?id=" user))
 
 (newsop saved (id) 
-  (if (only.profile id)
+  (if (only&profile id)
       (savedpage id)
       (pr "No such user.")))
 
@@ -1178,7 +1178,7 @@ function vote(node) {
      (sum [visible-family (item _) user] i!kids)))
 
 (def threadavg (i)
-  (only.avg (map [or (uvar _ avg) 1] 
+  (only&avg (map [or (uvar _ avg) 1] 
                  (rem admin (dedup (map !by (keep live (family i))))))))
 
 (= user-changetime* 120 editor-changetime* 1440)
@@ -1395,7 +1395,7 @@ function vote(node) {
 ; ugly to access vote fields by position number
 
 (def downvote-ratio ((o sample 20))
-  (ratio [is _.1.3 'down]
+  (ratio [is _!1!3 'down]
          (keep [let by ((item (car _)) 'by)
                  (nor (me by) (ignored by))]
                (bestn sample (compare > car:cadr) (tablist (votes))))))
@@ -1412,7 +1412,7 @@ function vote(node) {
 ; in one with the voter in the car and the other without.
 
 (def recent-votes-by ((t user me))
-  (keep [is _.3 user] recent-votes*))
+  (keep [is _!3 user] recent-votes*))
 
 
 ; Story Submission
@@ -1441,8 +1441,8 @@ function vote(node) {
             (do (row "url" (input "u" url 50))
                 (when showtext
                   (row "" "<b>or</b>")
-                  (row "text" (textarea "x" 4 50 (only.pr text)))))
-            (do (row "text" (textarea "x" 4 50 (only.pr text)))
+                  (row "text" (textarea "x" 4 50 (only&pr text)))))
+            (do (row "text" (textarea "x" 4 50 (only&pr text)))
                 (row "" "<b>or</b>")
                 (row "url" (input "u" url 50))))
         (row "" (submit))
@@ -1688,9 +1688,9 @@ function vote(node) {
                           (striptags arg!o))
       (tab
         (row "title"   (input "t" title 50))
-        (row "text"    (textarea "x" 4 50 (only.pr text)))
+        (row "text"    (textarea "x" 4 50 (only&pr text)))
         (row ""        "Use blank lines to separate choices:")
-        (row "choices" (textarea "o" 7 50 (only.pr opts)))
+        (row "choices" (textarea "o" 7 50 (only&pr opts)))
         (row ""        (submit))))))
 
 (= fewopts* "A poll must have at least two options.")
@@ -2143,8 +2143,8 @@ function vote(node) {
 
 (newsop reply (id whence)
   (with (i      (safe-item id)
-         whence (or (only.urldecode whence) "news"))
-    (if (only.comments-active i)
+         whence (or (only&urldecode whence) "news"))
+    (if (only&comments-active i)
         (if user
             (addcomment-page i whence)
             (login-page 'both "You have to be logged in to comment."
@@ -2270,7 +2270,7 @@ function vote(node) {
               (td (userlink u nil))
               (tdr:pr (karma u))
               (when (admin)
-                (tdr:prt (only.num (uvar u avg) 2 t t))))
+                (tdr:prt (only&num (uvar u avg) 2 t t))))
           (if (is i 10) (spacerow 30)))))))
 
 (= leader-threshold* 1)  ; redefined later
@@ -2288,7 +2288,7 @@ function vote(node) {
 
 (defbg update-avg 45
   (unless (or (empty profs*) (no stories*))
-    (update-avg (rand-user [and (only.> (car (uvar _ submitted)) 
+    (update-avg (rand-user [and (only&> (car (uvar _ submitted)) 
                                         (- maxid* initload*))
                                 (len> (uvar _ submitted) 
                                       update-avg-threshold*)]))))
@@ -2472,11 +2472,11 @@ first asterisk isn't whitespace.
             (tdr (when deads (pr (round (days-since ((car deads) 'time))))))
             (td site)
             (td (w/rlink (do (set-site-ban site nil) "badsites")
-                  (fontcolor (if ban gray.220 black) (pr "x"))))
+                  (fontcolor (if ban gray!220 black) (pr "x"))))
             (td (w/rlink (do (set-site-ban site 'kill) "badsites")
-                  (fontcolor (case ban kill darkred gray.220) (pr "x"))))
+                  (fontcolor (case ban kill darkred gray!220) (pr "x"))))
             (td (w/rlink (do (set-site-ban site 'ignore) "badsites")
-                  (fontcolor (case ban ignore darkred gray.220) (pr "x"))))
+                  (fontcolor (case ban ignore darkred gray!220) (pr "x"))))
             (td (each u (dedup (map !by deads))
                   (userlink u nil)
                   (pr " "))))))))
@@ -2604,9 +2604,9 @@ first asterisk isn't whitespace.
     (spacerow 10)
     (each name (sort < newsop-names*)
       (tr (td name)
-          (let ms (only.avg (qlist (optimes* name)))
-            (tdr:prt (only.round ms))
-            (tdr:prt (only.med (qlist (optimes* name))))
+          (let ms (only&avg (qlist (optimes* name)))
+            (tdr:prt (only&round ms))
+            (tdr:prt (only&med (qlist (optimes* name))))
             (let n (opcounts* name)
               (tdr:prt n)
               (tdr:prt (and n (round (/ (* n ms) 1000))))))))))

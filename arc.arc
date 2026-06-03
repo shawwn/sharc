@@ -1378,8 +1378,7 @@
 
 ; (def only (f g . args) (aif (apply g args) (f it)))
 
-(def only (f) 
-  (fn args (if (car args) (apply f args))))
+(def only (x) x)
 
 (mac conswhen (f x y)
   (w/uniq (gf gx)
