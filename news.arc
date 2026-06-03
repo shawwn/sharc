@@ -1323,7 +1323,7 @@ function vote(node) {
 (def text-age (a)
   (tostring
     (if (>= a 525600)
-        (let (s m h D M Y) (timedate (- (seconds) (* a 60)))
+        (let (s m h D M Y) (timedate:since (* a 60))
           (let M (case M
                    1 "Jan"
                    2 "Feb"
