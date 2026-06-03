@@ -1119,9 +1119,9 @@ function vote(node) {
          (pr "Can't make that vote."))))
 
 (def cansee-score (i)
-  (or (me i!by)
-      (admin)
-      (isnt i!type 'comment)))
+  (or (isnt i!type 'comment)
+      (me i!by)
+      (admin)))
 
 (def itemline (i)
   (when (cansee i)
