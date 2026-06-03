@@ -1322,7 +1322,24 @@ function vote(node) {
 
 (def text-age (a)
   (tostring
-    (if (>= a 1440) (pr (plural (trunc (/ a 1440)) "day")    " ago")
+    (if (>= a 525600)
+        (let (s m h D M Y) (timedate (- (seconds) (* a 60)))
+          (let M (case M
+                   1 "Jan"
+                   2 "Feb"
+                   3 "March"
+                   4 "April"
+                   5 "May"
+                   6 "June"
+                   7 "July"
+                   8 "Aug"
+                   9 "Sept"
+                   10 "Oct"
+                   11 "Nov"
+                   12 "Dec"
+                   (err "Bad month number"))
+            (pr "on " M " " D ", " Y)))
+        (>= a 1440) (pr (plural (trunc (/ a 1440)) "day")    " ago")
         (>= a   60) (pr (plural (trunc (/ a 60))   "hour")   " ago")
                     (pr (plural (trunc a)          "minute") " ago"))))
 
