@@ -982,8 +982,14 @@
 (xdef new-thread (f)
   (sb-thread:make-thread
    (lambda ()
-     (handler-case (arc-call0 f)
-       (error (c) (arc-report-error c *error-output*) nil)))
+     ;; handler-bind (not handler-case) so arc-report-error runs before
+     ;; the stack unwinds -- otherwise its backtrace would show only this
+     ;; thread's entry frame, not the arc functions that signalled.
+     (block done
+       (handler-bind ((error (lambda (c)
+                               (arc-report-error c *error-output*)
+                               (return-from done nil))))
+         (arc-call0 f))))
    :name "arc"))
 
 (xdef kill-thread (th) (sb-thread:terminate-thread th) nil)

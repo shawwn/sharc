@@ -386,6 +386,25 @@ c"
     (togglemem 0 s >)          ; some > 0 => remove elts > 0
     (test? nil s)))
 
+(define-test fn-names
+  ; A fn compiles to a named lambda whose arc name shows up in SBCL
+  ; backtraces; sb-kernel::%fun-name reads it back.  Names combine with
+  ; enclosing fns -- these defs sit inside test-fn-names, so they get a
+  ; test-fn-names-- prefix.
+  (def fn-names-simple (x) x)
+  (test? 'test-fn-names--fn-names-simple
+         (sb-kernel::%fun-name fn-names-simple))
+  ; complex arglists (optionals) are named too
+  (def fn-names-opt (x (o y 1)) x)
+  (test? 'test-fn-names--fn-names-opt
+         (sb-kernel::%fun-name fn-names-opt))
+  ; a let-bound fn value is named after its variable (let expands to an
+  ; immediately-applied fn, and ac names the value arg after the param)
+  (let g (fn (x) x)
+    (test? 'test-fn-names--g (sb-kernel::%fun-name g)))
+  ; an otherwise-anonymous fn inherits the enclosing name
+  (test? 'test-fn-names (sb-kernel::%fun-name (fn (x) x))))
+
 (define-test quasiquote
   (test? (quote a) (quasiquote a))
   (test? 'a `a)

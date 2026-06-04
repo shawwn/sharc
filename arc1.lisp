@@ -692,13 +692,69 @@ isn't shadowed by a lexical binding."
 
 ;;;; ---- fn ----
 
+;; A name marker is a one-element list (NAME) pushed onto *env* around an
+;; fn value, so the fn knows a name it's being bound to.  Markers come
+;; from ac-set1 (assignment, e.g. (= foo (fn ...))) and from ac-call
+;; (an fn passed as an arg to an immediately-applied fn, e.g. the value
+;; in (let f (fn ...) ...), which expands to ((fn (f) ...) (fn ...))).
+;; The marker is a cons, so it can never be eq to a symbol and lex-p
+;; ignores it.
+;;
+;; ac-fn does NOT consume the marker; it leaves it in the body env so
+;; nested fns combine their enclosing names: a fn compiled with env
+;; (y (bar) x (foo)) is named foo--bar, and an inner (let f ...) value
+;; there is named foo--bar--f.  The combined name shows up in SBCL
+;; backtraces.  Because named lambdas can land in operator position
+;; (or= and friends expand to ((fn ...) ...)), ac-call/ac-safe-call emit
+;; them under funcall, where a named-lambda is legal (a bare
+;; ((named-lambda ...) ...) is not).
+
+;; Lambda names that would collide with a CL symbol live here instead.
+;; Naming a lambda after a CL symbol (arc's >= is cl:>=, car is cl:car,
+;; ...) makes SBCL apply that symbol's ftype to the lambda body and
+;; mis-infer types, so we copy such names into a private package that
+;; has no function info attached.
+(defpackage :arc-fn (:use))
+
+(defun ac-fn-markers (env)
+  "The marker names in ENV, outermost first (foo before the bar nested
+   in it).  Markers are the cons entries; arglist entries are symbols."
+  (let ((names nil))
+    (dolist (e env names)
+      (when (and (consp e) (symbolp (car e)))
+        (push (car e) names)))))
+
+(defun ac-safe-name (name)
+  "NAME unless it's a CL symbol, in which case a same-named symbol in
+   the :arc-fn package (so SBCL attaches no ftype to the lambda)."
+  (if (eq (symbol-package name) (find-package :common-lisp))
+      (intern (symbol-name name) :arc-fn)
+      name))
+
+(defun ac-fn-name (env)
+  "Combined fn name from every marker in ENV (foo--bar--f), or nil.
+   A joined name has a -- in it, so it can't collide with a CL symbol;
+   a lone name might (e.g. >=), so it's run through ac-safe-name."
+  (let ((markers (ac-fn-markers env)))
+    (cond ((null markers)       nil)
+          ((null (cdr markers)) (ac-safe-name (car markers)))
+          (t (arc-sym (format nil "~{~A~^--~}"
+                              (mapcar #'symbol-name markers)))))))
+
+(defun ac-lambda (name largs body)
+  "A CL lambda form, named (so it appears in backtraces) when NAME is set."
+  (if name
+      `(sb-int:named-lambda ,name ,largs ,@body)
+      `(lambda ,largs ,@body)))
+
 (defun ac-fn (args body)
-  (let ((*env* *env*))
+  (let ((*env* *env*)
+        (name (ac-fn-name *env*)))   ; combined name incl. enclosing markers
     (if (ac-complex-args-p args)
-        (ac-complex-fn args body)
+        (ac-complex-fn args body name)
         (let ((largs (ac-arglist-cl args)))
           (setf *env* (append (ac-arglist args) *env*))
-          `(lambda ,largs ,@(ac-body* body))))))
+          (ac-lambda name largs (ac-body* body))))))
 
 ;;; Convert Arc arglist to CL lambda list (handles rest params)
 (defun ac-arglist-cl (args)
@@ -723,13 +779,13 @@ isn't shadowed by a lexical binding."
     ((and (consp args) (symbolp (car args))) (ac-complex-args-p (cdr args)))
     (t t)))
 
-(defun ac-complex-fn (args body)
+(defun ac-complex-fn (args body name)
   (let* ((ra (gensym "RA"))
          (z  (ac-complex-args args ra t)))
     (setf *env* (append (ac-complex-getargs z) *env*))
-    `(lambda (&rest ,ra)
-       (let* ,z
-         ,@(ac-body* body)))))
+    (ac-lambda name `(&rest ,ra)
+               `((let* ,z
+                   ,@(ac-body* body))))))
 
 (defun ac-complex-args (args ra is-params)
   (cond
@@ -861,7 +917,9 @@ isn't shadowed by a lexical binding."
   (cond
     ((null a) nil)
     ((and (symbolp a) (not (arc-sym= a "nil"))) (list a))
-    ((symbolp (cdr a)) (list (car a) (cdr a)))
+    ((and (symbolp (cdr a))
+          (not (arc-sym= (cdr a) "nil")))
+     (list (car a) (cdr a)))
     (t (cons (car a) (ac-arglist (cdr a))))))
 
 (defun ac-body  (body) (mapcar #'ac body))
@@ -877,9 +935,18 @@ isn't shadowed by a lexical binding."
       (cons (ac-set1 (ac-macex (car x)) (cadr x))
             (ac-setn (cddr x)))))
 
+;; True when B1 is (or macroexpands to) an fn form, so ac-set1 should
+;; tell that fn the name it's being assigned to (for backtraces).
+(defun ac-fn-value-p (b1)
+  (arc-sym= (arc-car? b1) "fn"))
+
 (defun ac-set1 (a b1)
   (if (symbolp a)
-      (let ((b (ac b1)))
+      (let* ((b1 (ac-macex b1))
+             (b (let ((*env* (if (ac-fn-value-p b1)
+                               (cons (list a) *env*)
+                               *env*)))
+                  (ac b1))))
         `(let ((zz ,b))
            ,(cond
               ((arc-sym= a "nil") (error "Can't rebind nil"))
@@ -896,12 +963,27 @@ isn't shadowed by a lexical binding."
 
 (defun lex-p (v) (member v *env* :test #'eq))
 
+;; Compile the args of an immediately-applied fn ((fn PARAMS body) . ARGS).
+;; An fn-valued arg is named after its (simple) param, so the value fn in
+;; (let f (fn ...) ...) -- which expands to ((fn (f) ...) (fn ...)) -- is
+;; named ...--f.  Other args (and complex/rest params) compile normally.
+(defun ac-named-args (params args)
+  (when args
+    (let* ((p (and (consp params) (car params)))
+           (a (car args)))
+      (cons (if (and (symbolp p) (not (arc-sym= p "nil")) (ac-fn-value-p a))
+                (let ((*env* (cons (list p) *env*))) (ac a))
+                (ac a))
+            (ac-named-args (and (consp params) (cdr params)) (cdr args))))))
+
 (defun ac-call (fn args)
   (let ((macfn (ac-macro-p fn)))
     (cond
       (macfn (ac-mac-call macfn args))
       ((and (consp fn) (arc-sym= (car fn) "fn"))
-       `(,(ac fn) ,@(mapcar #'ac args)))
+       ;; funcall, not ((ac fn) ...): ac fn may be a named-lambda, which
+       ;; is illegal in operator position but fine as a funcall argument.
+       `(funcall ,(ac fn) ,@(ac-named-args (cadr fn) args)))
       ((= (length args) 0)
        `(arc-call0 ,(ac fn)))
       ((= (length args) 1)
@@ -920,7 +1002,7 @@ isn't shadowed by a lexical binding."
     (cond
       (macfn (ac-mac-call macfn args))
       ((and (consp fn) (arc-sym= (car fn) "fn"))
-       `(,(ac fn) ,@(mapcar #'ac args)))
+       `(funcall ,(ac fn) ,@(ac-named-args (cadr fn) args)))
       (t `(ar-safe-apply ',expr ,(ac fn) (list ,@(mapcar #'ac args)))))))
 
 (defun ac-mac-call (m args)
