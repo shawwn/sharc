@@ -315,10 +315,10 @@ Connection: close"))
 
 (= fns* (table) fnids* nil timed-fnids* nil)
 
-; count on huge (expt 64 10) size of fnid space to avoid clashes
+; count on huge (expt 64 22) size of fnid space to avoid clashes
 
 (def new-fnid ()
-  (check (sym (rand-string 10)) ~fns* (new-fnid)))
+  (check (sym (rand-string 22)) ~fns* (new-fnid)))
 
 (def fnid (f)
   (atlet key (new-fnid)
