@@ -138,26 +138,21 @@
         (if srv-noisy* (pr "\n\n"))
         (respond o op (+ (parseargs (string (rev line))) args) cooks ip))))
 
-(= header* "HTTP/1.1 200 OK
-Content-Type: text/html; charset=utf-8
-Connection: close")
-
 (= type-header* (table))
 
 (def gen-type-header (ctype)
   (+ "HTTP/1.0 200 OK
-Content-Type: "
-     ctype
-     "
+Content-Type: " ctype "
 Connection: close"))
 
-(map (fn ((k v)) (= (type-header* k) (gen-type-header v)))
-     '((gif       "image/gif")
-       (jpg       "image/jpeg")
-       (png       "image/png")
-       (text/html "text/html; charset=utf-8")))
+(each (k v) '((gif       "image/gif")
+              (jpg       "image/jpeg")
+              (png       "image/png")
+              (text/html "text/html; charset=utf-8"))
+  (= (type-header* k) (gen-type-header v)))
 
-(= rdheader* "HTTP/1.0 302 Moved")
+(= header*   (type-header* 'text/html)
+   rdheader* "HTTP/1.0 302 Moved")
 
 (= srvops* (table) redirector* (table) optimes* (table) opcounts* (table))
 
