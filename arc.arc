@@ -1684,8 +1684,7 @@
 (= thread-locals* (table))
 
 (def thread-locals ()
-  (or (thread-locals* (current-thread))
-      (= (thread-locals* (current-thread)) (table))))
+  (or= (thread-locals* (current-thread)) (table)))
 
 (def thread-local (k) ((thread-locals) k))
 
