@@ -302,14 +302,15 @@ Connection: close"))
   (let req (the req)
     (alref req!args (if (isa key 'sym) (string key) key))))
 
-; *** Warning: does not currently urlencode args, so if need to do
-; that replace v with (urlencode v).
+; reassemble-args urlencodes each key and value for safety
 
 (def reassemble-args ((t req))
   (aif req!args
        (apply string "?" (intersperse '&
                                       (map (fn ((k v))
-                                             (string k '= v))
+                                             (with (k (urlencode (string k))
+                                                    v (urlencode v))
+                                               (string k '= v)))
                                            it)))
        ""))
 
