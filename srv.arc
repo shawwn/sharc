@@ -305,7 +305,7 @@ Connection: close"))
 ; *** Warning: does not currently urlencode args, so if need to do
 ; that replace v with (urlencode v).
 
-(def reassemble-args (req)
+(def reassemble-args ((t req))
   (aif req!args
        (apply string "?" (intersperse '&
                                       (map (fn ((k v))

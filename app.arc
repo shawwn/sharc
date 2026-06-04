@@ -699,5 +699,5 @@
          (do ,@body)
          (login-page 'both
                      "You need to be logged in to do that."
-                     (list {} (string ',name (reassemble-args (the req))))))))
+                     (list {} (string ',name (reassemble-args)))))))
 
