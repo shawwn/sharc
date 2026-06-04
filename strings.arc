@@ -57,31 +57,36 @@
 ;> (form-urlencoded-decode "x%ce%bbx")
 ;"xλx"
 
-; first byte: 0-7F, 1 char; c2-df 2; e0-ef 3, f0-f4 4. 
-
-; Fixed for utf8 by pc.
+; urlencode/urldecode operate on UTF-8 *bytes*, not characters: each
+; %XX escape is one byte, and a non-ascii character spans several (e.g.
+; λ is %ce%bb).  So we encode the string to its utf-8 bytes first, and
+; decode by gathering the bytes back into a vector and utf8-decoding it.
+; > (urldecode "x%ce%bbx") => "xλx"
 
 (def urldecode (s)
- (tostring
-  (forlen i s
-    (caselet c (s i)
-      #\+ (writec #\space)
-      #\% (do (when (> (- (len s) i) 2)
-                (writec (coerce (int (cut s (+ i 1) (+ i 3)) 16) 'char)))
-              (++ i 2))
-          (writec c)))))
+  (utf8-decode:coerce
+    (accum a
+      (forlen i s
+        (caselet c (s i)
+          #\+ (a 32)                                ; space
+          #\% (do (when (> (- (len s) i) 2)
+                    (a (int (cut s (+ i 1) (+ i 3)) 16)))
+                  (++ i 2))
+              (a (int c)))))                         ; literal byte
+    'vector))
 
 (def unreserved (c)
   (or (alphadig c) (in c #\- #\. #\_ #\~)))
 
 (def urlencode (s)
-  (tostring 
-    (each c s 
-      (if (unreserved c) (writec c)
-        (do (writec #\%)
-            (let i (int c)
-              (if (< i 16) (writec #\0))
-              (pr (coerce i 'string 16))))))))
+  (tostring
+    (each b (coerce (utf8-encode s) 'cons)
+      (let c (coerce b 'char)
+        (if (and (< b 128) (unreserved c))
+            (writec c)
+            (do (writec #\%)
+                (if (< b 16) (writec #\0))
+                (pr (coerce b 'string 16))))))))
 
 (mac litmatch (pat string (o start 0))
   (w/uniq (gstring gstart)

@@ -405,6 +405,51 @@ c"
   ; an otherwise-anonymous fn inherits the enclosing name
   (test? 'test-fn-names (sb-kernel::%fun-name (fn (x) x))))
 
+(define-test byte-vectors
+  ; ar-apply indexes a vector, len/type understand it
+  (let v (coerce '(104 105 106) 'vector)
+    (test? 104 (v 0))
+    (test? 106 (v 2))
+    (test? 3   (len v))
+    (test? 'vector (type v)))
+  ; coerce round-trips list <-> byte vector (ints in [0..255])
+  (test? '(1 2 255) (coerce (coerce '(1 2 255) 'vector) 'cons))
+  (test? 0          (len (coerce nil 'vector)))    ; empty list -> empty vec
+  ; is compares byte vectors elementwise
+  (test? t   (is (coerce '(1 2 3) 'vector) (coerce '(1 2 3) 'vector)))
+  (test? nil (is (coerce '(1 2 3) 'vector) (coerce '(1 2 4) 'vector)))
+  (test? nil (is (coerce '(1 2)   'vector) (coerce '(1 2 3) 'vector))))
+
+(define-test utf8
+  ; string <-> utf-8 bytes (λ = U+03BB = ce bb, é = c3 a9)
+  (test? '(206 187)     (coerce (utf8-encode "λ") 'cons))
+  (test? "λ"            (utf8-decode (coerce '(206 187) 'vector)))
+  (test? '(104 195 169) (coerce (utf8-encode "hé") 'cons))
+  (test? "héllo"        (utf8-decode (utf8-encode "héllo")))
+  ; string->bytes / bytes->string default to utf-8 and take a format
+  (test? '(206 187) (coerce (string->bytes "λ") 'cons))
+  (test? "λ"        (bytes->string (coerce '(206 187) 'vector)))
+  (test? '(233)     (coerce (string->bytes "é" :latin-1) 'cons)))
+
+(define-test urlencode
+  ; ascii unreserved passes through; space and reserved are %-escaped
+  (test? "abc-._~"    (urlencode "abc-._~"))
+  (test? "a%20b"      (urlencode "a b"))
+  (test? "a%2bb"      (urlencode "a+b"))        ; literal + -> %2b
+  ; non-ascii becomes its utf-8 bytes
+  (test? "h%c3%a9llo" (urlencode "héllo"))
+  (test? "x%ce%bbx"   (urlencode "xλx"))
+  ; urldecode inverts; + and %XX both denote a byte
+  (test? "héllo" (urldecode "h%c3%a9llo"))
+  (test? "xλx"   (urldecode "x%ce%bbx"))         ; the doc example
+  (test? "a b"   (urldecode "a+b"))
+  (test? "a b"   (urldecode "a%20b"))
+  (test? "a+b"   (urldecode "a%2bb"))
+  ; round-trips, including multibyte and empty
+  (test? "日本語" (urldecode (urlencode "日本語")))
+  (test? "" (urlencode ""))
+  (test? "" (urldecode "")))
+
 (define-test quasiquote
   (test? (quote a) (quasiquote a))
   (test? 'a `a)

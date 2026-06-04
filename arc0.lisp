@@ -118,6 +118,7 @@
        (if (eq v :arc/missing)
            (if (cdr args) (cadr args) nil)
            v)))
+    ((vectorp fn)    (aref fn (car args)))
     (t (error "Function call on non-function: ~S" fn))))
 
 (defun arc-apply (fn &rest args)
@@ -345,6 +346,7 @@
     ((and (streamp x) (output-stream-p x)) (intern "output" :arc))
     ((and (streamp x) (input-stream-p x))  (intern "input"  :arc))
     ((typep x 'sb-thread:thread)       (intern "thread"  :arc))
+    ((vectorp x)                       (intern "vector"  :arc))
     (t (error "Unknown type: ~S" x))))
 
 (defun arc-tag (type rep)
@@ -530,16 +532,46 @@
                      (mapcar (lambda (c)
                                (if (characterp c) (string c) (format nil "~A" c)))
                              x)))
+             ;; a list of byte ints -> a byte vector (inverse of the
+             ;; vector->cons case below)
+             ((string= tname "vector")
+              (make-array (length x) :element-type '(unsigned-byte 8)
+                                     :initial-contents x))
              (t (error "Can't coerce cons to ~S" type))))
       ((null x)
        (cond ((string= tname "string") "")
+             ((string= tname "vector")
+              (make-array 0 :element-type '(unsigned-byte 8)))
              (t (error "Can't coerce nil to ~S" type))))
       ((symbolp x)
        (cond ((string= tname "string") (symbol-name x))
              (t (error "Can't coerce sym ~S to ~S" x type))))
+      ;; a non-string vector (e.g. a byte vector) -> its elements as a
+      ;; list; for a byte vector that's a list of ints in [0..255]
+      ((vectorp x)
+       (cond ((string= tname "cons") (coerce x 'list))
+             (t (error "Can't coerce vector ~S to ~S" x type))))
       (t x))))
 
 (xdef coerce (x type &rest args) (arc-coerce x type (car args)))
+
+;;;; ---- utf-8/latin-1 conversion ----
+
+(defun arc-string->bytes (s &optional (ef :utf-8))
+  (sb-ext:string-to-octets s :external-format ef))
+
+(xdef string->bytes #'arc-string->bytes)
+
+(defun arc-bytes->string (b &optional (ef :utf-8))
+  (sb-ext::octets-to-string b :external-format ef))
+
+(xdef bytes->string #'arc-bytes->string)
+
+;; Convert between a string and its UTF-8 byte vector.  Useful where a
+;; protocol is defined over bytes rather than characters (urlencode,
+;; Content-Length, etc.).
+(xdef utf8-encode (s) (sb-ext:string-to-octets s :external-format :utf-8))
+(xdef utf8-decode (b) (sb-ext:octets-to-string b :external-format :utf-8))
 
 ;;;; ============================================================
 ;;;; Networking  (sb-bsd-sockets)
