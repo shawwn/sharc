@@ -247,6 +247,145 @@ c"
   ;  (test? `(d: ,d) (list :d)))
   )
 
+(define-test testify
+  ; non-fn test => (is _ x) by default
+  (test? t   ((testify 5) 5))
+  (test? nil ((testify 5) 4))
+  ; a fn test is returned unchanged (used as-is)
+  (test? t   ((testify [> _ 0]) 5))
+  (test? nil ((testify [> _ 0]) -1))
+  ; optional cmp replaces is
+  (test? t   ((testify 5 >) 6))
+  (test? nil ((testify 5 >) 4)))
+
+(define-test iso
+  ; iso is kept as an alias for is (which is a deep compare here)
+  (test? t   (iso '(1 2 (3)) '(1 2 (3))))
+  (test? nil (iso '(1 2) '(1 3) '(1 3)))
+  (test? t   (iso "ab" "ab" "ab")))
+
+(define-test some
+  ; default is, list branch
+  (test? t   (some 2 '(1 2 3)))
+  (test? nil (some 9 '(1 2 3)))
+  ; default is, string branch
+  (test? t   (some #\c "abc"))
+  (test? nil (some #\z "abc"))
+  ; with cmp, list branch
+  (test? t   (some 2 '(1 2 3) >))
+  (test? nil (some 5 '(1 2 3) >))
+  ; with cmp, string branch (cmp always true => first char matches)
+  (test? t   (some #\z "abc" (fn (a b) t))))
+
+(define-test all
+  (test? t   (all 0 '(1 2 3) >))
+  (test? nil (all 2 '(1 2 3) >))
+  (test? t   (all 1 '(1 1 1)))
+  (test? nil (all 1 '(1 2 1))))
+
+(define-test find
+  ; default is, list branch
+  (test? 2   (find 2 '(1 2 3)))
+  (test? nil (find 9 '(1 2 3)))
+  ; default is, string branch (returns the matching char)
+  (test? #\c (find #\c "abc"))
+  (test? nil (find #\z "abc"))
+  ; with cmp, list branch (first elt > 2)
+  (test? 3   (find 2 '(1 2 3 4) >))
+  ; with cmp, string branch
+  (test? #\a (find #\z "abc" (fn (a b) t))))
+
+(define-test mem
+  ; mem (the function) returns the tail starting at the first match
+  (test? '(2 3)   (mem 2 '(1 2 3)))
+  (test? nil      (mem 9 '(1 2 3)))
+  ; with cmp: tail from first elt > 2
+  (test? '(3 4)   (mem 2 '(1 2 3 4) >)))
+
+(define-test rem
+  ; default is, list branch
+  (test? '(1 3)   (rem 2 '(1 2 3 2)))
+  ; default is, string branch
+  (test? "ac"     (rem #\b "abcb"))
+  ; with cmp, list branch (remove elts > 2)
+  (test? '(1 2)   (rem 2 '(1 2 3 4) >))
+  ; with cmp, string branch (cmp always true => remove everything)
+  (test? ""       (rem #\a "abc" (fn (x y) t))))
+
+(define-test keep
+  (test? '(2 2)   (keep 2 '(1 2 3 2)))
+  ; with cmp: keep elts > 2
+  (test? '(3 4)   (keep 2 '(1 2 3 4) >)))
+
+(define-test adjoin
+  ; default test is is
+  (test? '(1 2 3)   (adjoin 2 '(1 2 3)))   ; already present, no dup
+  (test? '(9 1 2 3) (adjoin 9 '(1 2 3)))   ; absent, prepend
+  ; with custom test: some elt > 2 already, so 2 is "present"
+  (test? '(1 2 3)   (adjoin 2 '(1 2 3) >))
+  ; none > 9, so 9 is added
+  (test? '(9 1 2 3) (adjoin 9 '(1 2 3) >)))
+
+(define-test setmem
+  ; truthy test => adjoin
+  (with (s (list 1 2 3))
+    (setmem t 9 s)
+    (test? '(9 1 2 3) s))
+  (with (s (list 1 2 3))
+    (setmem t 2 s)             ; already present, no dup
+    (test? '(1 2 3) s))
+  ; nil test => rem
+  (with (s (list 1 2 3 2))
+    (setmem nil 2 s)
+    (test? '(1 3) s))
+  ; with cmp arg
+  (with (s (list 1 2 3 4))
+    (setmem nil 2 s >)         ; remove elts > 2
+    (test? '(1 2) s)))
+
+(define-test mem-place
+  ; mem is a settable place via defset; (= (mem x lst) t/nil) adds/removes
+  (with (s (list 1 2 3))
+    (= (mem 9 s) t)
+    (test? '(9 1 2 3) s)
+    (= (mem 9 s) nil)
+    (test? '(1 2 3) s)))
+
+(define-test pushnew
+  (with (s (list 1 2 3))
+    (pushnew 2 s)              ; present, no change
+    (test? '(1 2 3) s)
+    (pushnew 9 s)              ; absent, prepend
+    (test? '(9 1 2 3) s))
+  ; with test arg
+  (with (s (list 1 2 3))
+    (pushnew 9 s >)            ; none > 9 => add
+    (test? '(9 1 2 3) s)
+    (pushnew 0 s >)            ; some > 0 => no add
+    (test? '(9 1 2 3) s)))
+
+(define-test pull
+  (with (s (list 1 2 3 2))
+    (pull 2 s)
+    (test? '(1 3) s))
+  ; with test arg
+  (with (s (list 1 2 3 4))
+    (pull 2 s >)               ; remove elts > 2
+    (test? '(1 2) s)))
+
+(define-test togglemem
+  (with (s (list 1 2 3))
+    (togglemem 9 s)            ; absent => add
+    (test? '(9 1 2 3) s)
+    (togglemem 9 s)            ; present => remove
+    (test? '(1 2 3) s))
+  ; with test arg
+  (with (s (list 1 2 3))
+    (togglemem 9 s >)          ; none > 9 => add
+    (test? '(9 1 2 3) s)
+    (togglemem 0 s >)          ; some > 0 => remove elts > 0
+    (test? nil s)))
+
 (define-test quasiquote
   (test? (quote a) (quasiquote a))
   (test? 'a `a)

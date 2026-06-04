@@ -15,7 +15,7 @@
 (def expect-fields (got-tbl want)
   (let bad nil
     (each (k v) (tablist want)
-      (unless (iso (got-tbl k) v)
+      (unless (is (got-tbl k) v)
         (push (list k 'want v 'got (got-tbl k)) bad)))
     bad))
 

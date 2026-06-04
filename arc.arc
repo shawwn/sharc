@@ -185,14 +185,7 @@
     `(let ,g ,x
        (or ,@(map1 (fn (c) `(is ,g ,c)) choices)))))
 
-; Could take n args, but have never once needed that.
-
-(def iso (x y)
-  (or (is x y)
-      (and (acons x) 
-           (acons y) 
-           (iso (car x) (car y)) 
-           (iso (cdr x) (cdr y)))))
+(def iso args (apply is args)) ; kept for backwards compatibility
 
 (mac when (test . body)
   `(if ,test (do ,@body)))
@@ -221,27 +214,27 @@
               (self (+ i 1)))))
    start))
 
-(def testify (x)
-  (if (isa x 'fn) x [is _ x]))
+(def testify (x (o cmp is))
+  (if (isa x 'fn) x [cmp _ x]))
 
 ; Like keep, seems like some shouldn't testify.  But find should,
 ; and all probably should.
 
-(def some (test seq)
-  (let f (testify test)
+(def some (test seq (o cmp is))
+  (let f (testify test cmp)
     (if (alist seq)
         (reclist f:car seq)
         (recstring f:seq seq))))
 
-(def all (test seq) 
-  (~some (complement (testify test)) seq))
+(def all (test seq (o cmp is))
+  (~some (complement (testify test cmp)) seq))
        
-(def mem (test seq)
-  (let f (testify test)
+(def mem (test seq (o cmp is))
+  (let f (testify test cmp)
     (reclist [if (f:car _) _] seq)))
 
-(def find (test seq)
-  (let f (testify test)
+(def find (test seq (o cmp is))
+  (let f (testify test cmp)
     (if (alist seq)
         (reclist   [if (f:car _) (car _)] seq)
         (recstring [if (f:seq _) (seq _)] seq))))
@@ -510,23 +503,23 @@
       (last (cdr xs))
       (car xs)))
 
-(def rem (test seq)
-  (let f (testify test)
+(def rem (test seq (o cmp is))
+  (let f (testify test cmp)
     (if (alist seq)
         ((afn (s)
            (if (no s)       nil
                (f (car s))  (self (cdr s))
                             (cons (car s) (self (cdr s)))))
           seq)
-        (coerce (rem test (coerce seq 'cons)) 'string))))
+        (coerce (rem test (coerce seq 'cons) cmp) 'string))))
 
 ; Seems like keep doesn't need to testify-- would be better to
 ; be able to use tables as fns.  But rem does need to, because
 ; often want to rem a table from a list.  So maybe the right answer
 ; is to make keep the more primitive, not rem.
 
-(def keep (test seq) 
-  (rem (complement (testify test)) seq))
+(def keep (test seq (o cmp is))
+  (rem (complement (testify test cmp)) seq))
 
 ;(def trues (f seq) 
 ;  (rem nil (map f seq)))
@@ -595,35 +588,36 @@
          (do1 (car ,g) 
               (,setter (cdr ,g)))))))
 
-(def adjoin (x xs (o test iso))
-  (if (some [test x _] xs)
+(def adjoin (x xs (o test is))
+  (if (some x xs test)
       xs
       (cons x xs)))
-
-(mac pushnew (x place . args)
-  (w/uniq gx
-    (let (binds val setter) (setforms place)
-      `(atwiths ,(+ (list gx x) binds)
-         (,setter (adjoin ,gx ,val ,@args))))))
-
-(mac pull (test place)
-  (w/uniq g
-    (let (binds val setter) (setforms place)
-      `(atwiths ,(+ (list g test) binds)
-         (,setter (rem ,g ,val))))))
 
 (mac setmem (test x place . args)
   (w/uniq (gt gx)
     (let (binds val setter) (setforms place)
       `(atwiths ,(+ (list gt test gx x) binds)
          (,setter (if ,gt
-                      (pushnew ,gx ,val)
-                      (pull ,gx ,val ,@args)))))))
+                      (adjoin ,gx ,val ,@args)
+                      (rem ,gx ,val ,@args)))))))
+
+(defset mem (x place . args)
+  (w/uniq h
+    (list nil
+          `(mem ,x ,place ,@args)
+          `(fn (,h) (setmem ,h ,x ,place ,@args)))))
+
+(mac pushnew (x place . args)
+  `(set (mem ,x ,place ,@args)))
+
+(mac pull (test place . args)
+  `(wipe (mem ,test ,place ,@args)))
 
 (mac togglemem (x place . args)
-  (w/uniq gx
-    `(let ,gx ,x
-       (setmem (~mem ,gx ,place) ,gx ,place ,@args))))
+  (w/uniq (gx gargs)
+    `(atwith (,gx ,x ,@(if args `(,gargs ,@args)))
+       (= (mem ,gx ,place ,@(if args (list gargs)))
+          (~mem ,gx ,place ,@(if args (list gargs)))))))
 
 (mac ++ (place (o i 1))
   (if (isa place 'sym)
