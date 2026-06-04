@@ -221,7 +221,7 @@ Connection: close"))
              ;; request-thread) so these are naturally isolated.
              (= (the req) req
                 (the ip)  ip
-                (the me)  (errsafe (get-user req)))
+                (the me)  (errsafe (get-user)))
              (if (redirector* op)
                  (do (prn rdheader*)
                      (prn "Location: " (f str req))
@@ -437,9 +437,9 @@ Connection: close"))
 (mac rlinkf (text . body)
   `(tag (a href (rflink {do ,@body})) (pr ,text)))
 
-;(defop top req (linkf 'whoami? (req) (pr "I am " (get-user req))))
+;(defop top (linkf 'whoami? (pr "I am " (get-user))))
 
-;(defop testf req (w/link (pr "ha ha ha") (pr "laugh")))
+;(defop testf (w/link (pr "ha ha ha") (pr "laugh")))
 
 (mac w/link-if (test expr . body)
   `(tag-if ,test (a href (flink {do ,expr}))

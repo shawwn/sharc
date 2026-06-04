@@ -27,7 +27,7 @@
 
 (= cookie->user* (table) user->cookie* (table) logins* (table))
 
-(def get-user (req)
+(def get-user ((t req))
   (let u (aand (alref req!cooks "user") (cookie->user* it))
     (when u (= (logins* u) req!ip))
     u))
