@@ -1372,7 +1372,7 @@
 
 ; (def only (f g . args) (aif (apply g args) (f it)))
 
-(def only (x) x)
+(def only (x . args) x)
 
 (mac conswhen (f x y)
   (w/uniq (gf gx)
