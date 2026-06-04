@@ -949,9 +949,9 @@ isn't shadowed by a lexical binding."
                   (ac b1))))
         `(let ((zz ,b))
            ,(cond
+              ((lex-p a)          `(setq ,a zz))
               ((arc-sym= a "nil") (error "Can't rebind nil"))
               ((arc-sym= a "t")   (error "Can't rebind t"))
-              ((lex-p a)          `(setq ,a zz))
               (t `(setf (arc-global ',a) zz)))
            zz))
       (error "First arg to assign must be a symbol: ~S" a)))
@@ -959,7 +959,11 @@ isn't shadowed by a lexical binding."
 ;;;; ---- call / macros ----
 
 (defun ac-var-ref (s)
-  (if (lex-p s) s `(arc-global-ref ',s)))
+  (cond ((lex-p s) s)
+        ((or (arc-sym= s "scope")
+             (arc-sym= s "scope%"))
+         (ac `(%scope ,*env*)))
+        (t `(arc-global-ref ',s))))
 
 (defun lex-p (v) (member v *env* :test #'eq))
 

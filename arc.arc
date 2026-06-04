@@ -1700,6 +1700,27 @@
          (= (the ,var) ,prev)))))
 
 
+; Referencing the bare symbol `scope` (or `scope%`) compiles to
+; (%scope env), where ac splices in its compile-time lexical environment.
+; For each distinct lexical in scope, emit (name (fn () name) (fn (v) ...))
+; so you can read and mutate the live binding at runtime (handy for
+; debugging from a breakpoint).  Non-symbols (the fn-name markers ac keeps
+; in env) are skipped, and a shadowed name appears once, innermost binding.
+; Two spellings: a lexical named `scope` shadows the trigger (lex-p wins),
+; so `scope%` is a less-collidable fallback to reach the reflection.
+
+(mac %scope (env)
+  `(list ,@(accum a
+             (let seen (obj)
+               (each x env
+                 (when (isa x 'sym)
+                   (unless (seen x)
+                     (set (seen x))
+                     (w/uniq h
+                       (a `(list ',x
+                                 (fn () ,x)
+                                 (fn (,h) (assign ,x ,h))))))))))))
+
 ; any logical reason I can't say (push x (if foo y z)) ?
 ;   eval would have to always ret 2 things, the val and where it came from
 ; idea: implicit tables of tables; setf empty field, becomes table
