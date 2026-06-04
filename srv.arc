@@ -365,7 +365,7 @@ Connection: close"))
         (each id kill 
           (wipe (fns* id)))))))
 
-(= fnurl* "/x" rfnurl* "/r" rfnurl2* "/y" jfnurl* "/a")
+(= fnurl* "/x" rfnurl* "/r" rfnurl2* "/y")
 
 (= dead-msg* "\nUnknown or expired link.")
  
@@ -382,13 +382,6 @@ Connection: close"))
   (aif (fns* (sym arg!fnid))
        (w/stdout str (it))
        "deadlink"))
-
-; For asynchronous calls; discards the page.  Would be better to tell
-; the fn not to generate it.
-
-(defop-raw a (str req)
-  (aif (fns* (sym arg!fnid))
-       (tostring (it))))
 
 (defopr r
   (aif (fns* (sym arg!fnid))
