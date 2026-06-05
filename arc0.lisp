@@ -1186,15 +1186,38 @@
 
 (xdef exact (x) (tnil (and (integerp x) (= x (truncate x)))))
 
+;; Clocks:
+;;  now  -- wall-clock Unix time (seconds, double, microsecond precision);
+;;          absolute, but can jump (NTP / manual changes).
+;;  msec -- monotonic milliseconds (double), for measuring durations.
+;;  nsec -- monotonic nanoseconds (integer), jump-proof and high-res.
+;; msec and nsec have arbitrary, unrelated epochs, so only differences
+;; are meaningful -- don't treat them as wall-clock times or compare them
+;; to now (or each other).
+
+(defun arc-now ()
+  (multiple-value-bind (s us) (sb-ext:get-time-of-day)
+    (+ s (/ us 1000000d0))))
+
+(xdef now #'arc-now)
+
 (defun arc-msec ()
   (* 1d0 (* 1000 (/ (get-internal-real-time)
                     internal-time-units-per-second))))
 
 (xdef msec #'arc-msec)
 
-(xdef current-process-milliseconds ()
-  (floor (* 1000 (/ (get-internal-run-time)
+(defun arc-nsec ()
+  (multiple-value-bind (s ns) (sb-unix:clock-gettime sb-unix:clock-monotonic)
+    (+ (* s 1000000000) ns)))
+
+(xdef nsec #'arc-nsec)
+
+(defun arc-current-process-milliseconds ()
+  (* 1d0 (* 1000 (/ (get-internal-run-time)
                     internal-time-units-per-second))))
+
+(xdef current-process-milliseconds #'arc-current-process-milliseconds)
 
 (xdef current-gc-milliseconds () 0)
 
