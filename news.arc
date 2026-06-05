@@ -457,6 +457,7 @@
   (when (or (admin) arg!perf)
     (br2)
     (w/bars
+      (pr (len fns*) " fnids")
       (pr (len items*) "/" maxid* " loaded")
       (pr (round (/ (memory) 1000000)) " mb")
       (pr (num elapsed 3 t t) " msec")
