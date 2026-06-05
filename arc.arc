@@ -1132,7 +1132,12 @@
 (def avg (ns) (/ (apply + ns) (len ns)))
 
 (def med (ns (o test >))
-  ((sort test ns) (round (/ (len ns) 2))))
+  (with (xs (sort test ns) n (len ns))
+    (if (odd n)
+        (xs (trunc (/ n 2)))
+        (/ (+ (xs    (/ n 2))
+              (xs (- (/ n 2) 1)))
+           2))))
 
 ; Use mergesort on assumption that mostly sorting mostly sorted lists
 ; benchmark: (let td (n-of 10000 (rand 100)) (time (sort < td)) 1) 

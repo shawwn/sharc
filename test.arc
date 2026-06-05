@@ -133,6 +133,13 @@
     (test? true (and (> n 0) (< n 1))))
   (test? 4 (trunc 4.78)))
 
+(define-test med
+  (test? 2   (med '(3 1 2)))      ; odd: middle element
+  (test? 3   (med '(1 2 3 4 5)))  ; odd, longer
+  (test? 5/2 (med '(4 1 2 3)))    ; even: average of the two middles
+  (test? 15  (med '(10 20)))      ; even pair
+  (test? 7   (med '(7))))         ; single element
+
 (define-test precedence
   (test? -3 (- (+ 1 2)))
   (test? 10 (- 12 (+ 1 1)))
