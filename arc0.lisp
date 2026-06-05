@@ -1090,6 +1090,11 @@
     (when args (arc-call1 (car args) h))
     h))
 
+(xdef isotable (&rest args)
+  (let ((h (make-hash-table :test #'arc-is2 :hash-function #'sb-impl::psxhash :synchronized t)))
+    (when args (arc-call1 (car args) h))
+    h))
+
 (xdef maptable (fn table)
   (maphash (lambda (k v) (arc-call2 fn k v)) table)
   table)

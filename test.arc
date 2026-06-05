@@ -420,6 +420,55 @@ c"
   (test? nil (is (coerce '(1 2 3) 'vector) (coerce '(1 2 4) 'vector)))
   (test? nil (is (coerce '(1 2)   'vector) (coerce '(1 2 3) 'vector))))
 
+(define-test table
+  ; flat keys (string/symbol/int), absent key, and default for absent
+  (let h (table)
+    (= (h "a") 1  (h 'b) 2  (h 3) 'three)
+    (test? 1      (h "a"))
+    (test? 2      (h 'b))
+    (test? 'three (h 3))
+    (test? nil    (h "missing"))
+    (test? 'd     (h "missing" 'd))
+    (test? 3      (len h)))
+  ; the optional init fn is called on the new table
+  (test? 1 ((table [sref _ 1 'x]) 'x))
+  ; cons keys match by content (equal deep-compares conses)
+  (let h (table)
+    (= (h '(1 2)) 'x)
+    (test? 'x (h (list 1 2)))
+    (test? 1  (len h)))
+  ; but a table key compares by identity under equal: a distinct
+  ; equal-content table is a different key
+  (let h (table)
+    (let k (obj a 1)
+      (= (h k) 'same)
+      (test? 'same (h k)))            ; same object -> found
+    (test? nil (h (obj a 1)))         ; distinct equal table -> not found
+    (test? 1   (len h))))
+
+(define-test isotable
+  ; table keys are compared structurally (deep), unlike a regular table
+  (let h (isotable)
+    (= (h (obj a 1 b 2)) 'foo)
+    (test? 'foo (h (obj a 1 b 2)))    ; distinct table, same content -> found
+    (test? nil  (h (obj a 1)))        ; different content -> not found
+    (test? 1    (len h)))
+  ; vector and cons keys also match by content
+  (let h (isotable)
+    (= (h (coerce '(1 2 3) 'vector)) 'vec
+       (h '(9 8))                     'lst)
+    (test? 'vec (h (coerce '(1 2 3) 'vector)))
+    (test? 'lst (h (list 9 8)))
+    (test? nil  (h (coerce '(1 2) 'vector)))
+    (test? 2    (len h)))
+  ; equality stays case-sensitive (arc-is2 is the test; psxhash, which is
+  ; case-insensitive, only shares a bucket -- it doesn't merge the keys)
+  (let h (isotable)
+    (= (h "Foo") 'u  (h "foo") 'l)
+    (test? 'u (h "Foo"))
+    (test? 'l (h "foo"))
+    (test? 2  (len h))))
+
 (define-test utf8
   ; string <-> utf-8 bytes (λ = U+03BB = ce bb, é = c3 a9)
   (test? '(206 187)     (coerce (utf8-encode "λ") 'cons))
