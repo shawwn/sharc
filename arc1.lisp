@@ -674,7 +674,11 @@ isn't shadowed by a lexical binding."
 
 (defun ac-qs (x)
   (cond
-    ((not (consp x)) x)
+    ;; atoms pass through as a literal CL value: arc-package symbols are
+    ;; converted to their CL symbols (uppercased, like #'/cl-quoted), so
+    ;; #`(let ...) yields a real (CL:LET ...) without needing cl:: on
+    ;; every operator.  #,holes are still ac-compiled below.
+    ((not (consp x)) (cl-quoted x))
     ((arc-sym= (car x) "unsyntax") (ac (cadr x)))
     ((arc-sym= (car x) "unsyntax-splicing")
      (error "unsyntax-splicing inside quasisyntax not supported: ~S" x))

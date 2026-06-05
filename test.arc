@@ -784,6 +784,12 @@ c"
   ;; CL `let` is a special form and needs ((var val) ...) unevaluated;
   ;; without quasisyntax, ac would compile ((y 7)) as a function call.
   (test? 7 #`(cl::let ((y 7)) y))
+  ;; Bare operators (no cl:: prefix) work too: ac-qs uppercases arc
+  ;; symbols to their CL symbols, like #' does, so `let`/`+`/etc. resolve
+  ;; to the CL ones.
+  (test? 7    #`(let ((y 7)) y))
+  (test? 6    #`(+ 1 2 3))
+  (test? "hi" #`(with-output-to-string (s) (princ "hi" s)))
   ;; #, substitutes an arc-evaluated expression into the hole.
   (let v 41
     (test? 41 #`(cl::let ((y #,v)) y)))
