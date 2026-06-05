@@ -1131,8 +1131,8 @@
 
 (def avg (ns) (/ (apply + ns) (len ns)))
 
-(def med (ns (o test >))
-  (with (xs (sort test ns) n (len ns))
+(def med (ns)
+  (with (xs (sort > ns) n (len ns))
     (if (odd n)
         (xs (trunc (/ n 2)))
         (/ (+ (xs    (/ n 2))
