@@ -196,7 +196,7 @@
                  (string (comma a)
                          (when (and trail-zeros (> digits 0))
                            (string "." (newstring digits #\0))))
-                 (withs (d (expt 10 digits)
+                 (withs (d (expt 10d0 digits)
                          m (/ (roundup (* a d)) d)
                          i (trunc m)
                          r (abs (trunc (- (* m d) (* i d)))))
