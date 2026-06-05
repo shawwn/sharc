@@ -1187,8 +1187,9 @@
 (xdef exact (x) (tnil (and (integerp x) (= x (truncate x)))))
 
 (defun arc-msec ()
-  (floor (* 1000 (/ (get-internal-real-time)
+  (* 1d0 (* 1000 (/ (get-internal-real-time)
                     internal-time-units-per-second))))
+
 (xdef msec #'arc-msec)
 
 (xdef current-process-milliseconds ()

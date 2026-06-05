@@ -459,7 +459,7 @@
     (w/bars
       (pr (len items*) "/" maxid* " loaded")
       (pr (round (/ (memory) 1000000)) " mb")
-      (pr elapsed " msec")
+      (pr (num elapsed 3 t t) " msec")
       (when (admin)
         (link "settings" "newsadmin")
         (hook 'admin-bar whence)))))
@@ -2626,11 +2626,11 @@ first asterisk isn't whitespace.
     (each name (sort < newsop-names*)
       (tr (td name)
           (let ms (only&avg (qlist (optimes* name)))
-            (tdr:prt (only&round ms))
-            (tdr:prt (only&med (qlist (optimes* name))))
+            (tdr:prt (only&num ms 3 t t))
+            (tdr:prt (only&num (only&med (qlist (optimes* name))) 3 t t))
             (let n (opcounts* name)
               (tdr:prt n)
-              (tdr:prt (and n (round (/ (* n ms) 1000))))))))))
+              (tdr:prt (and n (num (/ (* n ms) 1000) 3 t t)))))))))
 
 (defop topcolors
   (minipage "Custom Colors"

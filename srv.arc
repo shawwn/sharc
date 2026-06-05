@@ -114,8 +114,8 @@
 (def log-request (type op args cooks ip t0 t1)
   (with (parsetime (- t1 t0) respondtime (- (msec) t1))
     (srvlog 'srv ip 
-                 parsetime 
-                 respondtime 
+                 (num parsetime 3 t t t)
+                 (num respondtime 3 t t t)
                  (if (> (+ parsetime respondtime) 1000) "***" "")
                  type
                  op

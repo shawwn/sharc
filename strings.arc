@@ -180,14 +180,16 @@
                  (+ i 1))))
         "")))
 
-(def num (n (o digits 2) (o trail-zeros nil) (o init-zero nil))
+(def num (n (o digits 2) (o trail-zeros nil) (o init-zero nil) (o nocomma nil))
   (withs (comma
           (fn (i)
-            (tostring
-              (map [apply pr (rev _)]
-                   (rev (intersperse '(#\,)
-                                     (tuples (rev (coerce (string i) 'cons))
-                                             3))))))
+            (if nocomma
+                (string i)
+                (tostring
+                  (map [apply pr (rev _)]
+                       (rev (intersperse '(#\,)
+                                         (tuples (rev (coerce (string i) 'cons))
+                                                 3)))))))
           abrep
           (let a (abs n)
             (if (< digits 1)
