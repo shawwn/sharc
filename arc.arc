@@ -1139,6 +1139,9 @@
               (xs (- (/ n 2) 1)))
            2))))
 
+(def median (ns (o test >))
+  ((sort test ns) (trunc (/ (len ns) 2))))
+
 ; Use mergesort on assumption that mostly sorting mostly sorted lists
 ; benchmark: (let td (n-of 10000 (rand 100)) (time (sort < td)) 1) 
 
