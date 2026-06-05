@@ -356,7 +356,7 @@ Connection: close"))
 (def harvest-fnids ((o n 50000))  ; was 20000
   (when (len> fns* n) 
     (pull (fn ((id created lasts))
-            (when (> (since created) lasts)    
+            (when (> (since created) lasts)
               (wipe (fns* id))
               t))
           timed-fnids*)
