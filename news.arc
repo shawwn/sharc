@@ -826,7 +826,7 @@ function vote(node) {
 
 (mac newscache (name time . body)
   (w/uniq gc
-    `(let ,gc (cache {* caching* ,time}
+    `(let ,gc (cache {if arg!perf nil (* caching* ,time)}
                      {tostring (w/me nil ,@body)})
        (def ,name ()
          (if (me)

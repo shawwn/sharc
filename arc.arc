@@ -1282,10 +1282,12 @@
 
 (def cache (timef valf)
   (with (cached nil gentime nil)
-    {do (unless (and cached (< (since gentime) (timef)))
-          (= cached  (valf)
-             gentime (seconds)))
-        cached}))
+    {aif (timef)
+         (do (unless (and cached (< (since gentime) it))
+               (= cached (valf)
+                  gentime (seconds)))
+             cached)
+         (valf)}))
 
 (mac defcache (name lasts . body)
   `(safeset ,name (cache {do ,lasts}
