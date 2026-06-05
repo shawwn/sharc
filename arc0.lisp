@@ -1178,7 +1178,8 @@
 
 (xdef bound (x) (tnil (arc-bound-p x)))
 
-(xdef newstring #'make-string)
+(xdef newstring (size &optional (c #\space))
+  (make-string size :initial-element c))
 
 (xdef trunc (x) (truncate x))
 
