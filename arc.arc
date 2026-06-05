@@ -1506,9 +1506,6 @@
        (deq q))
      (enq val q)))
 
-(def median (ns)
-  ((sort > ns) (trunc (/ (len ns) 2))))
-
 (mac noisy-each (n var val . body)
   (w/uniq (gn gc)
     `(with (,gn ,n ,gc 0)
