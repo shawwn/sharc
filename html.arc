@@ -135,6 +135,7 @@
 (attribute td         width          opnum)
 (attribute td         valign         opsym)
 (attribute td         class          opstring)
+(attribute td         timestamp      opnum)
 (attribute tr         bgcolor        opcolor)
 (attribute hr         color          opcolor)
 (attribute span       class          opstring)

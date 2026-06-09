@@ -318,11 +318,13 @@
                      (no val)
                       ""
                      val)
-         (tag (textarea cols (if (is typ 'doc) bigformwid* formwid*) 
+         (tag (textarea name id
+                        cols (if (is typ 'doc) bigformwid* formwid*) 
                         rows (needrows text formwid* 4)
                         wrap 'virtual 
-                        style (if (is typ 'doc) "font-size:8.5pt")
-                        name id)
+                        style (if (is typ 'doc)
+                                  "font-size:8.5pt"
+                                  "vertical-align:bottom"))
            (prn) ; needed or 1 initial newline gets chopped off
            (pr text))
          (when (in typ 'mdtext 'mdtext2)
@@ -453,10 +455,12 @@
     (when view
       (when question
         (tr (td (prn question))))
-      (tr (unless question (tag (td valign 'top)  (pr id ":")))
-          (td (if mod 
-                  (varfield typ id val)
-                  (varline  typ id val liveurls))))
+      (if (is typ 'raw)
+          (pr val)
+          (tr (unless question (tag (td valign 'top)  (only&pr id ":")))
+              (td (if mod 
+                      (varfield typ id val)
+                      (varline  typ id val liveurls)))))
       (prn))))
 
 ; http://daringfireball.net/projects/markdown/syntax

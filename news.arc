@@ -506,9 +506,9 @@ td    { font-family:Verdana; font-size:10pt; color:#828282; }
 .admin td   { font-family:Verdana; font-size:8.5pt; color:#000000; }
 .subtext td { font-family:Verdana; font-size:  7pt; color:#828282; }
 
-input    { font-family:Courier; font-size:10pt; color:#000000; }
+input    { font-family:monospace; font-size:10pt; }
 input[type=\"submit\"] { font-family:Verdana; }
-textarea { font-family:Courier; font-size:10pt; color:#000000; }
+textarea { font-family:monospace; font-size:10pt; resize:both; }
 
 a:link    { color:#000000; text-decoration:none; } 
 a:visited { color:#828282; text-decoration:none; }
@@ -756,12 +756,6 @@ function vote(node) {
 (def user-page (user)
   (shortpage nil nil (+ "Profile: " user) (user-url user)
     (profile-form user)
-    (br2)
-    (when (some astory:item (uvar user submitted))
-      (underlink "submissions" (submitted-url user)))
-    (when (some acomment:item (uvar user submitted))
-      (sp)
-      (underlink "comments" (threads-url user)))
     (hook 'user user)))
 
 (def profile-form (user)
@@ -776,6 +770,12 @@ function vote(node) {
 
 (= topcolor-threshold* 0)
 
+(= email-msg*
+  (+ "<font size=\"2\">"
+     "Only admins see your email below. To share publicly,"
+     " add to the 'about' box."
+     "</font>"))
+
 (def user-fields (user)
   (withs (e (editor)
           a (admin)
@@ -784,40 +784,58 @@ function vote(node) {
           u (or a w)
           m (or a (and (member) w))
           p (profile user))
-    `((string  user       ,user                                     t   nil)
-      (string  name       ,(p 'name)                               ,m  ,m)
-      (string  created    ,(text-age:user-age user)                 t   nil)
-      (string  password   ,(resetpw-link)                          ,w   nil)
-      (string  saved      ,(saved-link user)                       ,u   nil)
-      (int     auth       ,(p 'auth)                               ,e  ,a)
-      (yesno   member     ,(p 'member)                             ,a  ,a)
-      (posint  karma      ,(p 'karma)                               t  ,a)
-      (num     avg        ,(p 'avg)                                ,a  nil)
-      (yesno   ignore     ,(p 'ignore)                             ,e  ,e)
-      (num     weight     ,(p 'weight)                             ,a  ,a)
-      (mdtext2 about      ,(p 'about)                               t  ,u)
-      (string  email      ,(p 'email)                              ,u  ,u)
-      (yesno   showdead   ,(p 'showdead)                           ,u  ,u)
-      (yesno   noprocrast ,(p 'noprocrast)                         ,u  ,u)
-      (string  firstview  ,(p 'firstview)                          ,a   nil)
-      (string  lastview   ,(p 'lastview)                           ,a   nil)
-      (posint  maxvisit   ,(p 'maxvisit)                           ,u  ,u)
-      (posint  minaway    ,(p 'minaway)                            ,u  ,u)
-      (sexpr   keys       ,(p 'keys)                               ,a  ,a)
-      (hexcol  topcolor   ,(or (p 'topcolor) (hexrep site-color*)) ,k  ,k)
-      (int     delay      ,(p 'delay)                              ,u  ,u))))
+    `((raw     user        ,(user-field user)                        t   nil)
+      (string  name        ,(p 'name)                               ,m  ,m)
+      (string  created     ,(text-age:user-age user)                 t   nil)
+      (int     auth        ,(p 'auth)                               ,e  ,a)
+      (yesno   member      ,(p 'member)                             ,a  ,a)
+      (posint  karma       ,(p 'karma)                               t  ,a)
+      (num     avg         ,(p 'avg)                                ,a  nil)
+      (yesno   ignore      ,(p 'ignore)                             ,e  ,e)
+      (num     weight      ,(p 'weight)                             ,a  ,a)
+      (mdtext2 about       ,(p 'about)                               t  ,u)
+      (raw     nil         ,"<tr style=\"height:5px\"></tr>"        ,u  nil)
+      (string  nil         ,email-msg*                              ,u  nil)
+      (string  email       ,(p 'email)                              ,u  ,u)
+      (yesno   showdead    ,(p 'showdead)                           ,u  ,u)
+      (yesno   noprocrast  ,(p 'noprocrast)                         ,u  ,u)
+      (string  firstview   ,(p 'firstview)                          ,a   nil)
+      (string  lastview    ,(p 'lastview)                           ,a   nil)
+      (posint  maxvisit    ,(p 'maxvisit)                           ,u  ,u)
+      (posint  minaway     ,(p 'minaway)                            ,u  ,u)
+      (sexpr   keys        ,(p 'keys)                               ,a  ,a)
+      (hexcol  topcolor    ,(or (p 'topcolor) (hexrep site-color*)) ,k  ,k)
+      (int     delay       ,(p 'delay)                              ,u  ,u)
+      (string  nil         ,(resetpw-link)                          ,w   nil)
+      (string  nil         ,(user-submissions-link user)             t   nil)
+      (string  nil         ,(user-comments-link user)                t   nil)
+      (string  nil         ,(upvoted-links user)                    ,u   nil)
+      )))
 
-(def saved-link (user)
-  (when (or (admin) (me user))
-    (let n (if (len> (votes user) 500)
-               "many"
-               (len (voted-stories user)))
-      (if (is n 0)
-          ""
-          (tostring (underlink n (saved-url user)))))))
+(def user-field (user)
+  (tostring
+    (tag (tr class 'athing)
+      (tag (td valign 'top)
+        (pr "user:"))
+      (tag (td timestamp (uvar user created))
+        (tag (a href (user-url user) class 'hnuser)
+          (pr user))))))
 
 (def resetpw-link ()
   (tostring (underlink "reset password" "resetpw")))
+
+(def user-submissions-link ((t user me))
+  (tostring:underlink "submissions" (submitted-url user)))
+
+(def user-comments-link ((t user me))
+  (tostring:underlink "comments" (threads-url user)))
+
+(def upvoted-links ((t user me))
+  (tostring
+    (when (uvar user votes)
+      (underlink "upvoted submissions" (upvoted-url user))
+      (pr " / ")
+      (underlink "comments" (upvoted-url user t)))))
 
 (newsop welcome ()
   (pr "Welcome to " this-site* ", " user "!"))
@@ -918,23 +936,33 @@ function vote(node) {
       (hook 'listspage))))
 
 
-(def saved-url (user) (+ "saved?id=" user))
+(def voted-items (test (t user me))
+  (keep test (keep [cansee _ user] (map item (keys:votes user)))))
 
-(newsop saved (id) 
+(def upvoted-url (user (o comments))
+  (+ "upvoted?id=" user
+     (if comments "&comments=t" "")))
+
+(newsop upvoted (id comments) 
   (if (only&profile id)
-      (savedpage id)
+      (upvoted-page id (in comments "t" "T"))
       (pr "No such user.")))
 
-(def savedpage (user)
+(def upvoted-page (user comments)
   (if (or (me user) (admin))
       (listpage (msec)
-                (sort (compare < item-age) (voted-stories user))
-               "saved" "Saved Links" (saved-url user))
+                (sort (compare < item-age)
+                      (voted-items (if comments acomment astory) user))
+                "upvoted"
+                (if (and (~me user) comments)
+                     "@{user}'s upvoted comments"
+                    (and (~me user) (no comments))
+                     "@{user}'s upvoted submissions"
+                    comments
+                     "Upvoted comments"
+                     "Upvoted submissions")
+                (upvoted-url user comments))
       (pr "Can't display that.")))
-
-(def voted-stories (user)
-  (keep [astory&cansee _]
-        (map item (keys:votes user))))
 
 
 ; Story Display
