@@ -1251,6 +1251,29 @@
 
 (xdef memory () (sb-kernel:dynamic-usage))
 
+(defun arc-heap-hist ()
+  (sb-ext:gc :full t)
+  (let ((h (make-hash-table :test 'eq)))
+    (sb-vm:map-allocated-objects
+     (lambda (obj widetag size)
+       (declare (ignore widetag size))
+       (incf (gethash (type-of obj) h 0)))
+     :dynamic)
+    (let (rows)
+      (maphash (lambda (k v) (push (cons v k) rows)) h)
+      (sort (subseq (sort rows #'> :key #'car) 0 30)
+            #'string< :key #'arc-heap-name))))
+
+(defun arc-heap-name (x)
+  (if (consp x)
+      (or (arc-heap-name (car x))
+          (arc-heap-name (cdr x)))
+      (if (symbolp x)
+          (symbol-name x)
+          nil)))
+
+(xdef heap-hist #'arc-heap-hist)
+
 ;;;; ---- close / force-close ----
 
 (xdef close (&rest args)
