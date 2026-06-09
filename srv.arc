@@ -440,7 +440,7 @@ Connection: close"))
 ; f should be a fn of one arg, which will be http request args.
 
 (def fnform (f bodyfn (o redir))
-  (tag (form method 'post action (if redir rfnurl2* fnurl*))
+  (form (if redir rfnurl2* fnurl*)
     (fnid-field (fnid f))
     (bodyfn)))
 
@@ -454,12 +454,12 @@ Connection: close"))
 ; through (the req), (the me), arg!key etc.
 
 (mac aform (handler . body)
-  `(tag (form method 'post action fnurl*)
+  `(form fnurl*
      (fnid-field (fnid {do (prn) ,handler}))
      ,@body))
 
 (mac arform (handler . body)
-  `(tag (form method 'post action rfnurl*)
+  `(form rfnurl*
      (fnid-field (fnid {do ,handler}))
      ,@body))
 
@@ -468,14 +468,14 @@ Connection: close"))
 (mac taform (lasts handler . body)
   (w/uniq gh
     `(let ,gh {do (prn) ,handler}
-       (tag (form method 'post action fnurl*)
+       (form fnurl*
          (fnid-field (if ,lasts (timed-fnid ,lasts ,gh) (fnid ,gh)))
          ,@body))))
 
 (mac tarform (lasts handler . body)
   (w/uniq gh
     `(let ,gh {do ,handler}
-       (tag (form method 'post action rfnurl*)
+       (form rfnurl*
          (fnid-field (if ,lasts (timed-fnid ,lasts ,gh) (fnid ,gh)))
          ,@body))))
 
@@ -483,12 +483,12 @@ Connection: close"))
 ; HTTP headers (no implicit blank line before content).
 
 (mac aformh (handler . body)
-  `(tag (form method 'post action fnurl*)
+  `(form fnurl*
      (fnid-field (fnid {do ,handler}))
      ,@body))
 
 (mac arformh (handler . body)
-  `(tag (form method 'post action rfnurl2*)
+  `(form rfnurl2*
      (fnid-field (fnid {do ,handler}))
      ,@body))
 
