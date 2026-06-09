@@ -453,13 +453,17 @@
                  (hook 'longfoot)
                  (admin-bar (- (msec) ,gt) ,whence)))))))
 
+(def memory-after-gc ()
+  (sb-ext::gc :full t)
+  (memory))
+
 (def admin-bar (elapsed whence)
   (when (or (admin) arg!perf)
     (br2)
     (w/bars
       (pr (len fns*) " fnids")
       (pr (len items*) "/" maxid* " loaded")
-      (pr (round (/ (memory) 1000000)) " mb")
+      (pr (num:round:memory-after-gc) " bytes")
       (pr (num elapsed 3 t t) " msec")
       (when (admin)
         (link "settings" "newsadmin")
