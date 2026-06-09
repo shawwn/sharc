@@ -443,6 +443,7 @@
 
 (mac longpage (t1 lid label title whence . body)
   (w/uniq gt
+    (set (ignored-scopeids* gt)) ; ignore gt because (msec) is unique
     `(let ,gt ,t1
        (fulltop ,lid ,label ,title ,whence
          (trtd ,@body)
@@ -453,8 +454,11 @@
                  (hook 'longfoot)
                  (admin-bar (- (msec) ,gt) ,whence)))))))
 
+(def gc ((o full t))
+  (sb-ext::gc :full full))
+
 (def memory-after-gc ()
-  (sb-ext::gc :full t)
+  (gc)
   (memory))
 
 (def admin-bar (elapsed whence)

@@ -171,6 +171,7 @@ Connection: close"))
 
 (mac defop-raw (name parms . body)
   (w/uniq t1
+    (set (ignored-scopeids* t1)) ; need to ignore t1 because (msec) is unique
     `(= (srvops* ',name) 
         (fn ,parms 
           (let ,t1 (msec)
@@ -317,33 +318,113 @@ Connection: close"))
                                            it)))
        ""))
 
-(= fns* (table) fnids* nil timed-fnids* nil)
+(def valid-scopeval (x)
+  (if (isa x 'table)
+      (isnt x (the req))
+      (in (type x) 'string 'vector 'sym 'cons 'int 'num 'char 'table)))
+
+(def scrub-scopeval (x)
+  (case (type x)
+    cons  (map scrub-scopeval x)
+    fn    nil
+    table (aif (is x (the req))
+                nil
+               (x 'id)
+                (obj id it)
+                (let tbl (table)
+                  (each (k v) x
+                    (awhen (scrub-scopeval v)
+                      (= (tbl k) it)))
+                  tbl))
+    (if (valid-scopeval x) x)))
+
+(= ignored-scopeids* (table))
+
+; Snapshot the captured lexicals so links with identical bodies but
+; different closed-over data get distinct fnids.  Caveat: values we
+; can't faithfully represent are invisible to the key -- closures
+; become nil in scrub-scopeval, and anything off valid-scopeval's
+; allowlist is dropped here.  So two links differing *only* by such a
+; value collapse to one fnid.  This fails open (assume same), not
+; closed; in practice the quoted body plus op/user/args distinguish
+; them.  If it ever bites, bail to a fresh gen-fnid instead.
+(def scopevals (scope)
+  (accum a
+    (each (id getx setx) scope
+      (let val (getx)
+        (unless (ignored-scopeids* id)
+          (when (valid-scopeval val)
+            (a (list id (scrub-scopeval val)))))))))
+
+(mac scopekey (name . body)
+  `(list ,name
+         (scopevals scope)
+         ',body))
+
+(= fns* (table) fnids* (table) timed-fnids* (table))
+
+(= fnkey->fnid* (isotable) fnid->fnkey* (table))
+
+(def forget-fnid (key)
+  (atomic
+    (wipe (fns* key))
+    (wipe (fnids* key))
+    (wipe (timed-fnids* key))
+    (whenlet fnkey (fnid->fnkey* key)
+      (wipe (fnkey->fnid* fnkey))
+      (wipe (fnid->fnkey* key))
+      t)))
 
 ; count on huge (expt 64 22) size of fnid space to avoid clashes
 
-(def new-fnid ()
-  (check (sym (rand-string 22)) ~fns* (new-fnid)))
+(def gen-fnid ()
+  (check (rand-string 22) ~fns* (gen-fnid)))
 
-(def fnid (f)
-  (atlet key (new-fnid)
-    (= (fns* key) f)
-    (push key fnids*)
+; Only GETs fold args into the key.  A link rendered while serving a
+; POST (an aform handler's inline page) is keyed on op/user/scope
+; alone.  Not a hole: a link whose behavior depends on the page's args
+; must close over them -- the fnid-invocation request carries no such
+; args -- and closed-over values are already in the scopekey.  The GET
+; args are belt-and-suspenders over scope capture.
+(def fnid-key (key (t req))
+  (list (get-user)
+        req!op
+        (when (is req!type 'get)
+          (reassemble-args req))
+        key))
+
+(def new-fnid (key)
+  (if key
+      (let fnkey (fnid-key key)
+        (or= (fnkey->fnid* fnkey)
+             (let id (gen-fnid)
+               (= (fnid->fnkey* id) fnkey)
+               id)))
+      (gen-fnid)))
+
+(def fnid (f (o k))
+  (atlet key (new-fnid k)
+    (= (fns* key) f
+       (fnids* key) (list (seconds) (get-user)))
+    (wipe (timed-fnids* key))
     key))
 
-(def timed-fnid (lasts f)
-  (atlet key (new-fnid)
-    (= (fns* key) f)
-    (push (list key (seconds) lasts) timed-fnids*)
+(def timed-fnid (lasts f (o k))
+  (atlet key (new-fnid k)
+    (= (fns* key) f
+       (timed-fnids* key) (list (seconds) lasts (get-user)))
+    (wipe (fnids* key))
     key))
 
 ; Within f, it will be bound to the fn's own fnid.  Remember that this is
 ; so low-level that need to generate the newline to separate from the headers
 ; within the body of f.
 
-(mac afnid (f)
-  `(atlet it (new-fnid)
-     (= (fns* it) ,f)
-     (push it fnids*)
+(mac afnid (f (o k `(scopekey 'afnid ,f)))
+  `(atlet it (new-fnid ,k)
+     (= (fns* it) ,f
+        (fnids* it) (list (seconds) (get-user)))
+     (wipe (timed-fnids* it))
      it))
 
 ;(defop test-afnid req
@@ -356,18 +437,33 @@ Connection: close"))
 ; do is estimate what the max no of fnids can be and set the harvest 
 ; limit there-- beyond that the only solution is to buy more memory.
 
-(def harvest-fnids ((o n 50000))  ; was 20000
-  (when (len> fns* n) 
-    (pull (fn ((id created lasts))
-            (when (> (since created) lasts)
-              (wipe (fns* id))
-              t))
-          timed-fnids*)
-    (atlet nharvest (trunc (/ n 10))
-      (let (kill keep) (split (rev fnids*) nharvest)
-        (= fnids* (rev keep)) 
-        (each id kill 
-          (wipe (fns* id)))))))
+(= fnid-harvest-max*   50000 ; was 20000
+   fnid-harvest-ratio* 10
+   fnid-hours-max*     6)
+
+(def fnids ((o getter car))
+  (map getter (sortable fnids* < car)))
+
+(def dead-fnids ((o max-hours fnid-hours-max*))
+  (accum a
+    (each (id (created lasts user)) timed-fnids*
+      (when (> (since created) lasts)
+        (a id)))
+    (each (id (created user)) fnids*
+      (when (>= (hours-since created) max-hours)
+        (a id)))))
+
+(def harvest-fnids ((o n fnid-harvest-max*))
+  (atomic
+    (when (len> fns* n)
+      (each id (dead-fnids)
+        (forget-fnid id))
+      (when (len> fns* n)
+        (withs (n (min n (len fns*))
+                nharvest (trunc (/ n fnid-harvest-ratio*)))
+          (let (kill keep) (split (fnids) nharvest)
+            (each id kill
+              (forget-fnid id))))))))
 
 (= fnurl* "/x" rfnurl* "/r" rfnurl2* "/y")
 
@@ -378,17 +474,17 @@ Connection: close"))
 
 (defop-raw x (str req)
   (w/stdout str
-    (aif (fns* (sym arg!fnid))
+    (aif (fns* arg!fnid)
          (it)
          (pr dead-msg*))))
 
 (defopr-raw y (str req)
-  (aif (fns* (sym arg!fnid))
+  (aif (fns* arg!fnid)
        (w/stdout str (it))
        "deadlink"))
 
 (defopr r
-  (aif (fns* (sym arg!fnid))
+  (aif (fns* arg!fnid)
        (it)
        "deadlink"))
 
@@ -401,18 +497,24 @@ Connection: close"))
 ; flink / rflink take a thunk. flink wraps it with (prn) so the
 ; generated page starts after a blank line; rflink just stores it
 ; (its return value is the redirect URL).
-(def flink (f)
-  (string fnurl* "?fnid=" (fnid {do (prn) (f)})))
+(def flink-fn (f k)
+  (string fnurl* "?fnid=" (fnid {do (prn) (f)} k)))
 
-(def rflink (f)
-  (string rfnurl* "?fnid=" (fnid f)))
+(def rflink-fn (f k)
+  (string rfnurl* "?fnid=" (fnid f k)))
+
+(mac flink (f (o k `(scopekey 'flink ,f)))
+  `(flink-fn ,f ,k))
+
+(mac rflink (f (o k `(scopekey 'rflink ,f)))
+  `(rflink-fn ,f ,k))
 
 (mac w/link (expr . body)
-  `(tag (a href (flink {do ,expr}))
+  `(tag (a href (flink {do ,expr} (scopekey 'w/link ,expr ,@body)))
      ,@body))
 
 (mac w/rlink (expr . body)
-  `(tag (a href (rflink {do ,expr}))
+  `(tag (a href (rflink {do ,expr} (scopekey 'w/rlink ,expr ,@body)))
      ,@body))
 
 (mac onlink (text . body)
@@ -424,17 +526,22 @@ Connection: close"))
 ; bad to have both flink and linkf; rename flink something like fnid-link
 
 (mac linkf (text . body)
-  `(tag (a href (flink {do ,@body})) (pr ,text)))
+  (w/uniq gtext
+    `(let ,gtext ,text
+       (tag (a href (flink {do ,@body})) (pr ,gtext)))))
 
 (mac rlinkf (text . body)
-  `(tag (a href (rflink {do ,@body})) (pr ,text)))
+  (w/uniq gtext
+    `(let ,gtext ,text
+       (tag (a href (rflink {do ,@body})) (pr ,gtext)))))
 
 ;(defop top (linkf 'whoami? (pr "I am " (get-user))))
 
 ;(defop testf (w/link (pr "ha ha ha") (pr "laugh")))
 
 (mac w/link-if (test expr . body)
-  `(tag-if ,test (a href (flink {do ,expr}))
+  `(tag-if ,test (a href (flink {do ,expr}
+                                (scopekey 'w/link-if ,test ,expr ,@body)))
      ,@body))
 
 (def fnid-field (id)
@@ -442,10 +549,13 @@ Connection: close"))
 
 ; f should be a fn of one arg, which will be http request args.
 
-(def fnform (f bodyfn (o redir))
+(def fnform-fn (f bodyfn (o redir) (o k))
   (form (if redir rfnurl2* fnurl*)
-    (fnid-field (fnid f))
+    (fnid-field (fnid f k))
     (bodyfn)))
+
+(mac fnform (f bodyfn (o redir) (o k `(scopekey 'fnform ,f ,bodyfn ,redir)))
+  `(fnform-fn ,f ,bodyfn ,redir ,k))
 
 ; Could also make a version that uses just an expr, and var capture.
 ; Is there a way to ensure user doesn't use "fnid" as a key?
@@ -458,28 +568,36 @@ Connection: close"))
 
 (mac aform (handler . body)
   `(form fnurl*
-     (fnid-field (fnid {do (prn) ,handler}))
+     (fnid-field (fnid {do (prn) ,handler}
+                       (scopekey 'aform ,handler ,@body)))
      ,@body))
 
 (mac arform (handler . body)
   `(form rfnurl*
-     (fnid-field (fnid {do ,handler}))
+     (fnid-field (fnid {do ,handler}
+                       (scopekey 'arform ,handler ,@body)))
      ,@body))
 
 ; aform / arform variants with a fnid lifetime in seconds.
 
 (mac taform (lasts handler . body)
-  (w/uniq gh
-    `(let ,gh {do (prn) ,handler}
+  (w/uniq (gh gk)
+    `(with (,gk (scopekey 'taform ,handler ,@body)
+            ,gh {do (prn) ,handler})
        (form fnurl*
-         (fnid-field (if ,lasts (timed-fnid ,lasts ,gh) (fnid ,gh)))
+         (fnid-field (if ,lasts
+                         (timed-fnid ,lasts ,gh ,gk)
+                         (fnid ,gh ,gk)))
          ,@body))))
 
 (mac tarform (lasts handler . body)
-  (w/uniq gh
-    `(let ,gh {do ,handler}
+  (w/uniq (gh gk)
+    `(with (,gk (scopekey 'tarform ,handler ,@body)
+            ,gh {do ,handler})
        (form rfnurl*
-         (fnid-field (if ,lasts (timed-fnid ,lasts ,gh) (fnid ,gh)))
+         (fnid-field (if ,lasts
+                         (timed-fnid ,lasts ,gh ,gk)
+                         (fnid ,gh ,gk)))
          ,@body))))
 
 ; aform / arform variants where the body should manage its own
@@ -487,12 +605,12 @@ Connection: close"))
 
 (mac aformh (handler . body)
   `(form fnurl*
-     (fnid-field (fnid {do ,handler}))
+     (fnid-field (fnid {do ,handler} (scopekey 'aformh ,handler ,@body)))
      ,@body))
 
 (mac arformh (handler . body)
   `(form rfnurl2*
-     (fnid-field (fnid {do ,handler}))
+     (fnid-field (fnid {do ,handler} (scopekey 'arformh ,handler ,@body)))
      ,@body))
 
 ; only unique per server invocation
@@ -548,11 +666,10 @@ Connection: close"))
 
 ; eventually promote to general util
 
-(def sortable (ht (o f >))
+(def sortable (ht (o f >) (o key idfn))
   (let res nil
-    (maptable (fn kv
-                (insort (compare f cadr) kv res))
-              ht)
+    (each kv ht
+      (insort (compare f key:cadr) kv res))
     res))
 
 
