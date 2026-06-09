@@ -1624,11 +1624,11 @@
 
 (mac fromdisk (var file init load save)
   (w/uniq (gf gv)
-    `(unless (bound ',var)
-       (do1 (= ,var (iflet ,gf (file-exists ,file)
-                               (,load ,gf)
-                               ,init))
-            (= (savers* ',var) (fn (,gv) (,save ,gv ,file)))))))
+    `(do (= (savers* ',var) (fn (,gv) (,save ,gv ,file)))
+         (unless (bound ',var)
+           (= ,var (iflet ,gf (file-exists ,file)
+                          (,load ,gf)
+                          ,init))))))
 
 (mac diskvar (var file)
   `(fromdisk ,var ,file nil readfile1 writefile))
