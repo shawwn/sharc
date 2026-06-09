@@ -79,6 +79,7 @@
 
 (def abusive-ip (ip)
   (and (> (requests/ip* ip 0) 250)
+       (isnt ip "127.0.0.1")
        (let now (seconds)
          (do1 (if (req-times* ip)
                   (and (>= (qlen (req-times* ip)) 
