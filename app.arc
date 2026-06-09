@@ -83,7 +83,7 @@
 (mac urlink (text . body)
   (w/uniq g
     `(let ,g (me)
-      (rlinkf ,text (when-umatch/r ,g ,@body)))))
+       (rlinkf ,text (when-umatch/r ,g ,@body)))))
 
 (defop admin (admin-gate))
 
