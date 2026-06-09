@@ -407,7 +407,7 @@
 
 ; Page Layout
 
-(= up-url* "grayarrow.gif" down-url* "graydown.gif" logo-url* "arc.png")
+(= logo-url* "arc.png")
 
 (defopr favicon.ico favicon-url*)
 
@@ -540,7 +540,17 @@ a:visited { color:#828282; text-decoration:none; }
 .pagebreak {page-break-before:always}
 
 pre { overflow: auto; padding: 2px; max-width:600px; }
-pre:hover {overflow:auto} "))
+pre:hover {overflow:auto}
+
+.votearrow {
+  width: 10px;
+  height: 10px;
+  border: 0px;
+  margin: 3px 2px 6px;
+  background: url(triangle.svg), linear-gradient(transparent, transparent) no-repeat;
+  background-size: 10px;
+}
+.rotate180 { transform: rotate(180deg); } "))
 
 ; only need pre padding because of a bug in Mac Firefox
 
@@ -567,14 +577,17 @@ function vote(node) {
   var v = node.id.split(/_/);   // {'up', '123'}
   var item = v[1]; 
 
-  // adjust score
+  // adjust score (absent for items with no shown score, e.g. comments)
   var score = byId('score_' + item);
-  var newscore = parseInt(score.innerHTML) + (v[0] == 'up' ? 1 : -1);
-  score.innerHTML = newscore + (newscore == 1 ? ' point' : ' points');
+  if (score) {
+    var newscore = parseInt(score.innerHTML) + (v[0] == 'up' ? 1 : -1);
+    score.innerHTML = newscore + (newscore == 1 ? ' point' : ' points');
+  }
 
   // hide arrows
-  byId('up_'   + item).style.visibility = 'hidden';
-  byId('down_' + item).style.visibility = 'hidden';
+  var up = byId('up_' + item), down = byId('down_' + item);
+  if (up)   up.style.visibility   = 'hidden';
+  if (down) down.style.visibility = 'hidden';
 
   // ping server
   var ping = new Image();
@@ -1104,8 +1117,8 @@ function vote(node) {
           onclick (if (me) "return vote(this)")
           href    (vote-url i dir whence))
     (if (is dir 'up)
-        (out (gentag img src up-url*   border 0 vspace 3 hspace 2))
-        (out (gentag img src down-url* border 0 vspace 3 hspace 2)))))
+        (out (tag (div class "votearrow"           title "upvote")))
+        (out (tag (div class "votearrow rotate180" title "downvote"))))))
 
 (def vote-url (i dir whence)
   (+ "vote?" "for=" i!id

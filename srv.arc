@@ -148,10 +148,14 @@
 Content-Type: " ctype "
 Connection: close"))
 
-(each (k v) '((gif       "image/gif")
-              (jpg       "image/jpeg")
-              (png       "image/png")
-              (text/html "text/html; charset=utf-8"))
+(each (k v) '((text/plain "text/plain; charset=utf-8")
+              (text/html  "text/html; charset=utf-8")
+              (css        "text/css")
+              (gif        "image/gif")
+              (jpg        "image/jpeg")
+              (png        "image/png")
+              (svg        "image/svg+xml")
+              (js         "application/javascript"))
   (= (type-header* k) (gen-type-header v)))
 
 (= header*   (type-header* 'text/html)
@@ -231,7 +235,8 @@ Connection: close"))
                      (f str req))))
            (let filetype (static-filetype op)
              (aif (and filetype (file-exists (string staticdir* op)))
-                  (do (prn (type-header* filetype))
+                  (do (prn (or (type-header* filetype)
+                               (err "Unknown mime type for @filetype")))
                       (awhen static-max-age*
                         (prn "Cache-Control: max-age=" it))
                       (prn)
@@ -248,12 +253,13 @@ Connection: close"))
            "jpg"  'jpg
            "jpeg" 'jpg
            "png"  'png
-           "css"  'text/html
-           "txt"  'text/html
+           "svg"  'svg
+           "js"   'js
+           "css"  'css
+           "txt"  'text/plain
            "htm"  'text/html
            "html" 'text/html
-           "arc"  'text/html
-           ))))
+           "arc"  'text/plain))))
 
 (def respond-err (str msg . args)
   (w/stdout str
