@@ -779,9 +779,6 @@
   (mac w/infile (var name . body)
     (expander 'infile var name body))
 
-  (mac w/infile-binary (var name . body)
-    (expander 'infile-binary var name body))
-
   (mac w/outfile (var name . body)
     (expander 'outfile var name body))
 

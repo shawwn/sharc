@@ -487,6 +487,26 @@ c"
   (test? "λ"        (bytes->string (coerce '(206 187) 'vector)))
   (test? '(233)     (coerce (string->bytes "é" :latin-1) 'cons)))
 
+(define-test utf8-file
+  ; writefile/readfile1 (the profile save path) must round-trip codepoints
+  ; >255 now that outfile/infile are utf-8.  U+2019 (the curly ' that
+  ; crashed profiles) is utf-8 e2 80 99; also test lambda and a CJK char.
+  (let s (+ "I" (utf8-decode (coerce '(226 128 153) 'vector)) "m happy λ 日")
+    (let f "test-utf8-roundtrip.tmp"
+      (writefile s f)
+      (test? s (readfile1 f))
+      (rmfile f))))
+
+(define-test binary-file
+  ; a :default stream round-trips raw bytes verbatim (readb/writeb bypass
+  ; the utf-8 external-format): read a real png, which has high bytes like
+  ; the 0x89 signature, rewrite it, and confirm the bytes are identical.
+  (with (src (w/infile i "static/arc.png" (drain (readb i)))
+         f   "test-binary-roundtrip.tmp")
+    (w/outfile o f (each b src (writeb b o)))
+    (test? src (w/infile i f (drain (readb i))))
+    (rmfile f)))
+
 (define-test urlencode
   ; ascii unreserved passes through; space and reserved are %-escaped
   (test? "abc-._~"    (urlencode "abc-._~"))

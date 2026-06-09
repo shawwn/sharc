@@ -235,7 +235,7 @@ Connection: close"))
                       (awhen static-max-age*
                         (prn "Cache-Control: max-age=" it))
                       (prn)
-                      (w/infile-binary i it
+                      (w/infile i it
                         (whilet b (readb i)
                           (writeb b str))))
                   (respond-err str unknown-msg*))))))

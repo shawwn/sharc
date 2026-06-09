@@ -368,19 +368,21 @@
 
 (xdef infile (f)
   (open f :direction :input
-          :element-type 'character
-          :external-format :latin-1))
-
-(xdef infile-binary (f)
-  (open f :direction :input
-          :element-type '(unsigned-byte 8)))
+          :element-type :default
+          ;; replacement so a stray pre-utf-8 (latin-1) byte in old data
+          ;; degrades to #\? instead of crashing the load.
+          :external-format '(:utf-8 :replacement #\?)))
 
 (xdef outfile (f &rest args)
   (open f :direction :output
-          :element-type 'character
-          :external-format :latin-1
+          :element-type :default
+          :external-format :utf-8
           :if-exists (if (equal (car args) "append") :append :supersede)
           :if-does-not-exist :create))
+
+;; infile-binary and outfile-binary variants aren't needed.
+;; :element-type :default lets readc/writec work with UTF-8 and
+;; readb/writeb work with bytes.
 
 (xdef instring  #'make-string-input-stream)
 (xdef outstring () (make-string-output-stream))
@@ -624,10 +626,15 @@
     (let* ((ip  (format nil "~D.~D.~D.~D"
                         (aref ipv 0) (aref ipv 1)
                         (aref ipv 2) (aref ipv 3)))
+           ;; :default element-type keeps the stream bivalent, so binary
+           ;; output (writeb, e.g. images) still writes raw octets and
+           ;; ignores this external-format; utf-8 governs char i/o only.
+           ;; :replacement so a malformed request byte degrades to #\?
+           ;; instead of signalling mid-request.
            (stream (sb-bsd-sockets:socket-make-stream
                     client :input t :output t
                     :element-type :default
-                    :external-format :latin-1
+                    :external-format '(:utf-8 :replacement #\?)
                     :buffering :full))
            (lim (make-instance 'arc-limited-stream
                                :source stream :limit 2000000)))
