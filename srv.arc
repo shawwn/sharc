@@ -56,13 +56,15 @@
               (= th1 (thread
                        (after (handle-request-thread i o ip)
                               (close i o)
-                              (kill-thread th2))))
+                              (kill-thread th2)
+                              (wipe (thread-locals* th1)))))
               (= th2 (thread
                        (sleep threadlife*)
                        (unless (dead th1)
                          (prn "srv thread took too long for " ip))
                        (break-thread th1)
-                       (force-close i o))))))))
+                       (force-close i o)
+                       (wipe (thread-locals* th1)))))))))
 
 ; Returns true if ip has made req-limit* requests in less than
 ; req-window* seconds.  If an ip is throttled, only 1 request is 
