@@ -414,7 +414,7 @@
 ; redefined later
 
 (def gen-css-url ()
-  (prn "<link rel=\"stylesheet\" type=\"text/css\" href=\"news.css\">"))
+  (gentag link rel 'stylesheet type 'text/css href (static-src "news.css")))
 
 (mac npage (title . body)
   `(tag html 
@@ -494,80 +494,6 @@
                   (widtable 500 msg)
                   (pr msg))))
     (br2)))
-
-(= (max-age* 'news.css) 86400)   ; cache css in browser for 1 day
-
-; turn off server caching via (= caching* 0) or won't see changes
-
-(defop news.css
-  (pr "
-body  { font-family:Verdana; font-size:10pt; color:#828282; }
-td    { font-family:Verdana; font-size:10pt; color:#828282; }
-
-.admin td   { font-family:Verdana; font-size:8.5pt; color:#000000; }
-.subtext td { font-family:Verdana; font-size:  7pt; color:#828282; }
-
-input    { font-family:monospace; font-size:10pt; }
-input[type=\"submit\"] { font-family:Verdana; }
-textarea { font-family:monospace; font-size:10pt; resize:both; }
-
-a:link    { color:#000000; text-decoration:none; } 
-a:visited { color:#828282; text-decoration:none; }
-
-.default { font-family:Verdana; font-size: 10pt; color:#828282; }
-.admin   { font-family:Verdana; font-size:8.5pt; color:#000000; }
-.title   { font-family:Verdana; font-size: 10pt; color:#828282; }
-.adtitle { font-family:Verdana; font-size:  9pt; color:#828282; }
-.subtext { font-family:Verdana; font-size:  7pt; color:#828282; }
-.yclinks { font-family:Verdana; font-size:  8pt; color:#828282; }
-.pagetop { font-family:Verdana; font-size: 10pt; color:#222222; }
-.comhead { font-family:Verdana; font-size:  8pt; color:#828282; }
-.comment { font-family:Verdana; font-size:  9pt; }
-.dead    { font-family:Verdana; font-size:  9pt; color:#dddddd; }
-
-.comment a:link, .comment a:visited { text-decoration:underline;}
-.dead a:link, .dead a:visited { color:#dddddd; }
-.pagetop a:visited { color:#000000;}
-.topsel a:link, .topsel a:visited { color:#ffffff; }
-
-.subtext a:link, .subtext a:visited { color:#828282; }
-.subtext a:hover { text-decoration:underline; }
-
-.comhead a:link, .subtext a:visited { color:#828282; }
-.comhead a:hover { text-decoration:underline; }
-
-.default p { margin-top: 8px; margin-bottom: 0px; }
-
-.pagebreak {page-break-before:always}
-
-pre { overflow: auto; padding: 2px; max-width:600px; }
-pre:hover {overflow:auto}
-
-.votearrow {
-  width: 10px;
-  height: 10px;
-  border: 0px;
-  margin: 3px 2px 6px;
-  background: url(triangle.svg), linear-gradient(transparent, transparent) no-repeat;
-  background-size: 10px;
-}
-.rotate180 { transform: rotate(180deg); } "))
-
-; only need pre padding because of a bug in Mac Firefox
-
-; Without setting the bottom margin of p tags to 0, 1- and n-para comments
-; have different space at the bottom.  This solution suggested by Devin.
-; Really am using p tags wrong (as separators rather than wrappers) and the
-; correct thing to do would be to wrap each para in <p></p>.  Then whatever
-; I set the bottom spacing to, it would be the same no matter how many paras
-; in a comment. In this case by setting the bottom spacing of p to 0, I'm
-; making it the same as no p, which is what the first para has.
-
-; supplied by pb
-;.vote { padding-left:2px; vertical-align:top; }
-;.comment { margin-top:1ex; margin-bottom:1ex; color:black; }
-;.vote IMG { border:0; margin: 3px 2px 3px 2px; }
-;.reply { font-size:smaller; text-decoration:underline !important; }
 
 (= votejs* "
 function byId(id) {
@@ -1834,7 +1760,7 @@ function vote(node) {
     (tag (td class 'comment)
       (tag (div style "margin-top:1px;margin-bottom:0px")
         (if (~cansee o) (pr (pseudo-text o))
-            (~live o)        (spanclass dead 
+            (~live o)        (spanclass cdd
                                (pr (if (~blank o!title) o!title o!text)))
                              (if (and (~blank o!title) (~blank o!url))
                                  (link o!title o!url)
@@ -2195,11 +2121,9 @@ function vote(node) {
       (when (or parent (cansee c))
         (br))
       (tag (div class 'comment)
-        (tag (div class "commtext c00")
-          (if (~cansee c)               (pr (pseudo-text c))
-              (nor (live c) (author c)) (spanclass dead (pr c!text))
-                                             (fontcolor (comment-color c)
-                                               (pr c!text)))))
+        (tag (div class (string "commtext " (comment-class c)))
+          (if (~cansee c) (pr (pseudo-text c))
+              (pr c!text))))
       (when (and astree (cansee c) (live c))
         (para)
         (tag (font size 1)
@@ -2240,8 +2164,19 @@ function vote(node) {
   (if (> c!score 0) black (grayrange c!score)))
 
 (defmemo grayrange (s)
-  (gray (min 230 (round (expt (* (+ (abs s) 2) 900) .6)))))
+  (gray (min 221 (round (expt (* (+ (abs s) 2) 900) .6)))))
 
+; HN's commtext fade classes (in news.css): lightest text for the most
+; downvoted, cdd for dead.
+
+(def comment-class (c)
+  (if (is arg!id (string c!id))
+       "c00"
+      (and (~live c) (~author c))
+       "cdd"
+       (withs (g ((comment-color c) 'r)
+               x (coerce g 'string 16))
+         (string "c" (if (len< x 2) "0") x))))
 
 ; Threads
 

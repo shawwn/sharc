@@ -841,8 +841,17 @@
   (tostring (whiler c (readc str nil) no
               (writec c))))
 
+(def allbytes (str)
+  (let bs nil
+    (whiler b (readb str nil) no
+      (push b bs))
+    (coerce (rev bs) 'vector)))
+
 (def filechars (name)
   (w/infile s name (allchars s)))
+
+(def filebytes (name)
+  (w/infile s name (allbytes s)))
 
 (def writefile (val file)
   (let tmpfile (+ file ".tmp")

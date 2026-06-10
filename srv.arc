@@ -211,7 +211,9 @@ Connection: close"))
   cooks nil
   ip    nil)
 
-(= unknown-msg* "Unknown." max-age* (table) static-max-age* nil)
+(= unknown-msg*    "Unknown."
+   max-age*        (table)
+   static-max-age* 86400) ; cache static files in browser for 1 day
 
 (def respond (str op args cooks ip)
   (w/stdout str
@@ -260,6 +262,18 @@ Connection: close"))
            "htm"  'text/html
            "html" 'text/html
            "arc"  'text/plain))))
+
+(def static-src (filename)
+  (string "/" filename "?" (shashfile (+ staticdir* filename))))
+
+(def shash (str)
+  (downcase (sha1::sha1-hex str)))
+
+(defmemo shashfile-1 (filename modtime)
+  (shash:filebytes filename))
+
+(def shashfile (filename)
+  (shashfile-1 filename (modtime filename)))
 
 (def respond-err (str msg . args)
   (w/stdout str

@@ -229,13 +229,8 @@
         (do (enq-limit record bad-logins*)
             nil))))
 
-; Create a file in case people have quote chars in their pws.  I can't 
-; believe there's no way to just send the chars.
-
-(def shash (str)
-  (downcase (sha1::sha1-hex str)))
-
 ; bcrypt password hashing (cost 10, matching HN's $2b$10$ format).
+
 (def bhash (pw)
   (bcrypt::hashpw pw 10))
 

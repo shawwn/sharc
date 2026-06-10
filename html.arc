@@ -143,6 +143,9 @@
 (attribute span       align          opstring)
 (attribute span       id             opsym)
 (attribute rss        version        opstring)
+(attribute link       rel            opsym)
+(attribute link       type           opsym)
+(attribute link       href           opstring)
 
 
 (mac gentag args (start-tag args))
