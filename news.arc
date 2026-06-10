@@ -1744,10 +1744,10 @@ function vote(node) {
 ; option to sort the elements of a poll when displaying
 ; exclusive field? (means only allow one vote per poll)
 
-(= poll-threshold* 20)
+(= poll-threshold* 1)
 
 (newsop newpoll ()
-  (if (and user (> (karma user) poll-threshold*))
+  (if (and user (>= (karma user) poll-threshold*))
       (newpoll-page)
       (pr "Sorry, you need @poll-threshold* karma to create a poll.")))
 
