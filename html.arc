@@ -136,6 +136,7 @@
 (attribute td         valign         opsym)
 (attribute td         class          opstring)
 (attribute td         timestamp      opnum)
+(attribute td         indent         opnum)
 (attribute tr         bgcolor        opcolor)
 (attribute hr         color          opcolor)
 (attribute span       class          opstring)

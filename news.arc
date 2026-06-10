@@ -446,7 +446,8 @@
     (set (ignored-scopeids* gt)) ; ignore gt because (msec) is unique
     `(let ,gt ,t1
        (fulltop ,lid ,label ,title ,whence
-         (trtd ,@body)
+         (tag (tr id "bigbox")
+           (td ,@body))
          (trtd (vspace 10)
                (color-stripe (main-color))
                (br)
@@ -615,7 +616,8 @@ function vote(node) {
               (when (is switch 'full)
                 (tag (td style "line-height:12pt; height:10px;")
                   (spanclass pagetop
-                    (tag b (link this-site* "news"))
+                    (tag (b class 'hnname)
+                      (link this-site* "news"))
                     (hspace 10)
                     (toprow label))))
              (if (is switch 'full)
@@ -629,8 +631,8 @@ function vote(node) {
 (def gen-logo ()
   (tag (td style "width:18px;padding-right:4px")
     (tag (a href parent-url*)
-      (tag (img src logo-url* width 18 height 18 
-                style "border:1px #@(hexrep border-color*) solid;")))))
+      (tag (img src logo-url* width 18 height 18
+                style "border:1px #@(hexrep border-color*) solid; display:block;")))))
 
 (= toplabels* '(nil "welcome" "new" "threads" "comments" "leaders" "*"))
 
@@ -1013,50 +1015,53 @@ function vote(node) {
 
 (def display-story (i s whence)
   (when (or (cansee s) (s 'kids))
-    (tr (display-item-number i)
-        (td (votelinks s whence))
-        (titleline s s!url whence))
+    (tag (tr class "athing submission" id s!id)
+      (display-item-number i)
+      (tag (td valign 'top class 'votelinks) (votelinks s whence))
+      (titleline s s!url whence))
     (tr (tag (td colspan (if i 2 1)))
         (tag (td class 'subtext)
-          (hook 'itemline s)
-          (itemline s)
-          (when (in s!type 'story 'poll) (commentlink s))
-          (editlink s)
-          (when (apoll s) (addoptlink s))
-          (unless i (flaglink s whence))
-          (killlink s whence)
-          (blastlink s whence)
-          (blastlink s whence t)
-          (deletelink s whence)))))
+          (spanclass subline
+            (hook 'itemline s)
+            (itemline s)
+            (when (in s!type 'story 'poll) (commentlink s))
+            (editlink s)
+            (when (apoll s) (addoptlink s))
+            (unless i (flaglink s whence))
+            (killlink s whence)
+            (blastlink s whence)
+            (blastlink s whence t)
+            (deletelink s whence))))))
 
 (def display-item-number (i)
   (when i (tag (td align 'right valign 'top class 'title)
-            (pr i "."))))
+            (spanclass rank (pr i ".")))))
 
 (= follow-threshold* 5)
 
 (def titleline (s url whence)
   (tag (td class 'title)
     (if (cansee s)
-        (do (deadmark s)
-            (titlelink s url)
-            (awhen (sitename url)
-              (spanclass comhead
-                (pr " (" )
-                (if (admin)
-                    (w/rlink (do (set-site-ban it
-                                               (case (car (banned-sites* it))
-                                                 nil    'ignore
-                                                 ignore 'kill
-                                                 kill   nil))
-                                 whence)
-                      (let ban (car (banned-sites* it))
-                        (tag-if ban (font color (case ban 
-                                                  ignore darkred 
-                                                  kill   darkblue))
-                          (pr it))))
-                    (pr it))
-                (pr ") "))))
+        (spanclass titleline
+          (deadmark s)
+          (titlelink s url)
+          (awhen (sitename url)
+            (tag (span class "sitebit comhead")
+              (pr " (" )
+              (if (admin)
+                  (w/rlink (do (set-site-ban it
+                                             (case (car (banned-sites* it))
+                                               nil    'ignore
+                                               ignore 'kill
+                                               kill   nil))
+                               whence)
+                    (let ban (car (banned-sites* it))
+                      (tag-if ban (font color (case ban
+                                                ignore darkred
+                                                kill   darkblue))
+                        (spanclass sitestr (pr it)))))
+                  (spanclass sitestr (pr it)))
+              (pr ") "))))
         (pr (pseudo-text s)))))
 
 (def titlelink (s url)
@@ -1181,7 +1186,7 @@ function vote(node) {
     (byline i)))
 
 (def itemscore (i)
-  (tag (span id (+ "score_" i!id))
+  (tag (span class 'score id (+ "score_" i!id))
     (pr (plural (if (is i!type 'pollopt) (realscore i) i!score)
                 "point")))
   (hook 'itemscore i))
@@ -1202,7 +1207,8 @@ function vote(node) {
 (= show-avg* nil)
 
 (def userlink (user (o show-avg t))
-  (link (user-name user) (user-url user) (if (me user) 'me))
+  (tag (a href (user-url user) class 'hnuser id (if (me user) 'me))
+    (user-name user))
   (awhen (and show-avg* (admin) show-avg (uvar user avg))
     (pr " (@(num it 1 t t))")))
 
@@ -1210,10 +1216,10 @@ function vote(node) {
 
 (def user-name (user)
   (if (and (editor) (ignored user))
-       (tostring (fontcolor darkred (pr user)))
+       (fontcolor darkred (pr user))
       (and (editor) (< (user-age user) 1440))
-       (tostring (fontcolor noob-color* (pr user)))
-      user))
+       (fontcolor noob-color* (pr user))
+       (pr user)))
 
 (= show-threadavg* nil)
 
@@ -1821,17 +1827,18 @@ function vote(node) {
     (spacerow 7)))
 
 (def display-pollopt (n o whence)
-  (tr (display-item-number n)
-      (tag (td valign 'top)
-        (votelinks o whence))
-      (tag (td class 'comment)
-        (tag (div style "margin-top:1px;margin-bottom:0px")
-          (if (~cansee o) (pr (pseudo-text o))
-              (~live o)        (spanclass dead 
-                                 (pr (if (~blank o!title) o!title o!text)))
-                               (if (and (~blank o!title) (~blank o!url))
-                                   (link o!title o!url)
-                                   (fontcolor black (pr o!text)))))))
+  (tag (tr class 'athing id o!id)
+    (display-item-number n)
+    (tag (td valign 'top)
+      (votelinks o whence))
+    (tag (td class 'comment)
+      (tag (div style "margin-top:1px;margin-bottom:0px")
+        (if (~cansee o) (pr (pseudo-text o))
+            (~live o)        (spanclass dead 
+                               (pr (if (~blank o!title) o!title o!text)))
+                             (if (and (~blank o!title) (~blank o!url))
+                                 (link o!title o!url)
+                                 (fontcolor black (pr o!text)))))))
   (tr (if n (td))
       (td)
       (tag (td class 'default)
@@ -1876,18 +1883,20 @@ function vote(node) {
                     (or i!title (aand i!text (ellipsize (striptags it)))))
          here (item-url i!id))
     (longpage (msec) nil nil title here
-      (tab (display-item nil i here)
-           (display-item-text i)
-           (when (apoll i)
-             (spacerow 10)
-             (tr (td)
-                 (td (tab (display-pollopts i here)))))
-           (when (and (cansee i) (comments-active i))
-             (spacerow 10)
-             (row "" (comment-form i here))))
-      (br2)
+      (tag (table class 'fatitem border 0)
+        (display-item nil i here)
+        (display-item-text i)
+        (when (apoll i)
+          (spacerow 10)
+          (tr (td)
+              (td (tab (display-pollopts i here)))))
+        (when (and (cansee i) (comments-active i))
+          (spacerow 10)
+          (row "" (comment-form i here))))
+      (br)
       (when (and i!kids (commentable i))
-        (tab (display-subcomments i here))
+        (tag (table border 0 class 'comment-tree)
+          (display-subcomments i here))
         (br2)))))
 
 (def commentable (i) (in i!type 'story 'comment 'poll))
@@ -2100,7 +2109,8 @@ function vote(node) {
     (display-subcomments c whence (+ indent 1))))
 
 (def display-1comment (c whence indent showpar)
-  (row (tab (display-comment nil c whence t indent showpar showpar))))
+  (tag (tr class "athing comtr" id c!id)
+    (td (tab (display-comment nil c whence t indent showpar showpar)))))
 
 (def display-subcomments (c whence (o indent 0))
   (each k (sort (compare > frontpage-rank:item) c!kids)
@@ -2109,8 +2119,8 @@ function vote(node) {
 (def display-comment (n c whence (o astree) (o indent 0)
                                  (o showpar) (o showon))
   (tr (display-item-number n)
-      (when astree (td (hspace (* indent 40))))
-      (tag (td valign 'top) (votelinks c whence t))
+      (when astree (tag (td class 'ind indent indent) (hspace (* indent 40))))
+      (tag (td valign 'top class 'votelinks) (votelinks c whence t))
       (display-comment-body c whence astree indent showpar showon)))
 
 ; Comment caching doesn't make generation of comments significantly
@@ -2184,11 +2194,12 @@ function vote(node) {
               (link (ellipsize s!title 50) (item-url s!id))))))
       (when (or parent (cansee c))
         (br))
-      (spanclass comment
-        (if (~cansee c)               (pr (pseudo-text c))
-            (nor (live c) (author c)) (spanclass dead (pr c!text))
-                                           (fontcolor (comment-color c)
-                                             (pr c!text))))
+      (tag (div class 'comment)
+        (tag (div class "commtext c00")
+          (if (~cansee c)               (pr (pseudo-text c))
+              (nor (live c) (author c)) (spanclass dead (pr c!text))
+                                             (fontcolor (comment-color c)
+                                               (pr c!text)))))
       (when (and astree (cansee c) (live c))
         (para)
         (tag (font size 1)
