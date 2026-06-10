@@ -1845,7 +1845,7 @@ function vote(node) {
                            (display-story n i here)))
 
 (= (displayfn* 'comment) (fn (n i here inlist)
-                           (display-comment n i here nil 0 nil inlist)))
+                           (display-comment n i here nil 0 t (no inlist))))
 
 (= (displayfn* 'poll)    (displayfn* 'story))
 
@@ -2036,11 +2036,11 @@ function vote(node) {
 
 (def display-1comment (c whence indent showpar)
   (tag (tr class "athing comtr" id c!id)
-    (td (tab (display-comment nil c whence t indent showpar showpar)))))
+    (td (tab (display-comment nil c whence t indent showpar nil)))))
 
 (def display-subcomments (c whence (o indent 0))
   (each k (sort (compare > frontpage-rank:item) c!kids)
-    (display-comment-tree (item k) whence indent)))
+    (display-comment-tree (item k) whence indent (> indent 0))))
 
 (def display-comment (n c whence (o astree) (o indent 0)
                                  (o showpar) (o showon))
