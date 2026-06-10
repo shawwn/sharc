@@ -390,8 +390,8 @@
   (or (and user (uvar user showdead))
       (editor user)))
 
-(def visible (is (t user me))
-  (keep [cansee _ user] is))
+(def visible (items (t user me))
+  (keep [cansee _ user] items))
 
 (def cansee-descendant (c (t user me))
   (or (cansee c user)
