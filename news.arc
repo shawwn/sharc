@@ -2030,14 +2030,14 @@ function vote(node) {
 
 ; Comment Display
 
-(def display-comment-tree (c whence (o indent 0) (o initialpar))
+(def display-comment-tree (c whence (o indent 0) (o initialpar) (o initialon))
   (when (cansee-descendant c)
-    (display-1comment c whence indent initialpar)
+    (display-1comment c whence indent initialpar initialon)
     (display-subcomments c whence (+ indent 1))))
 
-(def display-1comment (c whence indent showpar)
+(def display-1comment (c whence indent showpar showon)
   (tag (tr class "athing comtr" id c!id)
-    (td (tab (display-comment nil c whence t indent showpar nil)))))
+    (td (tab (display-comment nil c whence t indent showpar showon)))))
 
 (def display-subcomments (c whence (o indent 0))
   (each k (sort (compare > frontpage-rank:item) c!kids)
@@ -2106,11 +2106,9 @@ function vote(node) {
           (itemline c)
           (when parent
             (when (cansee c) (pr bar*))
-            (if (is (string c!id) arg!id)
+            (if (or (is indent 0) (is (string c!id) arg!id))
                 (link "parent" (item-url ((item parent) 'id)))
-                (tag (a href (item-url arg!id ((item parent) 'id))
-                        class 'clicky aria-hidden t)
-                  (pr "parent"))))
+                (clickylink "parent" (string whence "#" ((item parent) 'id)))))
           (editlink c)
           (killlink c whence)
           (blastlink c whence)
@@ -2137,6 +2135,10 @@ function vote(node) {
                    (comments-active c))
               (underline (replylink c whence))
               (fontcolor sand (pr "-----"))))))))
+
+(def clickylink (text (o url text))
+  (tag (a href url class 'clicky aria-hidden t)
+    (pr text)))
 
 ; For really deeply nested comments, caching could add another reply 
 ; delay, but that's ok.
@@ -2207,7 +2209,7 @@ function vote(node) {
                       (o start 0) (o end threads-perpage*))
   (tab
     (each c (cut comments start end)
-      (display-comment-tree c whence 0 t))
+      (display-comment-tree c whence 0 t t))
     (when end
       (let newend (+ end threads-perpage*)
         (when (and (<= newend maxend*) (< end (len comments)))
