@@ -1233,6 +1233,11 @@
 
 (xdef seconds () (- (get-universal-time) +cl-to-unix+))
 
+;; a file's last-modification time as Unix seconds (nil if it's missing)
+(xdef modtime (name)
+  (let ((p (probe-file name)))
+    (and p (- (file-write-date p) +cl-to-unix+))))
+
 (xdef timedate (&rest args)
   (let* ((unix (if args (car args) (- (get-universal-time) +cl-to-unix+)))
          (ut   (+ unix +cl-to-unix+))
