@@ -38,7 +38,8 @@
         (onclick onfocus) opstring
         (width height)    opnum
         (tabindex)        opnum
-        (color bgcolor)   opcolor)))
+        (color bgcolor)   opcolor
+        (aria-hidden)     opbool)))
 
 (mac attribute (tag opt f)
   `(= (opmeths* (list ',tag ',opt)) ,f))
@@ -65,6 +66,9 @@
 
 (def opsym (key val)
   `(aif ,val (pr ,(+ " " key "=\"") it #\")))
+
+(def opbool (key val)
+  `(aif ,val (pr ,(+ " " key "=\"true\""))))
 
 (def opsel (key val)
   `(if ,val (pr " selected")))
