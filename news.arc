@@ -1778,7 +1778,8 @@ function vote(node) {
 
 ; Individual Item Page (= Comments Page of Stories)
 
-(defmemo item-url (id) (+ "item?id=" id))
+(defmemo item-url (id (o anchor))
+  (string (if id "item?id=") id (if anchor "#") anchor))
 
 (newsop item (id)
   (let s (safe-item id)
@@ -2009,7 +2010,7 @@ function vote(node) {
          (comment-ban-test c text comment-kill* comment-ignore*)
          (if (bad-user) (kill c 'ignored/karma))
          (submit-item c)
-         whence)))
+         (string whence "#" c!id))))
 
 (def bad-user ((t u me))
   (or (ignored u) (< (karma u) comment-threshold*)))
@@ -2105,7 +2106,10 @@ function vote(node) {
           (itemline c)
           (when parent
             (when (cansee c) (pr bar*))
-            (link "parent" (item-url ((item parent) 'id))))
+            (let parent-url (if (is (string c!id) arg!id)
+                                (item-url ((item parent) 'id))
+                                (item-url arg!id ((item parent) 'id)))
+              (link "parent" parent-url)))
           (editlink c)
           (killlink c whence)
           (blastlink c whence)
