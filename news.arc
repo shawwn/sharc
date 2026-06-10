@@ -1798,6 +1798,7 @@ function vote(node) {
                      'by (me) 'ip (ip))
     (save-item o)
     (= (items* o!id) o)
+    (vote-for o)
     o))
 
 (def add-pollopt-page (p)
