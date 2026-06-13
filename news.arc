@@ -1863,6 +1863,12 @@ function vote(node) {
 
 (def news-type (i) (and i (in i!type 'story 'comment 'poll 'pollopt)))
 
+(def ranked-siblings (items)
+  (sort (compare > (memo frontpage-rank)) items))
+
+(def ranked-kids (i)
+  (ranked-siblings:kids i))
+
 (def item-page (i)
   (with (title (and (cansee i)
                     (or i!title (aand i!text (ellipsize (striptags it)))))
@@ -1880,8 +1886,9 @@ function vote(node) {
           (row "" (comment-form i here))))
       (br)
       (when (and i!kids (commentable i))
-        (tag (table border 0 class 'comment-tree)
-          (display-subcomments i here))
+        (w/the comment-nav (comment-navs:ranked-kids i)
+          (tag (table border 0 class 'comment-tree)
+            (display-subcomments i here)))
         (br2)))))
 
 (def commentable (i) (in i!type 'story 'comment 'poll))
@@ -2098,8 +2105,8 @@ function vote(node) {
     (td (tab (display-comment nil c whence t indent showpar showon)))))
 
 (def display-subcomments (c whence (o indent 0))
-  (each k (sort (compare > frontpage-rank:item) c!kids)
-    (display-comment-tree (item k) whence indent (> indent 0))))
+  (each k (ranked-kids c)
+    (display-comment-tree k whence indent (> indent 0))))
 
 (def display-comment (n c whence (o astree) (o indent 0)
                                  (o showpar) (o showon))
@@ -2162,17 +2169,23 @@ function vote(node) {
       (tag (div style "margin-top:2px; margin-bottom:-10px; ")
         (spanclass comhead
           (itemline c whence)
-          (when parent
-            (when (cansee c) (pr bar*))
-            (if (or (is indent 0) (is (string c!id) arg!id))
-                (link "parent" (item-url ((item parent) 'id)))
-                (clickylink "parent" (string whence "#" ((item parent) 'id)))))
+          (spanclass navs
+            (when astree
+              (rootlink c whence))
+            (when parent
+              (parentlink c whence indent))
+            (when (or (no astree)
+                      (headmatch "threads" whence))
+              (unless (> indent 0)
+                (contextlink c whence)))
+            (when astree
+              (prevlink c whence)
+              (nextlink c whence)))
           (editlink c)
           (killlink c whence)
           (blastlink c whence)
           (deletelink c whence)
-          ; a hack to check whence but otherwise need an arg just for this
-          (unless (or astree (is whence "newcomments"))
+          (unless (or astree (~me))
             (flaglink c whence))
           (deadmark c)
           (when showon
@@ -2194,9 +2207,69 @@ function vote(node) {
               (underline (replylink c whence))
               (fontcolor sand (pr "-----"))))))))
 
+(def comment-navs (tops)
+  (let nav (table)
+    ((afn (sibs parent next-after root)
+       (let vs (keep cansee-descendant sibs) ; only the ones that render
+         (for j 0 (- (len vs) 1)
+           (let c (vs j)
+             (withs (prv (if (is j 0)
+                             parent
+                             ((vs (- j 1)) 'id))
+                     nxt (if (>= j (- (len vs) 1))
+                             next-after
+                             ((vs (+ j 1)) 'id))
+                     rt  (or root c!id)) ; top-level: c is its own root
+               (= (nav c!id) (obj root rt prev prv next nxt))
+               ; recurse: subtree's "next-after" is c's own next; root carries down
+               (self (ranked-kids c) c!id nxt rt))))))
+     tops nil nil nil)
+    nav))
+
+(def cnav (c key (t comment-nav))
+  (aand (comment-nav c!id) (it key)))
+
+(def root-comment (c) (cnav c 'root))
+
+(def prev-comment (c) (cnav c 'prev))
+
+(def next-comment (c) (cnav c 'next))
+
 (def clickylink (text (o url text))
   (tag (a href url class 'clicky aria-hidden t)
     (pr text)))
+
+(def rootlink (c whence)
+  (whenlet root (root-comment c)
+    (unless (or (is root c!id)
+                (is root c!parent))
+      (when (cansee c) (pr bar*))
+      (clickylink "root" (string whence "#" root)))))
+
+(def parentlink (c whence (o indent 0))
+  (when (cansee c) (pr bar*))
+  (if (or (is indent 0) (is (string c!id) arg!id))
+      (link "parent" (item-url c!parent))
+      (clickylink "parent" (string whence "#" c!parent))))
+
+(def contextlink (c whence)
+  (whenlet s (superparent c)
+    (pr bar*)
+    (tag (a href (item-url s!id c!id)
+            rel 'nofollow)
+      (pr "context"))))
+
+(def prevlink (c whence)
+  (whenlet prev (prev-comment c)
+    (unless (is prev c!parent)
+      (pr bar*)
+      (clickylink "prev" (string whence "#" prev)))))
+
+(def nextlink (c whence)
+  (whenlet next (next-comment c)
+    (pr bar*)
+    (clickylink "next" (string whence "#" next))))
+
 
 ; For really deeply nested comments, caching could add another reply 
 ; delay, but that's ok.
@@ -2258,16 +2331,21 @@ function vote(node) {
               label (if (me user) "threads" title)
               here  (threads-url user))
         (longpage (msec) nil label title here
-          (awhen (keep [and (cansee _) (~subcomment _)]
-                       (comments user maxend*))
+          (awhen (user-comments user)
             (display-threads it label title here))))
       (prn "No such user.")))
+
+(def user-comments ((t user me))
+  (keep [and (cansee _) (~subcomment _)]
+        (comments user maxend*)))
 
 (def display-threads (comments label title whence
                       (o start 0) (o end threads-perpage*))
   (tab
-    (each c (cut comments start end)
-      (display-comment-tree c whence 0 t t))
+    (let cs (cut comments start end)
+      (w/the comment-nav (comment-navs cs)
+        (each c cs
+          (display-comment-tree c whence 0 t t))))
     (when end
       (let newend (+ end threads-perpage*)
         (when (and (<= newend maxend*) (< end (len comments)))
