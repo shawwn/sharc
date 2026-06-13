@@ -595,12 +595,14 @@ function vote(node) {
       (pr ")"))
     (pr " | "))
   (if (me)
-      (urlink 'logout (logout-user) whence)
-      (onlink "login"
-        (login-page 'both nil
-                    (list {do (ensure-news-user)
-                              (newslog 'top-login)}
-                          whence)))))
+      (tag (span id 'logout)
+        (urlink 'logout (logout-user) whence))
+      (tag (span id 'login)
+        (onlink "login"
+          (login-page 'both nil
+                      (list {do (ensure-news-user)
+                                (newslog 'top-login)}
+                            whence))))))
 
 (def noob ((t user me))
   (and user (< (days-since (uvar user created)) 1)))
