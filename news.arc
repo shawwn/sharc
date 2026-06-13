@@ -1140,12 +1140,28 @@ function vote(node) {
 (def byline (i (o whence))
   (userlink i!by)
   (pr " ")
+  (agelink i)
+  (pr " ")
+  (unvotelink i whence))
+
+(def user-url (user) (+ "user?id=" user))
+
+(= show-avg* nil)
+
+(def userlink (user (o show-avg t))
+  (tag (a href (user-url user) class 'hnuser id (if (me user) 'me))
+    (user-name user))
+  (awhen (and show-avg* (admin) show-avg (uvar user avg))
+    (pr " (@(num it 1 t t))")))
+
+(def agelink (i)
   (let (s m h D M Y) (map [+ (if (< _ 10) "0" "") _]
                           (timedate i!time))
     (let title (+ "" Y "-" M "-" D "T" h ":" m ":" s " " i!time)
       (tag (span class "age" title title)
-        (link (text-age:item-age i) (item-url i!id)))))
-  (pr " ")
+        (link (text-age:item-age i) (item-url i!id))))))
+
+(def unvotelink (i (o whence))
   ; hn.js injects the "unvote" link here after a live vote; render it
   ; server-side too when the user has already voted, so it persists
   ; across refreshes.
@@ -1157,16 +1173,6 @@ function vote(node) {
               class 'clicky
               href  (vote-url i 'un (or whence "news")))
         (pr (if (is (vote 3) 'up) "unvote" "undown"))))))
-
-(def user-url (user) (+ "user?id=" user))
-
-(= show-avg* nil)
-
-(def userlink (user (o show-avg t))
-  (tag (a href (user-url user) class 'hnuser id (if (me user) 'me))
-    (user-name user))
-  (awhen (and show-avg* (admin) show-avg (uvar user avg))
-    (pr " (@(num it 1 t t))")))
 
 (= noob-color* (color 60 150 60))
 
@@ -1821,6 +1827,7 @@ function vote(node) {
       (tag (td class 'default)
         (spanclass comhead
           (itemscore o)
+          (unvotelink o whence)
           (editlink o)
           (killlink o whence)
           (deletelink o whence)
