@@ -630,6 +630,9 @@ function vote(node) {
 
 (= newsop-names* nil)
 
+(mac newsopr args
+  `(opexpand defopr ,@args))
+
 (mac newsop args
   `(do (pushnew ',(car args) newsop-names*)
        (opexpand defop ,@args)))
@@ -1086,14 +1089,14 @@ function vote(node) {
 ; voting something up by clicking on a link.  But a bad guy doesn't 
 ; know how to generate an auth arg that matches each user's cookie.
 
-(newsop vote (id how auth goto)
+(newsopr vote (id how auth goto)
   (with (i      (safe-item id)
          how    (saferead how)
          whence (if goto (urldecode goto) "news"))
     (if (no i)
-         (pr "No such item.")
+         (flink {pr "No such item."})
         (no (in how 'up 'down 'un))
-         (pr "Can't make that vote.")
+         (flink {pr "Can't make that vote."})
         (no user)
          (login-page 'both "You have to be logged in to vote."
                      (list {do (ensure-news-user)
@@ -1103,14 +1106,16 @@ function vote(node) {
                                  (logvote i))}
                            whence))
         (isnt auth (user->cookie* user))
-         (pr "User mismatch.")
+         (flink {pr "User mismatch."})
         (is how 'un)
          (do (unvote-for i)
-             (logvote i))
+             (logvote i)
+             goto)
         (canvote i how)
          (do (vote-for i how)
-             (logvote i))
-         (pr "Can't make that vote."))))
+             (logvote i)
+             goto)
+         (flink {pr "Can't make that vote."}))))
 
 (def cansee-score (i)
   (or (isnt i!type 'comment)
