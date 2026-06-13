@@ -680,7 +680,7 @@ function vote(node) {
                    comment-kill       (todisk comment-kill* val)
                    comment-ignore     (todisk comment-ignore* val)
                    lightweights       (todisk lightweights* (memtable val))))
-               {newsadmin-page})
+               {do "newsadmin"})
 
     (br2)
     (aform (let subject arg!id
@@ -715,7 +715,7 @@ function vote(node) {
                    (log-ignore user 'profile))
                  (= (prof name) val))
                {do (save-prof user)
-                   (user-page user)})))
+                   (user-url user)})))
 
 (= topcolor-threshold* 0)
 
@@ -2010,7 +2010,7 @@ function vote(node) {
                      (save-item i)
                      (metastory&adjust-rank i)
                      (wipe (comment-cache* i!id))
-                     (edit-page i)})
+                     here})
       (hook 'edit i))))
 
 (def ignore-edit (i name val)

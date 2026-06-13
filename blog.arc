@@ -71,7 +71,7 @@
     (vars-form `((string title ,p!title t t) (text text ,p!text t t))
                (fn (name val) (= (p name) val))
                {do (save-post p)
-                   (post-page p)})))
+                   (permalink p)})))
 
 (defop archive
   (blogpage
