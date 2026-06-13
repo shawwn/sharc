@@ -2180,19 +2180,19 @@ function vote(node) {
                 (contextlink c whence)))
             (when astree
               (prevlink c whence)
-              (nextlink c whence)))
-          (editlink c)
-          (killlink c whence)
-          (blastlink c whence)
-          (deletelink c whence)
-          (unless (or astree (~me))
-            (flaglink c whence))
-          (deadmark c)
-          (spanclass onstory
-            (when showon
-              (pr " | on: ")
-              (let s (superparent c)
-                (link (ellipsize s!title 50) (item-url s!id)))))))
+              (nextlink c whence))
+            (editlink c)
+            (killlink c whence)
+            (blastlink c whence)
+            (deletelink c whence)
+            (unless (or astree (~me))
+              (flaglink c whence))
+            (deadmark c)
+            (spanclass onstory
+              (when showon
+                (pr " | on: ")
+                (let s (superparent c)
+                  (link (ellipsize s!title 50) (item-url s!id))))))))
       (when (or parent (cansee c))
         (br))
       (tag (div class 'comment)
