@@ -82,10 +82,13 @@
 (= initload-users* nil)
 
 (def nsv ((o port 8080))
+  (load-news)
+  (asv port))
+
+(def load-news ()
   (map ensure-dir (list arcdir* newsdir* storydir* votedir* profdir*))
   (unless stories* (load-items))
-  (if (and initload-users* (empty profs*)) (load-users))
-  (asv port))
+  (if (and initload-users* (empty profs*)) (load-users)))
 
 (def load-users ()
   (pr "load users: ")
