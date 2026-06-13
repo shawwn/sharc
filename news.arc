@@ -1614,8 +1614,8 @@ function vote(node) {
   (and (valid-url url)
        (only&downcase
          (withs (parts (tokens (rem #\space url) [in _ #\/ #\?])
-                 host  (downcase (cadr parts)) ; hosts are case-insensitive
-                 path1 (car:cddr parts)        ; first path segment, if any
+                 host  (downcase parts!1) ; hosts are case-insensitive
+                 path1 parts!2            ; first path segment, if any
                  toks  (rev (tokens host #\.)))
            (if (isa (saferead (car toks)) 'int)
                (tostring (prall toks "" "."))
