@@ -2247,7 +2247,7 @@ function vote(node) {
       (clickylink "root" (string whence "#" root)))))
 
 (def parentlink (c whence (o indent 0))
-  (when (cansee c) (pr bar*))
+  (pr bar*)
   (if (or (is indent 0) (is (string c!id) arg!id))
       (link "parent" (item-url c!parent))
       (clickylink "parent" (string whence "#" c!parent))))
