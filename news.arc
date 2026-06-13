@@ -1806,7 +1806,7 @@ function vote(node) {
 (def display-pollopt (n o whence)
   (tag (tr class 'athing id o!id)
     (display-item-number n)
-    (tag (td valign 'top)
+    (tag (td valign 'top class 'votelinks)
       (votelinks o whence))
     (tag (td class 'comment)
       (tag (div style "margin-top:1px;margin-bottom:0px")
