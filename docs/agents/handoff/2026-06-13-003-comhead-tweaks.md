@@ -14,6 +14,7 @@ type: project
 |---|---|
 | `6258c12` | show [dead]/[flagged] markers unconditionally |
 | `469ed76` | anchor kill/delete/blast/flag redirects to the comment |
+| `d77a1ea` | make vars-form redirect after submit |
 
 ## What changed
 
@@ -26,6 +27,13 @@ type: project
   pollopt kill/delete) now get `whence#<id>` instead of bare `whence`,
   so acting on a comment returns you to it rather than the top of the
   page. Comments only anchor when `astree` (bare whence otherwise).
+- **`vars-form` redirects after submit** (`d77a1ea`): switched
+  `vars-form` (app.arc) from `taform` to `tarform`, so its `done`
+  callback's *return value* is a redirect URL instead of rendering a page
+  inline (same fix as the vote op, avoids the blank/duplicate page).
+  Callers now return urls: news profile -> `user-url`, newsadmin ->
+  `"newsadmin"`, edit -> `here`; blog edit -> `permalink`. (If you add a
+  new vars-form caller, its done thunk must return a url now.)
 
 ## Still deferred (unchanged from 002)
 - the **`collapse` server op** (hn.js pings `collapse?id=...` to persist a
