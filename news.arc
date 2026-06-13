@@ -1612,15 +1612,34 @@ function vote(node) {
 
 (defmemo sitename (url)
   (and (valid-url url)
-       (let toks (parse-site (rem #\space url))
-         (if (isa (saferead (car toks)) 'int)
-             (tostring (prall toks "" "."))
-             (let (t1 t2 t3 . rest) toks  
-               (if (and (~in t3 nil "www")
-                        (or (mem t1 multi-tld-countries*) 
-                            (mem t2 long-domains*)))
-                   (+ t3 "." t2 "." t1)
-                   (and t2 (+ t2 "." t1))))))))
+       (only&downcase
+         (withs (parts (tokens (rem #\space url) [in _ #\/ #\?])
+                 host  (downcase (cadr parts)) ; hosts are case-insensitive
+                 path1 (car:cddr parts)        ; first path segment, if any
+                 toks  (rev (tokens host #\.)))
+           (if (isa (saferead (car toks)) 'int)
+               (tostring (prall toks "" "."))
+               (let (t1 t2 t3 . rest) toks
+                 (let suffix (and t2 (+ t2 "." t1))
+                   (if (mem suffix subdomain-sites*)
+                        host                   ; e.g. name.github.io -> name.github.io
+                       (let site (if (and (~in t3 nil "www")
+                                          (or (mem t1 multi-tld-countries*)
+                                              (mem t2 long-domains*)))
+                                     (+ t3 "." t2 "." t1)
+                                     suffix)
+                         (if (and (mem site username-sites*) path1)
+                             ; strip a leading @ or ~ from the username
+                             (+ site "/" (if (in (path1 0) #\@ #\~)
+                                             (cut path1 1)
+                                             path1))
+                             site))))))))))
+
+; sites where the first path segment (a username) is part of the name
+(= username-sites* '("twitter.com" "x.com" "github.com" "medium.com"))
+
+; sites where the subdomain matters (name.github.io, not just github.io)
+(= subdomain-sites* '("github.io"))
 
 (= multi-tld-countries* '("uk" "jp" "au" "in" "ph" "tr" "za" "my" "nz" "br" 
                           "mx" "th" "sg" "id" "pk" "eg" "il" "at" "pl"))
