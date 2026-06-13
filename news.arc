@@ -2188,10 +2188,11 @@ function vote(node) {
           (unless (or astree (~me))
             (flaglink c whence))
           (deadmark c)
-          (when showon
-            (pr " | on: ")
-            (let s (superparent c)
-              (link (ellipsize s!title 50) (item-url s!id))))))
+          (spanclass onstory
+            (when showon
+              (pr " | on: ")
+              (let s (superparent c)
+                (link (ellipsize s!title 50) (item-url s!id)))))))
       (when (or parent (cansee c))
         (br))
       (tag (div class 'comment)
