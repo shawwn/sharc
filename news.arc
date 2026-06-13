@@ -2185,17 +2185,19 @@ function vote(node) {
           (deletelink c whence)
           (unless (or astree (~me))
             (flaglink c whence))
+          (when astree
+            (colllink c))
           (spanclass onstory
             (when showon
               (pr " | on: ")
               (let s (superparent c)
                 (link (ellipsize s!title 50) (item-url s!id))))))))
-      (br)
-      (tag (div class 'comment)
-        (if (~cansee c)
-            (pr (pseudo-text c))
-            (tag (div class (string "commtext " (comment-class c)))
-              (pr c!text))))
+    (br)
+    (tag (div class 'comment)
+      (if (~cansee c)
+          (pr (pseudo-text c))
+          (tag (div class (string "commtext " (comment-class c)))
+            (pr c!text)))
       (tag (div class 'reply)
         (when (and astree (cansee c) (live c))
           (para)
@@ -2206,24 +2208,25 @@ function vote(node) {
                 (underline (replylink c whence))
                 (fontcolor sand (pr "-----")))))))))
 
-; computes prev, next, and root for each toplevel comment.
+; computes prev, next, root, and number of descendants for each
+; comment.
 
 (def comment-navs (tops)
   (let nav (table)
     ((afn (sibs parent next-after root)
-       (let vs (keep cansee-descendant sibs) ; only the ones that render
-         (for j 0 (- (len vs) 1)
-           (let c (vs j)
-             (withs (prv (if (is j 0)
-                             parent
-                             ((vs (- j 1)) 'id))
-                     nxt (if (>= j (- (len vs) 1))
-                             next-after
-                             ((vs (+ j 1)) 'id))
-                     rt  (or root c!id)) ; top-level: c is its own root
-               (= (nav c!id) (obj root rt prev prv next nxt))
-               ; recurse: subtree's "next-after" is c's own next; root carries down
-               (self (ranked-kids c) c!id nxt rt))))))
+       (withs (vs   (keep cansee-descendant sibs) ; only the ones that render
+               last (- (len vs) 1))
+         (apply + 0 ; total of this sibling group
+           (map (fn (j)
+                  (let c (vs j)
+                    (withs (prv (if (is j 0) parent ((vs (- j 1)) 'id))
+                            nxt (if (>= j last) next-after ((vs (+ j 1)) 'id))
+                            rt  (or root c!id) ; top-level: c is its own root
+                            ; recurse: subtree's "next-after" is c's own next; root carries down
+                            n   (+ 1 (self (ranked-kids c) c!id nxt rt))) ; 1 + descendants
+                      (= (nav c!id) (obj root rt prev prv next nxt n n))
+                      n))) ; this comment's subtree size
+                (range 0 last)))))
      tops nil nil nil)
     nav))
 
@@ -2271,6 +2274,11 @@ function vote(node) {
     (pr bar*)
     (clickylink "next" (string whence "#" next))))
 
+(def colllink (c)
+  (pr " ")
+  (tag (a class "togg clicky" id c!id n (cnav c 'n)
+          href "javascript:void(0)")
+    (pr "[–]")))
 
 ; For really deeply nested comments, caching could add another reply 
 ; delay, but that's ok.

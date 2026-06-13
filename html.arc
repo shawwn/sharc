@@ -97,6 +97,7 @@
 (attribute a          class          opstring)
 (attribute a          id             opsym)
 (attribute a          onclick        opstring)
+(attribute a          n              opnum)
 (attribute body       alink          opcolor)
 (attribute body       bgcolor        opcolor)
 (attribute body       leftmargin     opnum)
