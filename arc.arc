@@ -1674,6 +1674,8 @@
       0
       (/ (count test xs) (len xs))))
 
+(mac assert (expr (o msg "Assertion failed"))
+  `(or ,expr (err (string ,msg ": " ',expr))))
 
 ; ---- Thread-local variables ---------------------------------------
 ;
@@ -1717,7 +1719,6 @@
        (= (the ,var) ,val)
        (after (do ,@body)
          (= (the ,var) ,prev)))))
-
 
 ; Referencing the bare symbol `scope` (or `scope%`) compiles to
 ; (%scope env), where ac splices in its compile-time lexical environment.
