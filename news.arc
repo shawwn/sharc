@@ -2164,48 +2164,49 @@ function vote(node) {
 
 (def gen-comment-body (c whence astree indent showpar showon)
   (tag (td class 'default)
-    (let parent (and (or (no astree) showpar) (c 'parent))
-      (tag (div style "margin-top:2px; margin-bottom:-10px; ")
-        (spanclass comhead
-          (itemline c whence)
-          (deadmark c)
-          (spanclass navs
-            (when astree
-              (rootlink c whence))
-            (when parent
-              (parentlink c whence indent))
-            (when (or (no astree)
-                      (headmatch "threads" whence))
-              (unless (> indent 0)
-                (contextlink c whence)))
-            (when astree
-              (prevlink c whence)
-              (nextlink c whence))
-            (editlink c)
-            (killlink c whence)
-            (blastlink c whence)
-            (deletelink c whence)
-            (unless (or astree (~me))
-              (flaglink c whence))
-            (spanclass onstory
-              (when showon
-                (pr " | on: ")
-                (let s (superparent c)
-                  (link (ellipsize s!title 50) (item-url s!id))))))))
-      (when (or parent (cansee c))
-        (br))
+    (tag (div style "margin-top:2px; margin-bottom:-10px; ")
+      (spanclass comhead
+        (itemline c whence)
+        (deadmark c)
+        (spanclass navs
+          (when astree
+            (rootlink c whence))
+          (when (or (no astree) showpar)
+            (parentlink c whence indent))
+          (when (or (no astree) (headmatch "threads" whence))
+            (unless (> indent 0)
+              (contextlink c whence)))
+          (when astree
+            (prevlink c whence)
+            (nextlink c whence))
+          (editlink c)
+          (killlink c whence)
+          (blastlink c whence)
+          (deletelink c whence)
+          (unless (or astree (~me))
+            (flaglink c whence))
+          (spanclass onstory
+            (when showon
+              (pr " | on: ")
+              (let s (superparent c)
+                (link (ellipsize s!title 50) (item-url s!id))))))))
+      (br)
       (tag (div class 'comment)
-        (tag (div class (string "commtext " (comment-class c)))
-          (if (~cansee c) (pr (pseudo-text c))
+        (if (~cansee c)
+            (pr (pseudo-text c))
+            (tag (div class (string "commtext " (comment-class c)))
               (pr c!text))))
-      (when (and astree (cansee c) (live c))
-        (para)
-        (tag (font size 1)
-          (if (and (~mem 'neutered c!keys)
-                   (replyable c indent)
-                   (comments-active c))
-              (underline (replylink c whence))
-              (fontcolor sand (pr "-----"))))))))
+      (tag (div class 'reply)
+        (when (and astree (cansee c) (live c))
+          (para)
+          (tag (font size 1)
+            (if (and (~mem 'neutered c!keys)
+                     (replyable c indent)
+                     (comments-active c))
+                (underline (replylink c whence))
+                (fontcolor sand (pr "-----")))))))))
+
+; computes prev, next, and root for each toplevel comment.
 
 (def comment-navs (tops)
   (let nav (table)
