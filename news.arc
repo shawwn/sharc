@@ -1123,11 +1123,10 @@ function vote(node) {
       (admin)))
 
 (def itemline (i (o whence))
-  (when (cansee i)
-    (when (cansee-score i)
-      (itemscore i)
-      (pr " by "))
-    (byline i whence)))
+  (when (cansee-score i)
+    (itemscore i)
+    (pr " by "))
+  (byline i whence))
 
 (def itemscore (i)
   (tag (span class 'score id (+ "score_" i!id))
