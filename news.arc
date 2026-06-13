@@ -1015,9 +1015,9 @@ function vote(node) {
                   "[dead]"))
 
 (def deadmark (i)
-  (when (and (flagged i) (seesdead))
+  (when (flagged i)
     (pr " [flagged] "))
-  (when (and i!dead (seesdead))
+  (when i!dead
     (pr " [dead] "))
   (when (and i!deleted (admin))
     (pr " [deleted] ")))
