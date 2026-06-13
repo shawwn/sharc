@@ -2169,6 +2169,7 @@ function vote(node) {
       (tag (div style "margin-top:2px; margin-bottom:-10px; ")
         (spanclass comhead
           (itemline c whence)
+          (deadmark c)
           (spanclass navs
             (when astree
               (rootlink c whence))
@@ -2187,7 +2188,6 @@ function vote(node) {
             (deletelink c whence)
             (unless (or astree (~me))
               (flaglink c whence))
-            (deadmark c)
             (spanclass onstory
               (when showon
                 (pr " | on: ")
