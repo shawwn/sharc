@@ -1830,8 +1830,9 @@ function vote(node) {
           (itemscore o)
           (unvotelink o whence)
           (editlink o)
-          (killlink o whence)
-          (deletelink o whence)
+          (let whenceid (string whence "#" o!id)
+            (killlink o whenceid)
+            (deletelink o whenceid))
           (deadmark o)))))
 
 
@@ -2182,13 +2183,14 @@ function vote(node) {
             (prevlink c whence)
             (nextlink c whence))
           (editlink c)
-          (killlink c whence)
-          (blastlink c whence)
-          (deletelink c whence)
-          (unless (or astree (~me))
-            (flaglink c whence))
-          (when astree
-            (colllink c))
+          (let whenceid (if astree (string whence "#" c!id) whence)
+            (killlink c whenceid)
+            (blastlink c whenceid)
+            (deletelink c whenceid)
+            (unless (or astree (~me))
+              (flaglink c whenceid))
+            (when astree
+              (colllink c)))
           (spanclass onstory
             (when showon
               (pr " | on: ")
