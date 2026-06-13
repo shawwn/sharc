@@ -424,7 +424,7 @@
      (tag head 
        (gen-css-url)
        (prn "<link rel=\"shortcut icon\" href=\"" favicon-url* "\">")
-       (tag script (pr votejs*))
+       (tag (script src (static-src "hn.js")))
        (tag title (pr ,title)))
      (tag body 
        (center
@@ -952,7 +952,7 @@ function vote(node) {
         (tag (td class 'subtext)
           (spanclass subline
             (hook 'itemline s)
-            (itemline s)
+            (itemline s whence)
             (when (in s!type 'story 'poll) (commentlink s))
             (editlink s)
             (when (apoll s) (addoptlink s))
@@ -1017,28 +1017,31 @@ function vote(node) {
   (when (and i!deleted (admin))
     (pr " [deleted] ")))
 
-(= downvote-threshold* 200 downvote-time* 1440)
+(= downvote-threshold* 0 downvote-time* 1440)
 
 (= votewid* 14)
       
 (def votelinks (i whence (o downtoo))
   (center
-    (if (and (cansee i)
-             (~and (me) ((votes) i!id)))
+    (if (author i)
+         (do (fontcolor orange (pr "*"))
+             (br)
+             (hspace votewid*))
+        ; Render arrows for logged-out viewers (click -> login) and for
+        ; logged-in users who could vote here, ignoring whether they've
+        ; already voted (canvote ... t).  When they have voted, votelink
+        ; adds nosee so the arrows are present but hidden, letting hn.js
+        ; un-hide them on unvote.
+        (and (cansee i) (or (~me) (canvote i 'up t)))
          (do (votelink i whence 'up)
              (if (and downtoo
                       (or (admin)
                           (< (item-age i) downvote-time*))
-                      (canvote i 'down))
-                 (do (br)
-                     (votelink i whence 'down))
+                      (canvote i 'down t))
+                 (votelink i whence 'down)
                  ; don't understand why needed, but is, or a new
                  ; page is generated on voting
                  (tag (span id (+ "down_" i!id)))))
-        (author i)
-         (do (fontcolor orange (pr "*"))
-             (br)
-             (hspace votewid*))
         (hspace votewid*))))
 
 ; could memoize votelink more, esp for non-logged in users,
@@ -1047,29 +1050,33 @@ function vote(node) {
 ; redefined later (identically) so the outs catch new vals of up-url, etc.
 
 (def votelink (i whence dir)
-  (tag (a id      (if (me) (string dir '_ i!id))
-          onclick (if (me) "return vote(this)")
-          href    (vote-url i dir whence))
+  (tag (a id    (if (me) (string dir '_ i!id))
+          ; hn.js's click handler catches .clicky; nosee hides an arrow
+          ; the user has already used (visibility:hidden) until unvote.
+          class (if (me) (string 'clicky (if ((votes) i!id) " nosee")))
+          href  (vote-url i dir whence))
     (if (is dir 'up)
         (out (tag (div class "votearrow"           title "upvote")))
         (out (tag (div class "votearrow rotate180" title "downvote"))))))
 
+; hn.js reads id/how/auth/goto from the vote link's href.
+
 (def vote-url (i dir whence)
-  (+ "vote?" "for=" i!id
-             "&dir=" dir
-             (aif (me) (+ "&by=" it "&auth=" (urlencode:user->cookie* it)))
-             "&whence=" (urlencode whence)))
+  (+ "vote?id=" i!id
+            "&how=" dir
+            (aif (me) (+ "&auth=" (urlencode:user->cookie* it)))
+            "&goto=" (urlencode whence)))
 
 (= lowest-score* -4)
 
 ; Not much stricter than whether to generate the arrow.  Further tests 
 ; applied in vote-for.
 
-(def canvote (i dir)
+(def canvote (i dir (o ignore-voted))
   (and (me)
        (news-type&live i)
        (or (is dir 'up) (> i!score lowest-score*))
-       (no ((votes) i!id))
+       (or ignore-voted (no ((votes) i!id)))
        (or (is dir 'up)
            (and (acomment i)
                 (> (karma) downvote-threshold*)
@@ -1079,26 +1086,29 @@ function vote(node) {
 ; voting something up by clicking on a link.  But a bad guy doesn't 
 ; know how to generate an auth arg that matches each user's cookie.
 
-(newsop vote (by for dir auth whence)
-  (with (i      (safe-item for)
-         dir    (saferead dir)
-         whence (if whence (urldecode whence) "news"))
+(newsop vote (id how auth goto)
+  (with (i      (safe-item id)
+         how    (saferead how)
+         whence (if goto (urldecode goto) "news"))
     (if (no i)
          (pr "No such item.")
-        (no (in dir 'up 'down))
+        (no (in how 'up 'down 'un))
          (pr "Can't make that vote.")
-        (and by (or (isnt by user) (isnt auth (user->cookie* user))))
-         (pr "User mismatch.")
         (no user)
          (login-page 'both "You have to be logged in to vote."
                      (list {do (ensure-news-user)
                                (newslog 'vote-login)
-                               (when (canvote i dir)
-                                 (vote-for i dir)
+                               (when (canvote i how)
+                                 (vote-for i how)
                                  (logvote i))}
                            whence))
-        (canvote i dir)
-         (do (vote-for i dir)
+        (isnt auth (user->cookie* user))
+         (pr "User mismatch.")
+        (is how 'un)
+         (do (unvote-for i)
+             (logvote i))
+        (canvote i how)
+         (do (vote-for i how)
              (logvote i))
          (pr "Can't make that vote."))))
 
@@ -1107,12 +1117,12 @@ function vote(node) {
       (me i!by)
       (admin)))
 
-(def itemline (i)
+(def itemline (i (o whence))
   (when (cansee i)
     (when (cansee-score i)
       (itemscore i)
       (pr " by "))
-    (byline i)))
+    (byline i whence)))
 
 (def itemscore (i)
   (tag (span class 'score id (+ "score_" i!id))
@@ -1122,14 +1132,26 @@ function vote(node) {
 
 ; redefined later
 
-(def byline (i)
+(def byline (i (o whence))
   (userlink i!by)
   (pr " ")
   (let (s m h D M Y) (map [+ (if (< _ 10) "0" "") _]
                           (timedate i!time))
     (let title (+ "" Y "-" M "-" D "T" h ":" m ":" s " " i!time)
       (tag (span class "age" title title)
-        (link (text-age:item-age i) (item-url i!id))))))
+        (link (text-age:item-age i) (item-url i!id)))))
+  (pr " ")
+  ; hn.js injects the "unvote" link here after a live vote; render it
+  ; server-side too when the user has already voted, so it persists
+  ; across refreshes.
+  (tag (span id (string "unv_" i!id))
+    ; not (author i): you auto-upvote your own items but can't unvote them
+    (whenlet vote (and (me) (~author i) ((votes) i!id))
+      (pr bar*)
+      (tag (a id    (string "un_" i!id)
+              class 'clicky
+              href  (vote-url i 'un (or whence "news")))
+        (pr (if (is (vote 3) 'up) "unvote" "undown"))))))
 
 (def user-url (user) (+ "user?id=" user))
 
@@ -1395,6 +1417,27 @@ function vote(node) {
       (push (cons i!id vote) recent-votes*))))
 
 ; redefined later
+
+; Inverse of vote-for: undo the current user's vote on i.  Mirrors the
+; recorded effects (score, karma, the vote records); hn.js sends how=un.
+
+(def unvote-for (i)
+  (whenlet vote ((votes) i!id)
+    (let dir (vote 3)
+      (-- i!score (case dir up 1 down -1))
+      (metastory&adjust-rank i)
+      (unless (or (author i)
+                  (and (is (logins* (me)) i!ip) (~editor))
+                  (is i!type 'pollopt))
+        (-- (karma i!by) (case dir up 1 down -1))
+        (save-prof i!by))
+      (pull [is _!2 (me)] i!votes)
+      (save-item i)
+      (wipe ((votes* (me)) i!id))
+      (pull [is _!1 i!id] (uvar (me) votes))
+      (save-votes)
+      (save-prof)
+      (wipe (comment-cache* i!id)))))
 
 (def biased-voter (i vote) nil)
 
@@ -2106,7 +2149,7 @@ function vote(node) {
     (let parent (and (or (no astree) showpar) (c 'parent))
       (tag (div style "margin-top:2px; margin-bottom:-10px; ")
         (spanclass comhead
-          (itemline c)
+          (itemline c whence)
           (when parent
             (when (cansee c) (pr bar*))
             (if (or (is indent 0) (is (string c!id) arg!id))
