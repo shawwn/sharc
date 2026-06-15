@@ -1317,7 +1317,8 @@
   `(on-err (fn (c) nil)
            {do ,expr}))
 
-(def saferead (arg) (errsafe:read arg))
+(def saferead (arg)
+  (if (isa arg 'string) (errsafe:read arg) arg))
 
 (def safe-load-table (filename) 
   (or (errsafe:load-table filename)
