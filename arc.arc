@@ -201,7 +201,7 @@
 
 (def empty (seq) 
   (or (no seq) 
-      (and (or (is (type seq) 'string) (is (type seq) 'table))
+      (and (in (type seq) 'string 'table)
            (is (len seq) 0))))
 
 (def reclist (f xs)
@@ -1676,7 +1676,7 @@
       (/ (count test xs) (len xs))))
 
 (mac assert (expr (o msg "Assertion failed"))
-  `(or ,expr (err (string ,msg ": " ',expr))))
+  `(or ,expr (err (string ,msg ": " (tostring:pr ',expr)))))
 
 ; ---- Thread-local variables ---------------------------------------
 ;
