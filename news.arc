@@ -644,6 +644,8 @@
 
 (def nad-fields ()
   `((num      caching         ,caching*                       t t)
+    (num      perpage         ,perpage*                       t t)
+    (num      threads-perpage ,threads-perpage*               t t)
     (bigtoks  comment-kill    ,comment-kill*                  t t)
     (bigtoks  comment-ignore  ,comment-ignore*                t t)
     (bigtoks  lightweights    ,(sort < (keys lightweights*))  t t)))
@@ -657,6 +659,8 @@
                (fn (name val)
                  (case name
                    caching            (= caching* val)
+                   perpage            (= perpage* (max 1 val))
+                   threads-perpage    (= threads-perpage* (max 1 val))
                    comment-kill       (todisk comment-kill* val)
                    comment-ignore     (todisk comment-ignore* val)
                    lightweights       (todisk lightweights* (memtable val))))
