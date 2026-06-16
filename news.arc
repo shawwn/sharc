@@ -11,6 +11,7 @@
 
 (= this-site*    "My Forum"
    site-url*     "http://news.yourdomain.com/"
+   site-email*   "hn@@ycombinator.com"
    parent-url*   "/news"
    favicon-url*  ""
    site-desc*    "What this site is about."               ; for rss feed
@@ -463,8 +464,21 @@
                (color-stripe (main-color))
                (br)
                (center
-                 (hook 'longfoot)
+                 (or (hook 'longfoot) (footer))
+                 (br2)
                  (admin-bar (- (msec) ,gt) ,whence)))))))
+
+(def footer ()
+  (spanclass yclinks
+    (w/bars
+      (link "Guidelines" "newsguidelines.html")
+      (link "FAQ" "newsfaq.html")
+      (link "Lists" "lists")
+      (link "API" "https://github.com/HackerNews/API")
+      (link "Security" "security.html")
+      (link "Legal" "https://www.ycombinator.com/legal/")
+      (link "Apply to YC" "https://www.ycombinator.com/apply/")
+      (link "Contact" "mailto:@site-email*"))))
 
 (def gc ((o full t))
   (sb-ext::gc :full full))
@@ -475,7 +489,6 @@
 
 (def admin-bar (elapsed whence)
   (when (or (admin) arg!perf)
-    (br2)
     (w/bars
       (pr (len fns*) " fnids")
       (pr (len items*) "/" maxid* " loaded")
@@ -547,7 +560,7 @@
 
 ; redefined later
 
-(= welcome-url* "welcome")
+(= welcome-url* "newswelcome.html")
 
 (def toprow (label)
   (w/bars
@@ -799,9 +812,6 @@
       (underlink "upvoted submissions" (upvoted-url user))
       (pr " / ")
       (underlink "comments" (upvoted-url user t)))))
-
-(newsop welcome ()
-  (pr "Welcome to " this-site* ", " user "!"))
 
 
 ; Main Operators
