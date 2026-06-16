@@ -12,7 +12,7 @@
 (= this-site*    "My Forum"
    site-url*     "http://news.yourdomain.com/"
    site-email*   "hn@@ycombinator.com"
-   parent-url*   "/news"
+   parent-url*   "/"
    favicon-url*  ""
    site-desc*    "What this site is about."               ; for rss feed
    site-color*   (color 141 141 190)
