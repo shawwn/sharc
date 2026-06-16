@@ -927,7 +927,7 @@
             (when (is (saferead (or kind "story")) 'story)
               (stories-from site))
             "from"
-            (+ "Submissions from " (tostring:pr-escaped site))
+            (+ "Submissions from " (eschtml site))
             (fromurl site) nil
             [fromurl site _]))
 
