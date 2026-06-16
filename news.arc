@@ -676,13 +676,14 @@
 
 (def spamsites-page ()
   (minipage "Spam Sites"
-    (pr "When a user submits a site from these domains, they'll be"
-        " shown the message \"Stop spamming us\" and the item"
-        " won't be submitted.")
-    (br2)
-    (pr "(Only for annoyingly high-volume spammers. For ordinary spammers it's"
-        " enough to ban their sites and ip addresses.)")
-    (br2)
+    (para "When a user submits a site from these domains, they'll be"
+          " shown the message \"Stop spamming us\" and the item"
+          " won't be submitted.")
+    (para "(Only for annoyingly high-volume spammers. For ordinary"
+          " spammers it's enough to ban their sites and ip"
+          " addresses.)")
+    (para)
+    (br)
     (sptab
       (each site (sort < (keys big-spamsites*))
         (row (pr site) (tag u (ulink "remove"
@@ -690,7 +691,7 @@
                                 (wipe (big-spamsites* site))
                                 (todisk big-spamsites*)
                                 (spamsites-page))))))
-    (br2)
+    (br)
     (uform (iflet site (sitename arg!url)
                   (do (newslog 'add-spamsite site)
                       (set (big-spamsites* site))
@@ -698,7 +699,7 @@
                       (spamsites-page))
                   (pr "Bad url."))
       (single-input "" 'url 20 "add spam url"))
-    (br2)
+    (br)
     (link "Back" "newsadmin")))
 
 
