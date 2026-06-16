@@ -1298,16 +1298,16 @@
 (def hours-since (t1)   (/ (since t1) 3600))
 (def days-since (t1)    (/ (since t1) 86400))
 
-; could use a version for fns of 1 arg at least
-
 (def cache (timef valf)
-  (with (cached nil gentime nil)
-    {aif (timef)
-         (do (unless (and cached (< (since gentime) it))
-               (= cached (valf)
-                  gentime (seconds)))
-             cached)
-         (valf)}))
+  (let store (table) ; args -> (list cached-value gentime)
+    (fn args
+      (aif (timef)
+           (let cell (or (store args) (= (store args) (list nil nil)))
+             (unless (and (car cell) (< (since (cadr cell)) it))
+               (= (car cell)  (apply valf args)
+                  (cadr cell) (seconds)))
+             (car cell))
+           (apply valf args)))))
 
 (mac defcache (name lasts . body)
   `(safeset ,name (cache {do ,lasts}
