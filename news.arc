@@ -1098,7 +1098,7 @@
 (def deadmark (i)
   (when (flagged i)
     (pr " [flagged] "))
-  (when i!dead
+  (when (and i!dead (seesdead))
     (pr " [dead] "))
   (when (and i!deleted (admin))
     (pr " [deleted] ")))
