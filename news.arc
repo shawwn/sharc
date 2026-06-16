@@ -662,16 +662,44 @@
                {do "newsadmin"})
 
     (br2)
-    (aform (let subject arg!id
-             (if (profile subject)
-                 (do (killallby subject)
-                     (submitted-page subject))
-                 (admin&newsadmin-page)))
+    (urform (iflet subject (profile arg!id)
+                   (do (killallby subject)
+                       (submitted-url subject))
+                   "newsadmin")
       (single-input "" 'id 20 "kill all by"))
     (br2)
-    (aform (do (set-ip-ban arg!ip t)
-               (admin&newsadmin-page))
-      (single-input "" 'ip 20 "ban ip"))))
+    (urform (do (set-ip-ban arg!ip t)
+                "newsadmin")
+      (single-input "" 'ip 20 "ban ip"))
+    (br2)
+    (tag u (onlink "manage spam sites" (spamsites-page)))))
+
+(def spamsites-page ()
+  (minipage "Spam Sites"
+    (pr "When a user submits a site from these domains, they'll be"
+        " shown the message \"Stop spamming us\" and the item"
+        " won't be submitted.")
+    (br2)
+    (pr "(Only for annoyingly high-volume spammers. For ordinary spammers it's"
+        " enough to ban their sites and ip addresses.)")
+    (br2)
+    (sptab
+      (each site (sort < (keys big-spamsites*))
+        (row (pr site) (tag u (ulink "remove"
+                                (newslog 'remove-spamsite site)
+                                (wipe (big-spamsites* site))
+                                (todisk big-spamsites*)
+                                (spamsites-page))))))
+    (br2)
+    (uform (iflet site (sitename arg!url)
+                  (do (newslog 'add-spamsite site)
+                      (set (big-spamsites* site))
+                      (todisk big-spamsites*)
+                      (spamsites-page))
+                  (pr "Bad url."))
+      (single-input "" 'url 20 "add spam url"))
+    (br2)
+    (link "Back" "newsadmin")))
 
 
 ; Users
@@ -860,7 +888,9 @@
       (row (link "noobcomments") "Comments from new accounts.")
       (when (admin)
         (map row:link
-             '(optimes topips flagged killed badguys badlogins goodlogins)))
+             '(optimes topips spurned flagged killed
+                       badlogins goodlogins
+                       badguys badsites badips)))
       (hook 'listspage))))
 
 
@@ -1530,8 +1560,8 @@
             (flink {submit-page url title showtext text toolong*})
            (and (blank url) (blank text))
             (flink {submit-page url title showtext text bothblank*})
-           (let site (sitename url)
-             (or (big-spamsites* site) (recent-spam site)))
+           ; could also match (recent-spam:sitename url)
+           (big-spamsites*:sitename url)
             (flink {msgpage spammage*})
            (oversubmitting 'story url)
             (flink {msgpage toofast*})
