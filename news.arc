@@ -672,7 +672,7 @@
                 "newsadmin")
       (single-input "" 'ip 20 "ban ip"))
     (br2)
-    (tag u (onlink "manage spam sites" (spamsites-page)))))
+    (tag u (ulink "manage spam sites" (spamsites-page)))))
 
 (def spamsites-page ()
   (minipage "Spam Sites"
