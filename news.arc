@@ -543,7 +543,7 @@
       (tag (img src logo-url* width 18 height 18
                 style "border:1px #@(hexrep border-color*) solid; display:block;")))))
 
-(= toplabels* '(nil "welcome" "new" "threads" "comments" "leaders" "*"))
+(= toplabels* '(nil "welcome" "new" "threads" "comments" "lists" "*"))
 
 ; redefined later
 
@@ -555,7 +555,7 @@
     (toplink "new" "newest" label)
     (if (me) (toplink "threads" (threads-url) label))
     (toplink "comments" "newcomments" label)
-    (toplink "leaders"  "leaders"     label)
+    (toplink "lists" "lists" label)
     (hook 'toprow label)
     (link "submit")
     (unless (mem label toplabels*)
@@ -949,17 +949,27 @@
 (newsop lists () 
   (longpage (msec) nil "lists" "Lists" "lists"
     (sptab
-      (row (link "best")         "Highest voted recent links.")
-      (row (link "active")       "Most active current discussions.")
-      (row (link "bestcomments") "Highest voted recent comments.")
-      (row (link "noobstories")  "Submissions from new accounts.")
-      (row (link "noobcomments") "Comments from new accounts.")
+      (row (link "best")         "Highest voted recent links")
+      (row (link "bestcomments") "Highest voted recent comments")
+      (row (link "active")       "Most active current discussions")
+      (row (link "noobstories")  "Submissions from new accounts")
+      (row (link "noobcomments") "Comments from new accounts")
+      (row (link "leaders")      "Users with most karma")
+      (row (link "topcolors")    (topcolors-label))
+      (when (editor)
+        (spacerow 10)
+        (map row:link '(flagged killed)))
       (when (admin)
-        (map row:link
-             '(optimes topips spurned flagged killed
-                       badlogins goodlogins
-                       badguys badsites badips)))
+        (spacerow 10)
+        (map row:link '(optimes editors topips spurned badlogins
+                                goodlogins badguys badsites badips)))
       (hook 'listspage))))
+
+(def topcolors-label ()
+  (pr "A sampler of ")
+  (underlink "topcolors"
+             "https://news.ycombinator.com/item?id=97573")
+  (pr " chosen by active users"))
 
 
 (def voted-items (test (t user me))
