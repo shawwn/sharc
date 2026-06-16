@@ -1112,6 +1112,7 @@
 (def pseudo-text (i)
   (if (flagged i) "[flagged]"
       i!deleted   "[deleted]"
+      (delayed i) "[delayed]"
                   "[dead]"))
 
 (def deadmark (i)
