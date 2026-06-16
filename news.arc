@@ -243,10 +243,17 @@
 ; because people try e.g. item?id=363/blank.php
 
 (def safe-item (id)
-  (ok-id&item (if (isa id 'string) (saferead id) id)))
+  (aif (safe-id id) (item it)))
 
-(def ok-id (id) 
-  (and (exact id) (<= 1 id maxid*)))
+(def safe-id     (id) (ok-id:saferead id))
+(def safe-int    (id) (ok-int:saferead id))
+(def safe-whole  (id) (ok-whole:saferead id))
+(def safe-posint (id) (ok-posint:saferead id))
+
+(def ok-id     (id) (and (exact id) (<= 1 id maxid*) id))
+(def ok-int    (id) (and (exact id) id))
+(def ok-whole  (id) (and (exact id) (>= id 0) id))
+(def ok-posint (id) (and (exact id) (> id 0) id))
 
 (def arg->item (key)
   (safe-item:saferead (arg key)))
@@ -498,34 +505,6 @@
                   (pr msg))))
     (br2)))
 
-(= votejs* "
-function byId(id) {
-  return document.getElementById(id);
-}
-
-function vote(node) {
-  var v = node.id.split(/_/);   // {'up', '123'}
-  var item = v[1]; 
-
-  // adjust score (absent for items with no shown score, e.g. comments)
-  var score = byId('score_' + item);
-  if (score) {
-    var newscore = parseInt(score.innerHTML) + (v[0] == 'up' ? 1 : -1);
-    score.innerHTML = newscore + (newscore == 1 ? ' point' : ' points');
-  }
-
-  // hide arrows
-  var up = byId('up_' + item), down = byId('down_' + item);
-  if (up)   up.style.visibility   = 'hidden';
-  if (down) down.style.visibility = 'hidden';
-
-  // ping server
-  var ping = new Image();
-  ping.src = node.href;
-
-  return false; // cancel browser nav
-} ")
-
 
 ; Page top
 
@@ -632,12 +611,12 @@ function vote(node) {
 
 (= newsop-names* nil)
 
-(mac newsopr args
-  `(opexpand defopr ,@args))
+(mac newsopr body
+  `(opexpand defopr ,@body))
 
-(mac newsop args
-  `(do (pushnew ',(car args) newsop-names*)
-       (opexpand defop ,@args)))
+(mac newsop body
+  `(do (pushnew ',(car body) newsop-names*)
+       (opexpand defop ,@body)))
 
 (mac adop (name parms . body)
   (w/uniq g
