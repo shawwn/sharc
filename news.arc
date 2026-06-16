@@ -803,33 +803,74 @@
 
 (= caching* 1 perpage* 30 threads-perpage* 10 maxend* 210)
 
-; Limiting that newscache can't take any arguments except the user.
-; To allow other arguments, would have to turn the cache from a single 
-; stored value to a hash table whose keys were lists of arguments.
-
-(mac newscache (name time . body)
+(mac newscache (name args time . body)
   (w/uniq gc
-    `(let ,gc (cache {if arg!perf nil (* caching* ,time)}
-                     {tostring (w/me nil ,@body)})
-       (def ,name ()
+    `(let ,gc (cache {unless (or arg!perf arg!p arg!n arg!next)
+                       (* caching* ,time)}
+                     (fn ,args
+                       (tostring (w/me nil ,@body))))
+       (def ,name ,args
          (if (me)
              (do ,@body)
-             (pr (,gc)))))))
+             (pr (,gc ,@args)))))))
 
 
-(newsop news () (newspage))
+(newsop news () (newspage "news"))
 
-(newsop ||   () (newspage))
+(newsop ||   () (newspage ""))
 
-;(newsop index.html () (newspage))
+;(newsop index.html () (newspage "index.html"))
 
-(newscache newspage 90
-  (listpage (msec) (topstories maxend*) nil nil "news"))
+(newscache newspage (whence) 90
+  (listpage (msec) (topstories maxend*) nil nil (pageurl whence) t
+            [pageurl whence (+ (curpage) 1)]))
 
-(def listpage (t1 items label title (o url label) (o number t))
+(def listpage (t1 items label title (o url label) (o number t) (o moreurl))
   (hook 'listpage)
   (longpage t1 nil label title url
-    (display-items items label title url 0 perpage* number)))
+    (let (start end numstart items) (paginate items perpage*)
+      (display-items items label title url start end number moreurl numstart))))
+
+(def curpage ()
+  (or (safe-posint arg!p) 1))
+
+(def cur-n ()
+  (or (safe-posint arg!n) 1))
+
+(def pageurl (whence (o p (curpage)) (o n (cur-n)))
+  (whenceurl whence nil
+             (if (> n 1) n)
+             (if (> p 1) (string p))))
+
+(def nexturl (whence (o next arg!next) (o n (cur-n)))
+  (whenceurl whence
+             (only&string next)
+             (if (only&> n 1) (string n))
+             nil))
+
+(def whenceurl (whence (o next arg!next) (o n arg!n) (o p arg!p))
+  (let sep (if (pos #\? whence) #\& #\?)
+    (if p
+         (string whence sep "p=" (urlencode:string p))
+        next
+         (string whence sep "next=" (urlencode:string next)
+                 (when n
+                   (string "&n=" (urlencode:string n))))
+         whence)))
+
+; Returns (start end numstart items): start/end are the index window into
+; items for the page, numstart is the rank to show for the first item.
+; ?p=N gives a page-numbered window; ?next=ID[&n=N] is an id cursor (used by
+; newest/from, whose lists run newest-id-first) that keeps items from ID on.
+
+(def paginate (items perpage)
+  (aif (safe-posint arg!p)
+        (with (start (* (- it 1) perpage)
+               end   (* it perpage))
+          (list start end (+ start 1) items))
+       (safe-id arg!next)
+        (list 0 perpage (cur-n) (keep [<= _!id it] items))
+        (list 0 perpage (cur-n) items)))
 
 
 (newsop newest () (newestpage))
@@ -837,8 +878,10 @@
 ; Note: dead/deleted items will persist for the remaining life of the 
 ; cached page.  If this were a prob, could make deletion clear caches.
 
-(newscache newestpage 40
-  (listpage (msec) (newstories maxend*) "new" "New Links" "newest"))
+(newscache newestpage () 40
+  (listpage (msec) (newstories maxend*) "new" "New Links"
+            (nexturl "newest") t
+            [nexturl "newest" _ (+ (cur-n) perpage*)]))
 
 (def newstories (n)
   (retrieve n [cansee _] stories*))
@@ -846,8 +889,9 @@
 
 (newsop best () (bestpage))
 
-(newscache bestpage 1000
-  (listpage (msec) (beststories maxend*) "best" "Top Links"))
+(newscache bestpage () 1000
+  (listpage (msec) (beststories maxend*) "best" "Top Links" (pageurl "best") t
+            [pageurl "best" (+ (curpage) 1)]))
 
 ; As no of stories gets huge, could test visibility in fn sent to best.
 
@@ -855,11 +899,13 @@
   (bestn n (compare > realscore) (visible stories*)))
 
 
-(newsop noobstories () (noobspage stories*))
-(newsop noobcomments () (noobspage comments*))
+(newsop noobstories () (noobspage stories* "noobstories"))
+(newsop noobcomments () (noobspage comments* "noobcomments"))
 
-(def noobspage (source)
-  (listpage (msec) (noobs maxend* source) "noobs" "New Accounts"))
+(def noobspage (source whence)
+  (listpage (msec) (noobs maxend* source) "noobs" "New Accounts"
+            (nexturl whence) nil
+            [nexturl whence _]))
 
 (def noobs (n source)
   (retrieve n [cansee&bynoob _] source))
@@ -867,12 +913,29 @@
 (def bynoob (i)
   (< (- (user-age i!by) (item-age i)) 2880))
 
+(newsop from (site kind next)
+  (listpage (msec)
+            (when (is (saferead (or kind "story")) 'story)
+              (stories-from site))
+            "from"
+            (+ "Submissions from " (tostring:pr-escaped site))
+            (fromurl site) nil
+            [fromurl site _]))
+
+(def fromurl (site (o next arg!next))
+  (whenceurl (string "from?site=" (urlencode site) "&kind=story")
+             (only&string next)))
+
+(def stories-from (site)
+  (visible (keep idfn (map item (sitename->stories* site)))))
+
 
 (newsop bestcomments () (bestcpage))
 
-(newscache bestcpage 1000
-  (listpage (msec) (bestcomments maxend*) 
-            "best comments" "Best Comments" "bestcomments" nil))
+(newscache bestcpage () 1000
+  (listpage (msec) (bestcomments maxend*)
+            "best comments" "Best Comments" (pageurl "bestcomments") nil
+            [pageurl "bestcomments" (+ (curpage) 1)]))
 
 (def bestcomments (n)
   (bestn n (compare > realscore) (visible comments*)))
@@ -898,8 +961,7 @@
   (keep test (keep [cansee _ user] (map item (keys:votes user)))))
 
 (def upvoted-url (user (o comments))
-  (+ "upvoted?id=" user
-     (if comments "&comments=t" "")))
+  (string "upvoted?id=" user (if comments "&comments=t")))
 
 (newsop upvoted (id comments) 
   (if (only&profile id)
@@ -908,51 +970,54 @@
 
 (def upvoted-page (user comments)
   (if (or (me user) (admin))
-      (listpage (msec)
-                (sort (compare < item-age)
-                      (voted-items (if comments acomment astory) user))
-                "upvoted"
-                (if (and (~me user) comments)
-                     "@{user}'s upvoted comments"
-                    (and (~me user) (no comments))
-                     "@{user}'s upvoted submissions"
-                    comments
-                     "Upvoted comments"
-                     "Upvoted submissions")
-                (upvoted-url user comments))
+      (withs (items (sort (compare < item-age)
+                          (voted-items (if comments acomment astory) user))
+              title (if (~me user)
+                         "@{user}'s upvoted @(if comments 'comments 'submissions)"
+                         "Upvoted @(if comments 'comments 'submissions)"))
+        (listpage (msec) items "upvoted" title
+                  (nexturl (upvoted-url user comments))
+                  (no comments)
+                  [nexturl (upvoted-url user comments) _
+                           (unless comments (+ (cur-n) perpage*))]))
       (pr "Can't display that.")))
 
 
 ; Story Display
 
 (def display-items (items label title whence
-                    (o start 0) (o end perpage*) (o number))
+                    (o start 0) (o end perpage*) (o number) (o moreurl)
+                    (o numstart (+ start 1)))
   (zerotable
-    (let n start
+    (let n (- numstart 1)
       (each i (cut items start end)
         (display-item (and number (++ n)) i whence t)
         (spacerow (if (acomment i) 15 5))))
     (when end
-      (let newend (+ end perpage*)
-        (when (and (<= newend maxend*) (< end (len items)))
-          (spacerow 10)
-          (tr (tag (td colspan (if number 2 1)))
-              (tag (td class 'title)
-                (morelink display-items
-                          items label title end newend number))))))))
+      (when (and (< end (len items))
+                 (<= (+ numstart (- end start)) maxend*))
+        (spacerow 10)
+        (tr (tag (td colspan (if number 2 1)))
+            (tag (td class 'title)
+              (morelink display-items
+                        items label title end (+ end perpage*)
+                        number moreurl (+ numstart perpage*))))))))
 
 ; This code is inevitably complex because the More fn needs to know 
 ; its own fnid in order to supply a correct whence arg to stuff on 
 ; the page it generates, like logout and delete links.
 
-(def morelink (f items label title . args)
+(def morelink (f items label title start end number moreurl . args)
   (tag (a href
-          (url-for
-            (afnid {do (prn)
-                       (let url (url-for it)     ; it bound by afnid
-                         (newslog 'more label)
-                         (longpage (msec) nil label title url
-                           (apply f items label title url args)))}))
+          (if moreurl
+              (moreurl ((items start) 'id))
+              (url-for
+                (afnid {do (prn)
+                           (let url (url-for it)     ; it bound by afnid
+                             (newslog 'more label)
+                             (longpage (msec) nil label title url
+                               (apply f items label title url start end
+                                      number moreurl args)))})))
           rel 'nofollow)
     (pr "More")))
 
@@ -974,7 +1039,13 @@
             (killlink s whence)
             (blastlink s whence)
             (blastlink s whence t)
-            (deletelink s whence))))))
+            (deletelink s whence)
+            (fromlink s))))))
+
+(def fromlink (s)
+  (unless (blank s!url)
+    (pr bar*)
+    (link "from" (+ "from?site=" (sitename s!url)))))
 
 (def display-item-number (i)
   (when i (tag (td align 'right valign 'top class 'title)
@@ -1665,9 +1736,18 @@
                      'by (me) 'ip (ip))
     (save-item s)
     (= (items* s!id) s)
-    (unless (blank url) (register-url s url))
+    (unless (blank url)
+      (register-sitename s)
+      (register-url s url))
     (push s stories*)
     s))
+
+(disktable sitename->stories* (+ newsdir* "sitename-stories"))
+
+(def register-sitename (s)
+  (awhen (sitename s!url)
+    (push s!id (sitename->stories* it))
+    (todisk sitename->stories*)))
 
 
 ; Bans
@@ -2359,7 +2439,8 @@
 
 ; Threads
 
-(def threads-url ((t user me)) (+ "threads?id=" user))
+(def threads-url ((t user me))
+  (string "threads?id=" user))
 
 (newsop threads (id)
   (if id
@@ -2370,10 +2451,12 @@
   (if (profile user)
       (withs (title (+ user "'s comments")
               label (if (me user) "threads" title)
-              here  (threads-url user))
+              here  (nexturl (threads-url user))
+              moreurl [nexturl (threads-url user) _])
         (longpage (msec) nil label title here
           (awhen (user-comments user)
-            (display-threads it label title here))))
+            (let (start end numstart items) (paginate it threads-perpage*)
+              (display-threads items label title here start end nil moreurl)))))
       (prn "No such user.")))
 
 (def user-comments ((t user me))
@@ -2381,7 +2464,8 @@
         (comments user maxend*)))
 
 (def display-threads (comments label title whence
-                      (o start 0) (o end threads-perpage*))
+                      (o start 0) (o end threads-perpage*)
+                      (o number) (o moreurl))
   (tab
     (let cs (cut comments start end)
       (w/the comment-nav (comment-navs cs)
@@ -2395,7 +2479,8 @@
                         (td (hspace votewid*))
                         (tag (td class 'title)
                           (morelink display-threads
-                                    comments label title end newend))))))))))
+                                    comments label title end newend
+                                    number moreurl))))))))))
 
 (def submissions (user (o limit)) 
   (map item (firstn limit (uvar user submitted))))
@@ -2438,7 +2523,7 @@
 
 (newsop rss () (w/me nil (rsspage)))
 
-(newscache rsspage 90 
+(newscache rsspage () 90 
   (rss-stories (retrieve perpage* live ranked-stories*)))
 
 (def rss-stories (stories)
@@ -2463,7 +2548,7 @@
 
 (= nleaders* 20)
 
-(newscache leaderspage 1000
+(newscache leaderspage () 1000
   (longpage (msec) nil "leaders" "Leaders" "leaders"
     (sptab
       (let i 0
@@ -2519,8 +2604,9 @@
 
 (newsop active () (active-page))
 
-(newscache active-page 600
-  (listpage (msec) (actives) "active" "Active Threads"))
+(newscache active-page () 600
+  (listpage (msec) (actives) "active" "Active Threads" (pageurl "active") t
+            [pageurl "active" (+ (curpage) 1)]))
 
 (def actives ((o n maxend*) (o consider 2000))
   (visible (rank-stories n consider (memo active-rank))))
@@ -2536,9 +2622,10 @@
 
 (newsop newcomments () (newcomments-page))
 
-(newscache newcomments-page 60
+(newscache newcomments-page () 60
   (listpage (msec) (visible (firstn maxend* comments*))
-            "comments" "New Comments" "newcomments" nil))
+            "comments" "New Comments" (pageurl "newcomments") nil
+            [pageurl "newcomments" (+ (curpage) 1)]))
 
 
 ; Doc
@@ -2670,7 +2757,7 @@ first asterisk isn't whitespace.
         (tr (tdr (when deads
                    (onlink (len deads)
                            (listpage (msec) deads
-                                     nil (+ "killed at " site) "badsites"))))
+                                     nil (+ "killed at " site) "badsites" t))))
             (tdr (when deads (pr (round (days-since ((car deads) 'time))))))
             (td site)
             (td (w/rlink (do (set-site-ban site nil) "badsites")
@@ -2722,11 +2809,9 @@ first asterisk isn't whitespace.
                                 (max (aif (car (goods ip)) it!time 0) 
                                      (aif (car (bads  ip)) it!time 0)))))))
             (tdr (onlink (len (bads ip))
-                         (listpage (msec) (bads ip)
-                                   nil (+ "dead from " ip) "badips")))
+                         (listpage (msec) (bads ip) nil (+ "dead from " ip))))
             (tdr (onlink (len (goods ip))
-                         (listpage (msec) (goods ip)
-                                   nil (+ "live from " ip) "badips")))
+                         (listpage (msec) (goods ip) nil (+ "live from " ip))))
             (td (each u (subs ip)
                   (userlink u nil) 
                   (pr " "))))))))
