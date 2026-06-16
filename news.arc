@@ -927,7 +927,8 @@
             [fromurl site _]))
 
 (def fromurl (site (o next arg!next))
-  (whenceurl (string "from?site=" (urlencode site) "&kind=story")
+  (whenceurl (string "from?site=" (urlencode site)
+                     (if next "&kind=story"))
              (only&string next)))
 
 (def stories-from (site)
@@ -1054,12 +1055,14 @@
             (blastlink s whence)
             (blastlink s whence t)
             (deletelink s whence)
-            (fromlink s))))))
+            (if (admin) (fromlink s)))))))
 
 (def fromlink (s)
   (unless (blank s!url)
-    (pr bar*)
-    (link "from" (+ "from?site=" (sitename s!url)))))
+    (if (admin) (pr bar*))
+    (let site (sitename s!url)
+      (link (if (admin) "from" site)
+            (+ "from?site=" site)))))
 
 (def display-item-number (i)
   (when i (tag (td align 'right valign 'top class 'title)
@@ -1088,7 +1091,7 @@
                                                 ignore darkred
                                                 kill   darkblue))
                         (spanclass sitestr (pr it)))))
-                  (spanclass sitestr (pr it)))
+                  (spanclass sitestr (fromlink s)))
               (pr ") "))))
         (pr (pseudo-text s)))))
 
