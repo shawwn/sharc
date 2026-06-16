@@ -1009,8 +1009,7 @@
         (display-item (and number (++ n)) i whence t)
         (spacerow (if (acomment i) 15 5))))
     (when end
-      (when (and (< end (len items))
-                 (<= (+ numstart (- end start)) maxend*))
+      (when (< end (len items))
         (spacerow 10)
         (tr (tag (td colspan (if number 2 1)))
             (tag (td class 'title)
@@ -1028,11 +1027,11 @@
               (moreurl ((items start) 'id))
               (url-for
                 (afnid {do (prn)
-                           (let url (url-for it)     ; it bound by afnid
+                           (let url (url-for it) ; it bound by afnid
                              (newslog 'more label)
                              (longpage (msec) nil label title url
-                               (apply f items label title url start end
-                                      number moreurl args)))})))
+                               (apply f items label title url start
+                                      end number moreurl args)))})))
           rel 'nofollow)
     (pr "More")))
 
