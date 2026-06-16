@@ -667,10 +667,11 @@
                {do "newsadmin"})
 
     (br2)
-    (urform (iflet subject (profile arg!id)
-                   (do (killallby subject)
-                       (submitted-url subject))
-                   "newsadmin")
+    (urform (let subject arg!id
+              (if (profile subject)
+                  (do (killallby subject)
+                      (submitted-url subject))
+                  "newsadmin"))
       (single-input "" 'id 20 "kill all by"))
     (br2)
     (urform (do (set-ip-ban arg!ip t)
