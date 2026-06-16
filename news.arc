@@ -968,8 +968,7 @@
 
 (def topcolors-label ()
   (pr "A sampler of ")
-  (underlink "topcolors"
-             "https://news.ycombinator.com/item?id=97573")
+  (underlink "topcolors" "https://news.ycombinator.com/item?id=97573")
   (pr " chosen by active users"))
 
 
