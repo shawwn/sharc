@@ -155,6 +155,7 @@ Connection: close"))
               (jpg        "image/jpeg")
               (png        "image/png")
               (svg        "image/svg+xml")
+              (ico        "image/x-icon")
               (js         "text/javascript; charset=utf-8"))
   (= (type-header* k) (gen-type-header v)))
 
@@ -263,6 +264,7 @@ Connection: close"))
            "jpeg" 'jpg
            "png"  'png
            "svg"  'svg
+           "ico"  'ico
            "js"   'js
            "css"  'css
            "txt"  'text/plain

@@ -419,7 +419,8 @@
 
 (= logo-url* "arc.png")
 
-(defopr favicon.ico favicon-url*)
+(unless (empty favicon-url*)
+  (defopr favicon.ico favicon-url*))
 
 ; redefined later
 
