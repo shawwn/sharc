@@ -823,7 +823,8 @@
 ;(newsop index.html () (newspage "index.html"))
 
 (newscache newspage (whence) 90
-  (listpage (msec) (topstories maxend*) nil nil (pageurl whence) t
+  (listpage (msec) (topstories maxend*) nil nil
+            (pageurl whence) t
             [pageurl whence (+ (curpage) 1)]))
 
 (def listpage (t1 items label title (o url label) (o number t) (o moreurl))
@@ -891,7 +892,8 @@
 (newsop best () (bestpage))
 
 (newscache bestpage () 1000
-  (listpage (msec) (beststories maxend*) "best" "Top Links" (pageurl "best") t
+  (listpage (msec) (beststories maxend*) "best" "Top Links"
+            (pageurl "best") t
             [pageurl "best" (+ (curpage) 1)]))
 
 ; As no of stories gets huge, could test visibility in fn sent to best.
@@ -935,7 +937,8 @@
 
 (newscache bestcpage () 1000
   (listpage (msec) (bestcomments maxend*)
-            "best comments" "Best Comments" (pageurl "bestcomments") nil
+            "best comments" "Best Comments"
+            (pageurl "bestcomments") nil
             [pageurl "bestcomments" (+ (curpage) 1)]))
 
 (def bestcomments (n)
@@ -971,14 +974,13 @@
 
 (def upvoted-page (user comments)
   (if (or (me user) (admin))
-      (withs (items (sort (compare < item-age)
-                          (voted-items (if comments acomment astory) user))
-              title (if (~me user)
-                         "@{user}'s upvoted @(if comments 'comments 'submissions)"
-                         "Upvoted @(if comments 'comments 'submissions)"))
+      (with (items (sort (compare < item-age)
+                         (voted-items (if comments acomment astory) user))
+             title (if (~me user)
+                        "@{user}'s upvoted @(if comments 'comments 'submissions)"
+                        "Upvoted @(if comments 'comments 'submissions)"))
         (listpage (msec) items "upvoted" title
-                  (nexturl (upvoted-url user comments))
-                  (no comments)
+                  (nexturl (upvoted-url user comments)) (no comments)
                   [nexturl (upvoted-url user comments) _
                            (unless comments (+ (cur-n) perpage*))]))
       (pr "Can't display that.")))
@@ -2606,7 +2608,8 @@
 (newsop active () (active-page))
 
 (newscache active-page () 600
-  (listpage (msec) (actives) "active" "Active Threads" (pageurl "active") t
+  (listpage (msec) (actives) "active" "Active Threads"
+            (pageurl "active") t
             [pageurl "active" (+ (curpage) 1)]))
 
 (def actives ((o n maxend*) (o consider 2000))
@@ -2625,7 +2628,8 @@
 
 (newscache newcomments-page () 60
   (listpage (msec) (visible (firstn maxend* comments*))
-            "comments" "New Comments" (pageurl "newcomments") nil
+            "comments" "New Comments"
+            (pageurl "newcomments") nil
             [pageurl "newcomments" (+ (curpage) 1)]))
 
 
