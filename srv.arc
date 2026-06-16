@@ -229,7 +229,14 @@ Connection: close"))
                 (the me)  (errsafe (get-user)))
              (if (redirector* op)
                  (do (prn rdheader*)
-                     (prn "Location: " (f str req))
+                     ; an empty location (e.g. a blank whence) or a
+                     ; location like ?p=2 would make the browser
+                     ; reload /y itself; send it home instead
+                     (prn "Location: " (let loc (f str req)
+                                         (if (or (empty loc)
+                                                 (is (pos #\? loc) 0))
+                                             (string "/" loc)
+                                             loc)))
                      (prn))
                  (do (prn header*)
                      (awhen (max-age* op)
