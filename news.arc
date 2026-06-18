@@ -947,7 +947,7 @@
              (only&string next)))
 
 (def stories-from (site)
-  (visible (keep idfn (map item (sitename->stories* site)))))
+  (visible (keep astory (map item (sitename->items* site)))))
 
 
 (newsop bestcomments () (bestcpage))
@@ -1773,12 +1773,12 @@
     (push s stories*)
     s))
 
-(disktable sitename->stories* (+ newsdir* "sitename-stories"))
+(disktable sitename->items* (+ newsdir* "sitename-items"))
 
 (def register-sitename (s)
   (awhen (sitename s!url)
-    (push s!id (sitename->stories* it))
-    (todisk sitename->stories*)))
+    (push s!id (sitename->items* it))
+    (todisk sitename->items*)))
 
 
 ; Bans
