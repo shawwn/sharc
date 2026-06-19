@@ -846,6 +846,7 @@
 (def listpage (t1 items label title (o url label) (o number t) (o moreurl))
   (hook 'listpage)
   (longpage t1 nil label title url
+    (awhen (the listpage-body) (it))
     (let (start end numstart items) (paginate items perpage*)
       (display-items items label title url start end number moreurl numstart))))
 
@@ -933,21 +934,31 @@
   (< (- (user-age i!by) (item-age i)) 2880))
 
 (newsop from (site kind next)
-  (listpage (msec)
-            (when (is (saferead (or kind "story")) 'story)
-              (stories-from site))
-            "from"
-            (+ "Submissions from " (eschtml site))
-            (fromurl site) nil
-            [fromurl site _]))
+  (w/the listpage-body
+         {sptab
+           (row (w/bars
+                  (link "submissions" (fromurl site nil "story"))
+                  (link "comments" (fromurl site nil "comment"))))
+           (spacerow 10)}
+    (let kind (saferead (or kind "story"))
+      (listpage (msec)
+                (case kind
+                  story   (items-from site astory)
+                  comment (items-from site acomment))
+                "from"
+                (+ (if (is kind 'comment) "Comments" "Submissions")
+                   " from " (eschtml site))
+                (fromurl site) nil
+                [fromurl site _]))))
 
-(def fromurl (site (o next arg!next))
-  (whenceurl (string "from?site=" (urlencode site)
-                     (if next "&kind=story"))
-             (only&string next)))
+(def fromurl (site (o next arg!next) (o kind arg!kind))
+  (whenceurl
+    (string "from?site=" (urlencode site)
+            (if (or kind next) "&kind=@(or kind "story")"))
+    (only&string next)))
 
-(def stories-from (site)
-  (visible (keep astory (map item (sitename->items* site)))))
+(def items-from (site test)
+  (visible (keep test (map item (sitename->items* site)))))
 
 
 (newsop bestcomments () (bestcpage))
@@ -1767,18 +1778,24 @@
                      'by (me) 'ip (ip))
     (save-item s)
     (= (items* s!id) s)
-    (unless (blank url)
-      (register-sitename s)
-      (register-url s url))
+    (register-story s)
     (push s stories*)
     s))
 
+(def register-story (s)
+  (unless (blank s!url)
+    (process-url s s!url)
+    (todisk sitename->items*)
+    (register-url s s!url)))
+
 (disktable sitename->items* (+ newsdir* "sitename-items"))
 
-(def register-sitename (s)
-  (awhen (sitename s!url)
-    (push s!id (sitename->items* it))
-    (todisk sitename->items*)))
+(def process-url (i url)
+  (awhen (sitename url)
+    (pushnew i!id (sitename->items* it))
+    ; for e.g. "github.com/antirez", also register "github.com"
+    (whenlet p (pos #\/ it)
+      (pushnew i!id (sitename->items* (cut it 0 p))))))
 
 
 ; Bans
@@ -2144,6 +2161,8 @@
                    (unless (ignore-edit i name val)
                      (when (and (is name 'dead) val (no i!dead))
                        (log-kill i))
+                     (when (and (is name 'text) (acomment i))
+                       (register-comment i (unmarkdown val)))
                      (= (i name) val)))
                  {do (if (admin) (pushnew 'locked i!keys))
                      (save-item i)
@@ -2212,7 +2231,7 @@
        (flink {addcomment-page parent whence text retry*})
       (oversubmitting 'comment)
        (flink {msgpage toofast*})
-       (atlet c (create-comment parent (md-from-form text))
+       (atlet c (create-comment parent text)
          (comment-ban-test c text comment-kill* comment-ignore*)
          (if (bad-user) (kill c 'ignored/karma))
          (submit-item c)
@@ -2222,17 +2241,22 @@
   (or (ignored u) (< (karma u) comment-threshold*)))
 
 (def create-comment (parent text)
-  (newslog 'comment (parent 'id))
+  (newslog 'comment parent!id)
   (let c (inst 'item 'type 'comment 'id (new-item-id)
-                     'text text 'parent parent!id
+                     'text (md-from-form text) 'parent parent!id
                      'by (me) 'ip (ip))
     (save-item c)
     (= (items* c!id) c)
     (push c!id parent!kids)
     (save-item parent)
     (push c comments*)
+    (register-comment c text)
     c))
 
+(def register-comment (c text)
+  (each url (urls text)
+    (process-url c url))
+  (todisk sitename->items*))
 
 ; Comment Display
 

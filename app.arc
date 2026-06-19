@@ -560,8 +560,26 @@
                                   (and indelim (no (closedelim c)))))))))
 
 (def opendelim (c)  (in c #\< #\( #\[ #\{))
- 
+
 (def closedelim (c) (in c #\> #\) #\] #\}))
+
+
+; Walks s and calls f with each http(s) url it finds, along with the
+; indices [start end) of that url within s.  Uses the same delimiter
+; rules as markdown's urlend, so it agrees with how links get rendered.
+
+(def eachurl-pos (s f)
+  (forlen i s
+    (when (or (litmatch "http://" s i)
+              (litmatch "https://" s i))
+      (let n (urlend s i)
+        (f (cut s i n) i n)
+        (= i (- n 1))))))
+
+; Returns the list of urls in s, in order.
+
+(def urls (s)
+  (accum a (eachurl-pos s (fn (url i n) (a url)))))
 
 
 (def code-block (s i)
