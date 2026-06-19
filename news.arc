@@ -935,19 +935,19 @@
 
 (newsop from (site kind next)
   (w/the listpage-body
-         {sptab
-           (row (w/bars
-                  (link "submissions" (fromurl site nil "story"))
-                  (link "comments" (fromurl site nil "comment"))))
-           (spacerow 10)}
+         {tag (div style "margin-left:36px; margin-top:6px; margin-bottom:12px")
+           (w/bars
+             (link "submissions" (fromurl site nil "story"))
+             (link "comments" (fromurl site nil "comment")))}
     (let kind (saferead (or kind "story"))
       (listpage (msec)
                 (case kind
                   story   (items-from site astory)
                   comment (items-from site acomment))
                 "from"
-                (+ (if (is kind 'comment) "Comments" "Submissions")
-                   " from " (eschtml site))
+                (string (when (is kind 'story)
+                          "Submissions from ")
+                        (eschtml site))
                 (fromurl site) nil
                 [fromurl site _]))))
 
