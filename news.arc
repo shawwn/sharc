@@ -807,8 +807,8 @@
   (tostring:underlink "comments" (threads-url user)))
 
 (def upvoted-links ((t user me))
-  (tostring
-    (when (uvar user votes)
+  (when (uvar user votes)
+    (tostring
       (underlink "upvoted submissions" (upvoted-url user))
       (pr " / ")
       (underlink "comments" (upvoted-url user t)))))

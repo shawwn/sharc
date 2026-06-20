@@ -448,15 +448,16 @@
 (def showvars (fields (o liveurls))
   (each (typ id val view mod question) fields
     (when view
-      (when question
-        (tr (td (prn question))))
-      (if (is typ 'raw)
-          (pr val)
-          (tr (unless question (tag (td valign 'top)  (only&pr id ":")))
-              (td (if mod 
-                      (varfield typ id val)
-                      (varline  typ id val liveurls)))))
-      (prn))))
+      (unless (and (no val) (or (is id nil) (is typ 'raw)))
+        (when question
+          (tr (td (prn question))))
+        (if (is typ 'raw)
+            (pr val)
+            (tr (unless question (tag (td valign 'top)  (only&pr id ":")))
+                (td (if mod
+                        (varfield typ id val)
+                        (varline  typ id val liveurls)))))
+        (prn)))))
 
 ; http://daringfireball.net/projects/markdown/syntax
 
