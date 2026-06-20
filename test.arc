@@ -879,8 +879,6 @@ c"
          ((fn ((:a :b) (:c :d)) (list a b c d))
           (obj a 1 b 2) (obj c 3 d 4))))
 
-(load "json.arc")
-
 (define-test json-encode-primitives
   (test? "null"  (tostring (to-json nil)))
   (test? "true"  (tostring (to-json t)))

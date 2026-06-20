@@ -4,4 +4,5 @@
             "html.arc"
             "srv.arc"
             "app.arc"
+            "json.arc"
             "prompt.arc"))
