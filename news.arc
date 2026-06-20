@@ -1223,7 +1223,7 @@
 (newsopr vote (id how auth goto)
   (with (i      (safe-item id)
          how    (saferead how)
-         whence (if goto (urldecode goto) "news"))
+         whence (safe-goto goto))
     (if (no i)
          (flink {pr "No such item."})
         (no (in how 'up 'down 'un))
@@ -1241,11 +1241,11 @@
         (is how 'un)
          (do (unvote-for i)
              (logvote i)
-             goto)
+             whence)
         (canvote i how)
          (do (vote-for i how)
              (logvote i)
-             goto)
+             whence)
          (flink {pr "Can't make that vote."}))))
 
 
@@ -1256,9 +1256,11 @@
 ; relative path, no scheme or //host).  Otherwise action links like
 ; hide could be turned into open redirects to phishing pages.
 
+; goto arrives already url-decoded (parseargs decodes every query value),
+; so we don't decode it again here.
+
 (def safe-goto (goto (o default "news"))
-  (let g (and goto (urldecode goto))
-    (if (and g (relative-url g)) g default)))
+  (if (and goto (relative-url goto)) goto default))
 
 (def relative-url (s)
   (and (~blank s)
@@ -2580,7 +2582,7 @@
 
 (newsop reply (id whence)
   (with (i      (safe-item id)
-         whence (or (only&urldecode whence) "news"))
+         whence (safe-goto whence))
     (if (only&comments-active i)
         (if user
             (addcomment-page i whence)
