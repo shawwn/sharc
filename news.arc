@@ -2058,7 +2058,7 @@
 
 (def comments-active (i)
   (and (live&commentable i)
-       (live (superparent i))
+       (live:superparent i)
        (or (< (item-age i) commentable-threshold*)
            (mem 'commentable i!keys))))
 
