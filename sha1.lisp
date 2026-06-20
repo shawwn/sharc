@@ -177,6 +177,11 @@
 
 (defun hmac-sha1-digest (key message)
   "Return the HMAC-SHA1 digest for a byte sequence."
+  ;; make sure the key is a byte vector before measuring/xoring it.  A
+  ;; string key of exactly 64 chars would otherwise skip both branches
+  ;; below and reach the xor loop still a string.
+  (setf key (hash-vector key))
+
   (when (> (length key) 64)
     (setf key (sha1-digest key)))
 
