@@ -2052,9 +2052,9 @@
 (def commentable (i) (in i!type 'story 'comment 'poll))
 
 ; By default the ability to comment on an item is turned off after 
-; 45 days, but this can be overriden with commentable key.
+; 14 days, but this can be overriden with commentable key.
 
-(= commentable-threshold* (* 60 24 45))
+(= commentable-threshold* (* 60 24 14))
 
 (def comments-active (i)
   (and (live&commentable i)
