@@ -91,11 +91,16 @@ working `<64`/`>64` paths and now correct for `==64`.
 - **Auth token is per-(user, id), not per-action.** Matches the two HN
   example URLs the user provided (same auth for hide and un-hide of the
   same id). Prevents cross-item replay.
-- **HMAC over the cookie-as-auth approach.** The existing `vote` op puts
-  the raw cookie in the URL (`auth=user->cookie*`). The new hide token
-  is an HMAC of a server secret, so it never exposes the cookie. The
-  `vote` op was left on its cookie scheme to avoid breaking `hn.js`,
-  which builds vote URLs from the cookie.
+- **HMAC over the cookie-as-auth approach.** The old `vote` op put the
+  raw cookie in the URL (`auth=user->cookie*`), which leaks the session
+  via Referer/history/logs. The new hide token is an HMAC of a server
+  secret, so it never exposes the cookie. The `vote` op was then
+  **migrated to the same HMAC scheme** (`vote-url` emits
+  `(auth-for it i!id)`, the op validates with `good-auth`). This is safe
+  for `hn.js`, which reads the `auth` straight from the vote link's href
+  (`p.get('auth')`), not from the cookie; the unvote link reuses the same
+  per-item token, which `good-auth` accepts since the token isn't bound
+  to direction.
 - **Fixed the real sha1 bug rather than dodging it** (e.g. using a
   32-char key). Any 64-byte key was silently broken.
 - **`safe-goto` does not url-decode.** Callers always receive
@@ -131,8 +136,11 @@ working `<64`/`>64` paths and now correct for `==64`.
   HMAC correctness was cross-checked against `python3 -c "import hmac..."`.
 - **Pre-existing gaps noted but not fixed:** `process-comment` reads
   `whence` from the fnid closure (safe), but a future POST-only path that
-  re-reads `whence` from form args would need its own `safe-goto`. The
-  `vote` op still uses the cookie as its `auth` param (in the URL).
+  re-reads `whence` from form args would need its own `safe-goto`.
+- **Migration glitch (vote auth switch):** a page rendered before the
+  vote-auth switch has cookie-based vote links; clicking one after deploy
+  sends the cookie as `auth`, fails `good-auth` ("User mismatch"), and
+  self-heals on reload. Only relevant right after deploying.
 - Branch: `main`, clean after the handoff commit. All work above is
   committed.
 - Relevant code locations in `news.arc`: hide/auth/safe-goto block sits

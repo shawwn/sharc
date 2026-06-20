@@ -1198,7 +1198,7 @@
 (def vote-url (i dir whence)
   (+ "vote?id=" i!id
             "&how=" dir
-            (aif (me) (+ "&auth=" (urlencode:user->cookie* it)))
+            (aif (me) (+ "&auth=" (auth-for it i!id)))
             "&goto=" (urlencode whence)))
 
 (= lowest-score* -4)
@@ -1236,7 +1236,7 @@
                                  (vote-for i how)
                                  (logvote i))}
                            whence))
-        (isnt auth (user->cookie* user))
+        (~good-auth user i!id auth)
          (flink {pr "User mismatch."})
         (is how 'un)
          (do (unvote-for i)
