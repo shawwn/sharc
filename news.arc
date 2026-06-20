@@ -48,6 +48,7 @@
   minaway    180
   topcolor   nil
   keys       nil
+  hidden     nil   ; ids of items this user has hidden from their listings
   delay      0)
 
 (deftem item
@@ -377,7 +378,7 @@
 
 (def topstories (n (o threshold front-threshold*))
   (retrieve n
-            [and (>= (realscore _) threshold) (cansee _)]
+            [and (>= (realscore _) threshold) (cansee _) (~hidden _)]
             ranked-stories*))
 
 (= max-delay* 10)
@@ -785,6 +786,7 @@
       (string  nil         ,(resetpw-link)                          ,w   nil)
       (string  nil         ,(user-submissions-link user)             t   nil)
       (string  nil         ,(user-comments-link user)                t   nil)
+      (string  nil         ,(user-hidden-link user)                 ,u   nil)
       (string  nil         ,(upvoted-links user)                    ,u   nil)
       )))
 
@@ -805,6 +807,10 @@
 
 (def user-comments-link ((t user me))
   (tostring:underlink "comments" (threads-url user)))
+
+(def user-hidden-link ((t user me))
+  (when (hidden-items user)
+    (tostring:underlink "hidden" (hidden-url user))))
 
 (def upvoted-links ((t user me))
   (when (uvar user votes)
@@ -903,7 +909,7 @@
             [nexturl "newest" _ (+ (cur-n) perpage*)]))
 
 (def newstories (n)
-  (retrieve n [cansee _] stories*))
+  (retrieve n [and (cansee _) (~hidden _)] stories*))
 
 
 (newsop best () (bestpage))
@@ -1073,6 +1079,7 @@
             (itemline s whence)
             (when (in s!type 'story 'poll) (commentlink s))
             (editlink s)
+            (hidelink s whence)
             (when (apoll s) (addoptlink s))
             (unless i (flaglink s whence))
             (killlink s whence)
@@ -1240,6 +1247,115 @@
              (logvote i)
              goto)
          (flink {pr "Can't make that vote."}))))
+
+
+; Safe redirects.
+
+; A goto value comes straight from the query string, so before using it
+; as a redirect target we make sure it points back into the site (a
+; relative path, no scheme or //host).  Otherwise action links like
+; hide could be turned into open redirects to phishing pages.
+
+(def safe-goto (goto (o default "news"))
+  (let g (and goto (urldecode goto))
+    (if (and g (relative-url g)) g default)))
+
+(def relative-url (s)
+  (and (~blank s)
+       (~begins s "/")             ; rejects "/path" and protocol-relative "//host"
+       (~find #\\ s)
+       (let colon (pos #\: s)
+         (or (no colon)            ; no scheme at all, or
+             (aand (pos #\/ s)     ; the ':' only appears after the first '/'
+                   (< it colon))))))
+
+
+; Auth tokens.
+
+; Per-user token for authenticating action links (e.g. hide).  Derived
+; from a server secret so it can't be forged, stable per user so links
+; keep working across restarts, and (unlike the cookie) safe to put in a
+; url.
+
+(diskvar hmac-key* (+ newsdir* "hmac-key"))
+
+(def auth-key ()
+  (or hmac-key*
+      (do (= hmac-key* (rand-string 64))
+          (todisk hmac-key*)
+          hmac-key*)))
+
+; The token is bound to the user and the item id, so a token issued for
+; one story can't be replayed to act on another.  It's the same for hide
+; and un-hide of a given item (the un flag isn't part of the token).
+
+(def auth-for (user id)
+  (and user (downcase (sha1::hmac-sha1-hex (auth-key) (string user "/" id)))))
+
+(def good-auth (user id auth)
+  (and user auth (is auth (auth-for user id))))
+
+
+; Hiding.
+
+; Lets a logged-in user remove items from their own listings without
+; affecting anyone else.  The hidden ids live in the user's profile.
+
+(def hidden (i (o user (me)))
+  (and user (mem i!id (uvar user hidden))))
+
+(def hide-item (i user)
+  (pushnew i!id (uvar user hidden))
+  (save-prof user))
+
+(def unhide-item (i user)
+  (pull i!id (uvar user hidden))
+  (save-prof user))
+
+(def hide-url (i un whence)
+  (+ "hide?id=" i!id
+            (if un "&un=t")
+            (aif (me) (+ "&auth=" (auth-for it i!id)))
+            "&goto=" (urlencode whence)))
+
+(def hidelink (i whence)
+  (when (and (me) (news-type i))
+    (pr bar*)
+    (link (if (hidden i) "un-hide" "hide")
+          (hide-url i (hidden i) whence))))
+
+(newsopr hide (id un auth goto)
+  (let i (safe-item id)
+    (if (no i)
+         (flink {pr "No such item."})
+        (no user)
+         (flink {pr "You have to be logged in to hide submissions."})
+        (~good-auth user i!id auth)
+         (flink {pr "User mismatch."})
+        (do (if (and un (~blank un))
+                (unhide-item i user)
+                (hide-item i user))
+            (safe-goto goto)))))
+
+(newsop hidden (id)
+  (let subject (if (and id (~blank id) (goodname id)) id (me))
+    (if (no (me))
+         (pr "You have to be logged in to see hidden submissions.")
+        (and (~me subject) (~admin))
+         (pr "Can't see another user's hidden submissions.")
+         (listpage (msec)
+                   (hidden-items subject)
+                   "hidden" "Hidden submissions"
+                   (nexturl (hidden-url subject)) t
+                   [nexturl (hidden-url subject) _
+                            (+ (cur-n) perpage*)]))))
+
+(def hidden-url ((t user me))
+  (string "hidden?id=" user))
+
+(def hidden-items ((t user me))
+  (rem no (map item (uvar user hidden))))
+
 
 (def cansee-score (i)
   (or (isnt i!type 'comment)
