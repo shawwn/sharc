@@ -283,7 +283,8 @@
 
 ;(def spacerow (h) (tr (td (vspace h))))
 
-(def spacerow (h) (pr "<tr class=\"spacer\" style=\"height:" h "px\"></tr>"))
+(def spacerow (h (o class))
+  (tag (tr class class style "height:@{h}px")))
 
 ; For use as nested table.
 

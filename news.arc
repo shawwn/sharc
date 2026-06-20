@@ -1038,10 +1038,10 @@
     (let n (- numstart 1)
       (each i (cut items start end)
         (display-item (and number (++ n)) i whence t)
-        (spacerow (if (acomment i) 15 5))))
+        (spacerow (if (acomment i) 15 5) "spacer")))
     (when end
       (when (< end (len items))
-        (spacerow 10)
+        (spacerow 10 "morespace")
         (tr (tag (td colspan (if number 2 1)))
             (tag (td class 'title)
               (morelink display-items
@@ -1324,8 +1324,12 @@
 (def hidelink (i whence)
   (when (and (me) (news-type i))
     (pr bar*)
-    (link (if (hidden i) "un-hide" "hide")
-          (hide-url i (hidden i) whence))))
+    (if (in (the op) "" "news" "newest")
+        (clickylink (if (hidden i) "un-hide" "hide")
+                    (hide-url i (hidden i) whence)
+                    "clicky hider" nil)
+        (link (if (hidden i) "un-hide" "hide")
+              (hide-url i (hidden i) whence)))))
 
 (newsopr hide (id un auth goto)
   (let i (safe-item id)
@@ -1358,6 +1362,44 @@
 
 (def hidden-items ((t user me))
   (rem no (map item (uvar user hidden))))
+
+
+; snip-story backs the JS "hide" on listing pages (see hidestory /
+; newstory in hn.js).  It hides the item, like the hide op, then returns
+; a 2-element JSON array [html next] so the page can drop the hidden row
+; and pull in one more item from the bottom: html is the rendered next
+; story and next is the id of the story after it, for the morelink's
+; cursor.  The link is the hide link with hide->snip-story, goto->onop.
+
+(newsop snip-story (id auth onop next)
+  (awhen (safe-item id)
+    (when (and user (good-auth user it!id auth))
+      (hide-item it user)))
+  (to-json (snip-pair onop next)))
+
+; /newest is ordered by id, so hn.js sends a next= item id: render the
+; first visible story at/after it and return the id after that for the
+; morelink's cursor.  /news (and root /) is ranked and shows the top
+; perpage*; hn.js sends no cursor there, so once the item is hidden the
+; story that refills the bottom is simply the one now at perpage*-1.  No
+; new cursor is needed (the page-based morelink stays valid).
+
+(def snip-pair (onop next)
+  ; onop is the listing's whence; on a paginated page it carries a query
+  ; string (e.g. "newest?next=12&n=3"), so match newest on its base op.
+  ; newest is cursor-based, so it refills on any page.  The front page is
+  ; page-based, so only its first page (exact "news"/"") can be refilled;
+  ; deeper pages match nothing and safely no-op.
+  (if (is (and onop (car (tokens onop #\?))) "newest")
+       (w/the op "newest"
+         (whenlet n (safe-id next)
+           (whenlet tail (keep [<= _!id n] (newstories maxend*))
+             (list (tostring (display-item 1 (car tail) onop t))
+                   (aand (cadr tail) it!id)))))
+      (in onop "news" "")
+       (w/the op (or onop "")
+         (whenlet s ((topstories maxend*) (- perpage* 1))
+           (list (tostring (display-item 1 s onop t)) nil)))))
 
 
 (def cansee-score (i)
@@ -2525,8 +2567,8 @@
 
 (def next-comment (c) (cnav c 'next))
 
-(def clickylink (text (o url text))
-  (tag (a href url class 'clicky aria-hidden t)
+(def clickylink (text (o url text) (o class 'clicky) (o aria-hidden t))
+  (tag (a href url class class aria-hidden aria-hidden)
     (pr text)))
 
 (def rootlink (c whence)
