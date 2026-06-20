@@ -1317,9 +1317,9 @@
 
 (def hide-url (i un whence)
   (+ "hide?id=" i!id
-            (if un "&un=t")
-            (aif (me) (+ "&auth=" (auth-for it i!id)))
-            "&goto=" (urlencode whence)))
+     (if un "&un=t")
+     (aif (me) (+ "&auth=" (auth-for it i!id)))
+     "&goto=" (urlencode whence)))
 
 (def hidelink (i whence)
   (when (and (me) (news-type i))
