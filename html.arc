@@ -98,6 +98,7 @@
 (attribute a          id             opsym)
 (attribute a          onclick        opstring)
 (attribute a          n              opnum)
+(attribute html       op             opstring)
 (attribute body       alink          opcolor)
 (attribute body       bgcolor        opcolor)
 (attribute body       leftmargin     opnum)

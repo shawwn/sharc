@@ -430,8 +430,8 @@
   (gentag link rel 'stylesheet type 'text/css href (static-src "news.css")))
 
 (mac npage (title . body)
-  `(tag html 
-     (tag head 
+  `(tag (html op (the op))   ; op lets hn.js know which listing it's on
+     (tag head
        (gen-css-url)
        (prn "<link rel=\"shortcut icon\" href=\"" favicon-url* "\">")
        (tag (script src (static-src "hn.js")))

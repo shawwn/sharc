@@ -227,6 +227,7 @@ Connection: close"))
              ;; request-thread) so these are naturally isolated.
              (= (the req) req
                 (the ip)  ip
+                (the op)  (string op)
                 (the me)  (errsafe (get-user)))
              (if (redirector* op)
                  (do (prn rdheader*)
