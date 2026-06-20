@@ -1063,7 +1063,8 @@
                              (longpage (msec) nil label title url
                                (apply f items label title url start
                                       end number moreurl args)))})))
-          rel 'nofollow)
+          class 'morelink
+          rel 'next)
     (pr "More")))
 
 (def display-story (i s whence)
