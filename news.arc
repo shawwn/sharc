@@ -942,7 +942,7 @@
     (let kind (saferead (or kind "story"))
       (listpage (msec)
                 (case kind
-                  story   (items-from site astory)
+                  story   (items-from site metastory)
                   comment (items-from site acomment))
                 "from"
                 (string (when (is kind 'story)
@@ -1012,7 +1012,7 @@
 (def upvoted-page (user comments)
   (if (or (me user) (admin))
       (with (items (sort (compare < item-age)
-                         (voted-items (if comments acomment astory) user))
+                         (voted-items (if comments acomment metastory) user))
              title (if (~me user)
                         "@{user}'s upvoted @(if comments 'comments 'submissions)"
                         "Upvoted @(if comments 'comments 'submissions)"))
