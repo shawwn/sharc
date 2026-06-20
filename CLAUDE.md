@@ -28,3 +28,5 @@ Don't strip informative comments or docstrings when refactoring code unless expl
 Don't delete files under `arc/`. e.g. `arc/news/story/1`
 
 `(is x y)` does a deep compare of x and y. For object identity, use `(id x y)`.
+
+You can't use ! after a closing paren, like `((newstories maxend*) 2)!id`.
