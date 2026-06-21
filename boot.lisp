@@ -39,9 +39,9 @@
     (setf (arc::arc-global 'arc::|main-file*|) nil)
     (when files
       (setf (arc::arc-global 'arc::|main-file*|)
-            (namestring (truename (car (last files))))))
+            (car (last files))))
     (cond (files
-           (dolist (f files) (arc:arc-load f))
+           (dolist (f files) (arc:arc-eval (list 'arc::|load| f)))
            (uiop:quit 0))
           ((not (interactive-stream-p *standard-input*))
            (arc-load-stdin)

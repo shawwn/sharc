@@ -803,6 +803,16 @@
     (expander 'open-socket var port body))
   )
 
+; Non-atomic, otherwise it would hold the lock during body
+
+(mac w/assign (place newval . body)
+  (w/uniq prev
+    (let (binds getter setter) (setforms place)
+      `(withs ,(+ binds (list prev getter))
+         (,setter ,newval)
+         (after (do ,@body)
+           (,setter ,prev))))))
+
 (mac w/outstring (var . body)
   `(let ,var (outstring) ,@body))
 
@@ -1474,23 +1484,34 @@
        (pr ,@(parse-format str))))
 )
 
+(or= loaded-files* (list "arc.arc") reloading* nil)
+
 (def load (file)
   (w/infile f file
+    (pushnew file loaded-files*)
     (w/uniq eof
-      (let prev script-file*
-        (= script-file* file)
-        (after
-          (whiler e (read f eof) eof
-            (eval e))
-          (= script-file* prev))))))
+      (w/assign script-file* file
+        (whiler e (read f eof) eof
+          (eval e))))))
+
+(def reload ()
+  (w/assign reloading* t
+    (each file (rev loaded-files*)
+      (load file))))
 
 ; True iff the current file is the toplevel script (last .arc file
 ; passed on the sharc command line). Analogous to Python's
 ;   if __name__ == "__main__":
+;
 ; Use as:
 ;   (when (main) (do-toplevel-stuff))
+;
+; The (no reloading*) clause keeps these effects from re-firing when
+; (reload) re-loads the toplevel script, so a hot-reload swaps code
+; without restarting the server or re-entering the repl.
+
 (def main ()
-  (and main-file* (is script-file* main-file*)))
+  (and main-file* (is script-file* main-file*) (no reloading*)))
 
 (def positive (x)
   (and (number x) (> x 0)))
@@ -1683,16 +1704,6 @@
 
 (mac assert (expr (o msg "Assertion failed"))
   `(or ,expr (err (string ,msg ": " (tostring:pr ',expr)))))
-
-; Non-atomic, otherwise it would hold the lock during body
-
-(mac w/assign (place newval . body)
-  (w/uniq prev
-    (let (binds getter setter) (setforms place)
-      `(withs ,(+ binds (list prev getter))
-         (,setter ,newval)
-         (after (do ,@body)
-           (,setter ,prev))))))
 
 ; ---- Thread-local variables ---------------------------------------
 ;
