@@ -1323,7 +1323,7 @@
   (let store (table) ; args -> (list cached-value gentime)
     (fn args
       (aif (timef)
-           (let cell (or (store args) (= (store args) (list nil nil)))
+           (let cell (or= (store args) (list nil nil))
              (unless (and (car cell) (< (since (cadr cell)) it))
                (= (car cell)  (apply valf args)
                   (cadr cell) (seconds)))
