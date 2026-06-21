@@ -1747,15 +1747,11 @@
 
 (mac %scope (env)
   `(list ,@(accum a
-             (let seen (obj)
-               (each x env
-                 (when (isa x 'sym)
-                   (unless (seen x)
-                     (set (seen x))
-                     (w/uniq h
-                       (a `(list ',x
-                                 (fn () ,x)
-                                 (fn (,h) (assign ,x ,h))))))))))))
+             (each x (dedup:keep [isa _ 'sym] env)
+               (w/uniq h
+                 (a `(list ',x
+                           (fn () ,x)
+                           (fn (,h) (assign ,x ,h)))))))))
 
 ; any logical reason I can't say (push x (if foo y z)) ?
 ;   eval would have to always ret 2 things, the val and where it came from
