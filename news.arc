@@ -2421,6 +2421,11 @@
 
 ; Comment Display
 
+(def display-comments (cs whence (o indent 0) (o initialpar t) (o initialon t))
+  (w/the comment-nav (comment-navs cs)
+    (each c cs
+      (display-comment-tree c whence indent initialpar initialon))))
+
 (def display-comment-tree (c whence (o indent 0) (o initialpar) (o initialon))
   (when (cansee-descendant c)
     (display-1comment c whence indent initialpar initialon)
@@ -2683,10 +2688,7 @@
                       (o start 0) (o end threads-perpage*)
                       (o number) (o moreurl))
   (tab
-    (let cs (cut comments start end)
-      (w/the comment-nav (comment-navs cs)
-        (each c cs
-          (display-comment-tree c whence 0 t t))))
+    (display-comments (cut comments start end) whence)
     (when end
       (let newend (+ end threads-perpage*)
         (when (and (<= newend maxend*) (< end (len comments)))
