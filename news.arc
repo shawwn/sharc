@@ -1234,13 +1234,14 @@
         (no (in how 'up 'down 'un))
          (flink {pr "Can't make that vote."})
         (no user)
-         (login-page 'both "You have to be logged in to vote."
-                     (list {do (ensure-news-user)
-                               (newslog 'vote-login)
-                               (when (canvote i how)
-                                 (vote-for i how)
-                                 (logvote i))}
-                           whence))
+         (flink
+           {login-page 'both "You have to be logged in to vote."
+                       (list {do (ensure-news-user)
+                                 (newslog 'vote-login)
+                                 (when (canvote i how)
+                                   (vote-for i how)
+                                   (logvote i))}
+                             whence)})
         (~good-auth user i!id auth)
          (flink {pr "User mismatch."})
         (is how 'un)
