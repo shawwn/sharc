@@ -471,7 +471,7 @@ errors out clearly rather than polluting (often locked) CL packages."
     ((null (cdr toks)) (chars->value (car toks)))
     (t (list (build-sexpr (cddr toks) orig)
              (if (eql (cadr toks) #\!)
-                 (list 'quote (chars->value (car toks)))
+                 (list (arc-sym 'quote) (chars->value (car toks)))
                  (if (or (eql (car toks) #\.) (eql (car toks) #\!))
                      (error "Bad ssyntax: ~S" orig)
                      (chars->value (car toks))))))))
