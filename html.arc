@@ -27,7 +27,7 @@
    darkblue (color 0 0 120)
    )
 
-(= opmeths* (table))
+(or= opmeths* (table))
 
 (def opmeth (spec opt)
   (or (opmeths* (list spec opt))
@@ -44,7 +44,7 @@
 (mac attribute (tag opt f)
   `(= (opmeths* (list ',tag ',opt)) ,f))
 
-(= hexreps (table))
+(or= hexreps (table))
 
 (for i 0 255 (= (hexreps i)
                 (let s (coerce i 'string 16)

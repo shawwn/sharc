@@ -7,7 +7,9 @@
 ; arc> (bsv)
 ; go to http://localhost:8080/blog
 
-(= postdir* "arc/posts/"  maxid* 0  posts* (table))
+(= postdir* (string arcdir* "posts/"))
+
+(or= maxid* 0  posts* (table))
 
 (= blogtitle* "A Blog")
 

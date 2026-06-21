@@ -1,6 +1,6 @@
 ; Prompt: Web-based programming application.  4 Aug 06.
 
-(= appdir* "arc/apps/")
+(= appdir* (string arcdir* "apps/"))
 
 (defop prompt
   (if (admin)

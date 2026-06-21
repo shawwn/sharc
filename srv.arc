@@ -2,9 +2,24 @@
 
 ; To improve performance with static files, set static-max-age*.
 
-(= arcdir* "arc/" logdir* "arc/logs/" staticdir* "static/")
+(def pathenv (name default)
+  (let d (getenv name default)
+    (if (endmatch "/" d) d (+ d "/"))))
 
-(= quitsrv* nil breaksrv* nil)
+; Data root. Override with the ARC_DATA_DIR env var (e.g. a temp dir for
+; tests or an alternate instance); defaults to "arc/". or= so a value set
+; before this file loads still wins; getenv defaults on unset-or-empty.
+; Also override ARC_STATIC_DIR to an alternate dir that should serve
+; static files.
+
+(or= arcdir*    (pathenv "ARC_DATA_DIR"   "arc/")
+     staticdir* (pathenv "ARC_STATIC_DIR" "static/"))
+
+(= logdir* (string arcdir* "logs/"))
+
+(or= breaksrv* nil)
+
+(= quitsrv* nil)
 
 (def serve ((o port 8080))
   (init-serve port)
@@ -44,7 +59,7 @@
 (def ensure-srvdirs ()
   (map ensure-dir (list arcdir* logdir* staticdir*)))
 
-(= srv-noisy* nil)
+(or= srv-noisy* nil)
 
 ; http requests currently capped at 2 meg by socket-accept
 
@@ -56,8 +71,10 @@
 ; to handle it. also arrange to kill that thread if it
 ; has not completed in threadlife* seconds.
 
-(= threadlife* 30  requests* 0  requests/ip* (table)  
-   throttle-ips* (table)  ignore-ips* (table)  spurned* (table))
+(= threadlife* 30)
+
+(or= requests* 0  requests/ip* (table)
+     throttle-ips* (table)  ignore-ips* (table)  spurned* (table))
 
 (def handle-request (s breaksrv)
   (if breaksrv
@@ -92,7 +109,9 @@
 ; To adjust this while running, adjust the req-window* time, not 
 ; req-limit*, because algorithm doesn't enforce decreases in the latter.
 
-(= req-times* (table) req-limit* 30 req-window* 10 dos-window* 2)
+(= req-limit* 30 req-window* 10 dos-window* 2)
+
+(or= req-times* (table))
 
 (def abusive-ip (ip)
   (and (> (requests/ip* ip 0) 250)
@@ -158,7 +177,7 @@
         (if srv-noisy* (pr "\n\n"))
         (respond o op (+ (parseargs (string (rev line))) args) cooks ip))))
 
-(= type-header* (table))
+(or= type-header* (table))
 
 (def gen-type-header (ctype)
   (+ "HTTP/1.0 200 OK
@@ -179,7 +198,7 @@ Connection: close"))
 (= header*   (type-header* 'text/html)
    rdheader* "HTTP/1.0 302 Moved")
 
-(= srvops* (table) redirector* (table) optimes* (table) opcounts* (table))
+(or= srvops* (table) redirector* (table) optimes* (table) opcounts* (table))
 
 (def save-optime (name elapsed)
   ; this is the place to put a/b testing
@@ -229,8 +248,9 @@ Connection: close"))
   cooks nil)
 
 (= unknown-msg*    "Unknown."
-   max-age*        (table)
    static-max-age* 86400) ; cache static files in browser for 1 day
+
+(or= max-age*      (table))
 
 (def respond (str op args cooks ip)
   (w/stdout str
@@ -384,7 +404,7 @@ Connection: close"))
                   tbl))
     (if (valid-scopeval x) x)))
 
-(= ignored-scopeids* (table))
+(or= ignored-scopeids* (table))
 
 ; Snapshot the captured lexicals so links with identical bodies but
 ; different closed-over data get distinct fnids.  Caveat: values we
@@ -407,9 +427,9 @@ Connection: close"))
          (scopevals scope)
          ',body))
 
-(= fns* (table) fnids* (table) timed-fnids* (table))
+(or= fns* (table) fnids* (table) timed-fnids* (table))
 
-(= fnkey->fnid* (isotable) fnid->fnkey* (table))
+(or= fnkey->fnid* (isotable) fnid->fnkey* (table))
 
 (def forget-fnid (key)
   (atomic
@@ -661,7 +681,7 @@ Connection: close"))
 
 ; only unique per server invocation
 
-(= unique-ids* (table))
+(or= unique-ids* (table))
 
 (def unique-id ((o len 8))
   (let id (sym (rand-string (max 5 len)))
@@ -721,7 +741,7 @@ Connection: close"))
 
 ; Background Threads
 
-(= bgthreads* (table) pending-bgthreads* nil)
+(or= bgthreads* (table) pending-bgthreads* nil)
 
 (def new-bgthread (id f sec)
   (aif (bgthreads* id) (stop-thread it))

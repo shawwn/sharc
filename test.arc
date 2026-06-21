@@ -4,7 +4,7 @@
 
 (= true 't false nil)
 
-(= tests* (table))
+(or= tests* (table))
 
 (mac test! (x msg)
   `(if (no ,x)

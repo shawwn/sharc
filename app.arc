@@ -6,10 +6,10 @@
 
 ; A user is simply a string: "pg". Use /whoami to test user cookie.
 
-(= hpwfile*   "arc/hpw"
-   oidfile*   "arc/openids"
-   adminfile* "arc/admins"
-   cookfile*  "arc/cooks")
+(= hpwfile*    (string arcdir* "hpw")
+   oidfile*    (string arcdir* "openids")
+   adminfile*  (string arcdir* "admins")
+   cookfile*   (string arcdir* "cooks"))
 
 (def asv ((o port 8080))
   (load-userinfo)
@@ -25,7 +25,7 @@
 
 ; idea: a bidirectional table, so don't need two vars (and sets)
 
-(= cookie->user* (table) user->cookie* (table) logins* (table))
+(or= cookie->user* (table) user->cookie* (table) logins* (table))
 
 (def get-user ((t req))
   (let u (aand (alref req!cooks "user") (cookie->user* it))
@@ -220,7 +220,7 @@
   (br)
   (submit label))
 
-(= good-logins* (queue) bad-logins* (queue))
+(or= good-logins* (queue) bad-logins* (queue))
 
 (def good-login (user pw ip)
   (let record (list (seconds) ip user)
@@ -239,7 +239,7 @@
 (def bcheckpw (pw hash)
   (bcrypt::checkpw pw hash))
 
-(= dc-usernames* (table))
+(or= dc-usernames* (table))
 
 (def username-taken (user)
   (hpasswords* user))

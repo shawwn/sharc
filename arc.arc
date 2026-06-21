@@ -1257,7 +1257,7 @@
   (+ xs (rem (fn (y) (some [f _ y] xs))
              ys)))
 
-(= templates* (table))
+(or= templates* (table))
 
 (mac deftem (tem . fields)
   (withs (name (carif tem) includes (if (acons tem) (cdr tem)))
@@ -1625,7 +1625,7 @@
           ,@(map [list _ g] fs)))
       ,x)))
 
-(= hooks* (table))
+(or= hooks* (table))
 
 (def hook (name . args)
   (aif (hooks* name) (apply it args)))
@@ -1639,7 +1639,7 @@
 
 (def get (index) [_ index])
 
-(= savers* (table))
+(or= savers* (table))
 
 (mac fromdisk (var file init load save)
   (w/uniq (gf gv)
@@ -1713,7 +1713,7 @@
 ; the call site). It expands to a call to the underlying `thread-local`
 ; function, which is what setforms-and-friends actually hook into.
 
-(= thread-locals* (table))
+(or= thread-locals* (table))
 
 (def thread-locals ()
   (or= (thread-locals* (current-thread)) (table)))

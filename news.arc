@@ -74,12 +74,12 @@
 
 ; Load and Save
 
-(= newsdir*  "arc/news/"
-   storydir* "arc/news/story/"
-   profdir*  "arc/news/profile/"
-   votedir*  "arc/news/vote/")
+(= newsdir*  (string arcdir* "news/")
+   storydir* (string arcdir* "news/story/")
+   profdir*  (string arcdir* "news/profile/")
+   votedir*  (string arcdir* "news/vote/"))
 
-(= votes* (table) profs* (table))
+(or= votes* (table) profs* (table))
 
 (= initload-users* nil)
 
@@ -173,9 +173,11 @@
 (def author (i (t u me)) (is u i!by))
 
 
-(= stories* nil comments* nil 
-   items* (table) url->story* (table)
-   maxid* 0 initload* 15000)
+(or= stories* nil comments* nil 
+     items* (table) url->story* (table)
+     maxid* 0)
+
+(= initload* 15000)
 
 ; The dir expression yields stories in order of file creation time 
 ; (because arc infile truncates), so could just rev the list instead of
@@ -226,7 +228,7 @@
 
 ; redefined later
 
-(= stemmable-sites* (table))
+(or= stemmable-sites* (table))
 
 (def canonical-url (url)
   (if (stemmable-sites* (sitename url))
@@ -271,7 +273,7 @@
     (set i!dead)
     (save-item i)))
 
-(= kill-log* nil)
+(or= kill-log* nil)
 
 (def log-kill (i (t how me))
   (push (list i!id how) kill-log*))
@@ -442,7 +444,7 @@
                      bgcolor sand)
            ,@body)))))
 
-(= pagefns* nil)
+(or= pagefns* nil)
 
 (mac fulltop (lid label title whence . body)
   (w/uniq (gi gl gt gw)
@@ -557,7 +559,7 @@
       (tag (img src logo-url* width 18 height 18
                 style "border:1px #@(hexrep border-color*) solid; display:block;")))))
 
-(= toplabels* '(nil "welcome" "new" "threads" "comments" "lists" "*"))
+(or= toplabels* '(nil "welcome" "new" "threads" "comments" "lists" "*"))
 
 ; redefined later
 
@@ -624,7 +626,7 @@
          (newslog ',name ,@parms)
          ,@body))))
 
-(= newsop-names* nil)
+(or= newsop-names* nil)
 
 (mac newsopr body
   `(opexpand defopr ,@body))
@@ -824,7 +826,9 @@
 
 ; remember to set caching to 0 when testing non-logged-in 
 
-(= caching* 1 perpage* 30 threads-perpage* 10 maxend* 210)
+(or= caching* 1 perpage* 30 threads-perpage* 10)
+
+(= maxend* 210)
 
 (mac newscache (name args time . body)
   (w/uniq gc
@@ -1490,7 +1494,7 @@
 
 (= user-changetime* 120 editor-changetime* 1440)
 
-(= everchange* (table) noedit* (table))
+(or= everchange* (table) noedit* (table))
 
 (def canedit (i (t user me))
   (or (admin user)
@@ -1664,7 +1668,9 @@
       (and (< (user-age user) new-age-threshold*)
            (< (karma user) new-karma-threshold*))))
 
-(= downvote-ratio-limit* .65 recent-votes* nil votewindow* 100)
+(= downvote-ratio-limit* .65 votewindow* 100)
+
+(or= recent-votes* nil)
 
 ; Note: if vote-for by one user changes (s 'score) while s is being
 ; edited by another, the save after the edit will overwrite the change.
@@ -1985,7 +1991,7 @@
 (diskvar  comment-kill*    (+ newsdir* "comment-kill"))
 (diskvar  comment-ignore*  (+ newsdir* "comment-ignore"))
 
-(= comment-kill* nil ip-ban-threshold* 3)
+(= ip-ban-threshold* 3)
 
 (def set-ip-ban (ip yesno (o info) (t actor me))
   (= (banned-ips* ip) (and yesno (list actor (seconds) info)))
@@ -2166,7 +2172,9 @@
         (do (note-baditem)
             (pr "No such item.")))))
 
-(= baditemreqs* (table) baditem-threshold* 1/100)
+(or= baditemreqs* (table))
+
+(= baditem-threshold* 1/100)
 
 ; Something looking at a lot of deleted items is probably the bad sort
 ; of crawler.  Throttle it for this server invocation.
@@ -2224,7 +2232,7 @@
            (mem 'commentable i!keys))))
 
 
-(= displayfn* (table))
+(or= displayfn* (table))
 
 (= (displayfn* 'story)   (fn (n i here inlist)
                            (display-story n i here)))
@@ -2266,7 +2274,7 @@
 
 (def editable-type (i) (fieldfn* i!type))
 
-(= fieldfn* (table))
+(or= fieldfn* (table))
 
 (= (fieldfn* 'story)
    (fn (s)
@@ -2452,9 +2460,11 @@
 ; It might solve the same problem more generally to make html code
 ; more efficient.
 
-(= comment-cache* (table) comment-cache-timeout* (table) cc-window* 10000)
+(or= comment-cache* (table) comment-cache-timeout* (table))
 
-(= comments-printed* 0 cc-hits* 0)
+(= cc-window* 10000)
+
+(or= comments-printed* 0 cc-hits* 0)
 
 (= comment-caching* t) 
 

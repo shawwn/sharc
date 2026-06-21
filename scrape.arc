@@ -26,11 +26,11 @@
 
 ; ----- Config -----
 
-(= scrape-dir*       "arc/scrape/"
-   scrape-item-dir*  "arc/scrape/item/"
-   scrape-user-dir*  "arc/scrape/user/"
-   scrape-cookies*   "arc/scrape/cookies.txt"
-   scrape-fetchlog*  "arc/scrape/last-fetch.lisp"
+(= scrape-dir*       (string arcdir* "scrape/")
+   scrape-item-dir*  (string arcdir* "scrape/item/")
+   scrape-user-dir*  (string arcdir* "scrape/user/")
+   scrape-cookies*   (string arcdir* "scrape/cookies.txt")
+   scrape-fetchlog*  (string arcdir* "scrape/last-fetch.lisp")
    scrape-user-agent*
      "hnscraper (https://news.ycombinator.com/user?id=hnscraper; contact shawnpresser@@gmail.com)"
    scrape-refetch-secs* 3600       ; skip items refetched within last hour
@@ -45,7 +45,7 @@
    scrape-hn-host*      "https://news.ycombinator.com"
    scrape-api-host*     "https://hacker-news.firebaseio.com/v0")
 
-(= scrape-last-fetch* (table))     ; id -> unix seconds when last fetched
+(or= scrape-last-fetch* (table))     ; id -> unix seconds when last fetched
 
 
 ; ----- Shell + curl -----
@@ -489,7 +489,7 @@
 (def collect-users-from-comment (c) (if c!by (list c!by) nil))
 
 ; users discovered during scraping; processed at end
-(= scrape-users-to-fetch* (table))
+(or= scrape-users-to-fetch* (table))
 
 (def push-user-to-fetch (u)
   (when u (= (scrape-users-to-fetch* u) t)))
