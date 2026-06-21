@@ -1484,11 +1484,26 @@
        (pr ,@(parse-format str))))
 )
 
-(or= loaded-files* (list "arc.arc") reloading* nil)
+(or= loaded-files* nil
+     loaded-file-times* (table)
+     reloading* nil)
+
+(def notetime (file)
+  (= (loaded-file-times* file) (modtime file))
+  (pushnew file loaded-files*))
+
+(notetime "arc.arc")
+
+(def file-changed (file)
+  (awhen (loaded-file-times* file)
+    (> (modtime file) it)))
+
+(def loaded-files-changed ()
+  (some file-changed loaded-files*))
 
 (def load (file)
   (w/infile f file
-    (pushnew file loaded-files*)
+    (notetime file)
     (w/uniq eof
       (w/assign script-file* file
         (whiler e (read f eof) eof
@@ -1497,7 +1512,13 @@
 (def reload ()
   (w/assign reloading* t
     (each file (rev loaded-files*)
-      (load file))))
+      (call-quietly {load file}))))
+
+(def maybe-reload ()
+  (when (loaded-files-changed)
+    (atomic
+      (when (loaded-files-changed)
+        (call-reporting reload)))))
 
 ; True iff the current file is the toplevel script (last .arc file
 ; passed on the sharc command line). Analogous to Python's

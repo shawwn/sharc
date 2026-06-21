@@ -1372,3 +1372,10 @@
              (setf (arc-global '|thatexpr|) expr)))))))
   (arc-tl2))
 
+(xdef call-reporting (f)
+  (block done
+    (handler-bind ((error (lambda (c)
+                            (arc-report-error c *error-output*)
+                            (return-from done nil))))
+      (arc-call0 f))))
+

@@ -1083,3 +1083,8 @@ isn't shadowed by a lexical binding."
                (arc-eval x)))
         (setf (arc-global '|script-file*|) prev)))))
 
+(xdef call-quietly (thunk)
+  (handler-bind ((style-warning #'muffle-warning))
+    (with-compilation-unit (:override t)
+      (arc-call0 thunk))))
+

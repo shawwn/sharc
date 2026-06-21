@@ -17,7 +17,9 @@
 
 (= logdir* (string arcdir* "logs/"))
 
-(or= breaksrv* nil)
+; set ARC_RELOAD=t to reload source files whenever they change.
+
+(or= breaksrv* nil autoreload* (in (getenv "ARC_RELOAD") "t" "1"))
 
 (= quitsrv* nil)
 
@@ -77,6 +79,7 @@
      throttle-ips* (table)  ignore-ips* (table)  spurned* (table))
 
 (def handle-request (s breaksrv)
+  (if autoreload* (maybe-reload))
   (if breaksrv
       (handle-request-1 s)
       (errsafe (handle-request-1 s))))
