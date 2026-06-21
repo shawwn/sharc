@@ -62,17 +62,9 @@
 (def cons args
   (reduce join args))
 
-; Can return to this def once Rtm gets ac to make all rest args
-; nil-terminated lists.
+(def list args args)
 
-; (def list args args)
-
-(def copylist (xs)
-  (if (no xs) 
-      nil 
-      (cons (car xs) (copylist (cdr xs)))))
-
-(def list args (copylist args))
+(def copylist (x) (apply list x))
 
 (def idfn (x) x)
 
@@ -1125,7 +1117,7 @@
 (def copy (x . args)
   (let x2 (case (type x)
             sym    x
-            cons   (copylist x) ; (apply (fn args args) x)
+            cons   (copylist x)
             string (let new (newstring (len x))
                      (forlen i x
                        (= (new i) (x i)))
