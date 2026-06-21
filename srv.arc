@@ -4,31 +4,39 @@
 
 (= arcdir* "arc/" logdir* "arc/logs/" staticdir* "static/")
 
-(= quitsrv* nil breaksrv* nil donesrv* nil)
+(= quitsrv* nil breaksrv* nil)
+
+(def serve ((o port 8080))
+  (init-serve port)
+  (restart-serve port))
+
+(def init-serve (port)
+  (wipe quitsrv*)
+  (ensure-srvdirs)
+  (prn "ready to serve port " port)
+  (flushout))
 
 (or= serve-thread* nil)
 
-(def serve ((o port 8080))
-  (wipe quitsrv*)
-  (ensure-srvdirs)
-  (map [apply new-bgthread _] pending-bgthreads*)
-  (prn "ready to serve port " port)
-  (flushout)
-  (awhen serve-thread*
-    (kill-thread it)
-    (until donesrv* (sleep 0)))
-  (wipe donesrv*)
-  (= serve-thread* (thread (serve-thread port))))
+(def stop-serve ()
+  (stop-bgthreads)
+  (stop-thread serve-thread*))
 
-(def serve-thread ((o port 8080))
-  (after
-    (w/socket s port
-      ; (setuid 2) ; XXX switch from root to pg
-      (= currsock* s)
-      (until quitsrv*
-        (handle-request s breaksrv*))
-      (ero "quit server"))
-    (= donesrv* t)))
+(def start-serve (port)
+  (start-bgthreads)
+  (= serve-thread* (thread (handle-serve port))))
+
+(def restart-serve (port)
+  (stop-serve)
+  (start-serve port))
+
+(def handle-serve ((o port 8080))
+  (w/socket s port
+    ; (setuid 2) ; XXX switch from root to pg
+    (= currsock* s)
+    (until quitsrv*
+      (handle-request s breaksrv*))
+    (ero "quit server")))
 
 (def serve1 ((o port 8080))
   (w/socket s port (handle-request s t)))
@@ -66,16 +74,14 @@
             (with (th1 nil th2 nil)
               (= th1 (thread
                        (after (handle-request-thread i o ip)
-                              (close i o)
-                              (kill-thread th2)
-                              (wipe (thread-locals* th1)))))
+                         (close i o)
+                         (stop-thread th2))))
               (= th2 (thread
                        (sleep threadlife*)
                        (unless (dead th1)
                          (prn "srv thread took too long for " ip))
-                       (break-thread th1)
                        (force-close i o)
-                       (wipe (thread-locals* th1)))))))))
+                       (stop-thread th1))))))))
 
 ; Returns true if ip has made req-limit* requests in less than
 ; req-window* seconds.  If an ip is throttled, only 1 request is 
@@ -718,8 +724,16 @@ Connection: close"))
 (= bgthreads* (table) pending-bgthreads* nil)
 
 (def new-bgthread (id f sec)
-  (aif (bgthreads* id) (kill-thread it))
-  (= (bgthreads* id) (new-thread {while t (sleep sec) (f)})))
+  (aif (bgthreads* id) (stop-thread it))
+  (= (bgthreads* id) (start-thread {while t (sleep sec) (f)})))
+
+(def start-bgthreads ()
+  (map [apply new-bgthread _] pending-bgthreads*))
+
+(def stop-bgthreads ()
+  (each id (keys bgthreads*)
+    (stop-thread (bgthreads* id))
+    (wipe (bgthreads* id))))
 
 ; should be a macro for this?
 

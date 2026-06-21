@@ -1618,9 +1618,6 @@
 
 (def len> (x n) (> (len x) n))
 
-(mac thread body 
-  `(new-thread {do ,@body}))
-
 (mac trav (x . fs)
   (w/uniq g
     `((afn (,g)
@@ -1736,6 +1733,20 @@
 (mac w/the (var val . body)
   `(w/assign (the ,var) ,val
      ,@body))
+
+(def start-thread (f)
+  (new-thread {after (f)
+                (wipe (thread-locals* (current-thread)))}))
+
+(mac thread body
+  `(start-thread {do ,@body}))
+
+(def stop-thread (th)
+  (when th
+    (unless (dead th)
+      (kill-thread th))
+    (until (dead th) (sleep 0))
+    (wipe (thread-locals* th))))
 
 ; Referencing the bare symbol `scope` (or `scope%`) compiles to
 ; (%scope env), where ac splices in its compile-time lexical environment.
