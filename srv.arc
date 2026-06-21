@@ -699,15 +699,8 @@ Connection: close"))
 (def logfile-name (type)
   (string logdir* type "-" (memodate)))
 
-(with (lastasked nil lastval nil)
-
-(def memodate ()
-  (let now (seconds)
-    (if (or (no lastasked) (> (- now lastasked) 60))
-        (= lastasked now lastval (datestring))
-        lastval)))
-
-)
+(defcache memodate 60
+  (datestring))
 
 (defop || (pr "It's alive."))
 
