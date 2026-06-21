@@ -1327,7 +1327,9 @@
     (fn args
       (aif (timef)
            (let cell (or= (store args) (list nil nil))
-             (unless (and (car cell) (< (since (cadr cell)) it))
+             ; key freshness on gentime, not the value, so a nil result
+             ; is cached for the interval instead of recomputed each call
+             (unless (and (cadr cell) (< (since (cadr cell)) it))
                (= (car cell)  (apply valf args)
                   (cadr cell) (seconds)))
              (car cell))
