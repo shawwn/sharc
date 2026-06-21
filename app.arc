@@ -29,7 +29,7 @@
 
 (def get-user ((t req))
   (let u (aand (alref req!cooks "user") (cookie->user* it))
-    (when u (= (logins* u) req!ip))
+    (when u (= (logins* u) (ip)))
     u))
 
 ; (me)        --- read the current request's user
@@ -42,6 +42,8 @@
     (if other (and (is m other) m) m)))
 
 (def ip () (the ip))
+
+(def op () (the op))
 
 (mac w/me (val . body)
   `(w/the me ,val ,@body))

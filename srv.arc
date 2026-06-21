@@ -209,8 +209,7 @@ Connection: close"))
 
 (deftem request
   args  nil
-  cooks nil
-  ip    nil)
+  cooks nil)
 
 (= unknown-msg*    "Unknown."
    max-age*        (table)
@@ -219,7 +218,7 @@ Connection: close"))
 (def respond (str op args cooks ip)
   (w/stdout str
     (iflet f (srvops* op)
-           (let req (inst 'request 'args args 'cooks cooks 'ip ip)
+           (let req (inst 'request 'args args 'cooks cooks)
              ;; Bind per-request thread-locals once, here, so every
              ;; helper down the call stack can reach them via (the me)
              ;; / (the ip) / (the req) without explicit threading.
