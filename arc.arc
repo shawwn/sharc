@@ -39,10 +39,16 @@
                                  (disp #\newline (stderr))))
                          (assign ,var ,val)))))
 
-(assign def (annotate 'mac
-               (fn (name parms . body)
-                 `(do (sref sig ',parms ',name)
-                      (safeset ,name (fn ,parms ,@body))))))
+(assign mac (annotate 'mac
+              (fn (name parms . body)
+                `(do (sref sig ',parms ',name)
+                     (safeset ,name (annotate 'mac (fn ,parms ,@body)))))))
+
+(mac def (name x . body)
+  (if (is body nil)
+      `(safeset ,name ,x)
+      `(do (sref sig ',x ',name)
+           (safeset ,name (fn ,x ,@body)))))
 
 (def caar (xs) (car (car xs)))
 (def cadr (xs) (car (cdr xs)))
@@ -80,11 +86,6 @@
       (no (cdr xs)) (cons (f (car xs)) nil)
                     (cons (f (car xs) (cadr xs))
                           (pair (cddr xs) f))))
-
-(assign mac (annotate 'mac
-              (fn (name parms . body)
-                `(do (sref sig ',parms ',name)
-                     (safeset ,name (annotate 'mac (fn ,parms ,@body)))))))
 
 (mac and args
   (if (cdr args)
