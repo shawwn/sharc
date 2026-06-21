@@ -176,6 +176,11 @@
          `(let ,g ,(car args)
             (if ,g ,g (or ,@(cdr args)))))))
 
+(mac check (x test (o alt))
+  (w/uniq gx
+    `(let ,gx ,x
+       (if (,test ,gx) ,gx ,alt))))
+
 (def alist (x) (or (no x) (is (type x) 'cons)))
 
 (mac in (x . choices)
@@ -766,11 +771,6 @@
          (atom x) (cons x acc)
                   (self (car x) (self (cdr x) acc))))
    x nil))
-
-(mac check (x test (o alt))
-  (w/uniq gx
-    `(let ,gx ,x
-       (if (,test ,gx) ,gx ,alt))))
 
 (def pos (test seq (o start 0))
   (let f (testify test)
