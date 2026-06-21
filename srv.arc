@@ -4,20 +4,31 @@
 
 (= arcdir* "arc/" logdir* "arc/logs/" staticdir* "static/")
 
-(= quitsrv* nil breaksrv* nil) 
+(= quitsrv* nil breaksrv* nil donesrv* nil)
+
+(or= serve-thread* nil)
 
 (def serve ((o port 8080))
   (wipe quitsrv*)
   (ensure-srvdirs)
   (map [apply new-bgthread _] pending-bgthreads*)
-  (w/socket s port
-    ; (setuid 2) ; XXX switch from root to pg
-    (prn "ready to serve port " port)
-    (flushout)
-    (= currsock* s)
-    (until quitsrv*
-      (handle-request s breaksrv*)))
-  (prn "quit server"))
+  (prn "ready to serve port " port)
+  (flushout)
+  (awhen serve-thread*
+    (kill-thread it)
+    (until donesrv* (sleep 0)))
+  (wipe donesrv*)
+  (= serve-thread* (thread (serve-thread port))))
+
+(def serve-thread ((o port 8080))
+  (after
+    (w/socket s port
+      ; (setuid 2) ; XXX switch from root to pg
+      (= currsock* s)
+      (until quitsrv*
+        (handle-request s breaksrv*))
+      (ero "quit server"))
+    (= donesrv* t)))
 
 (def serve1 ((o port 8080))
   (w/socket s port (handle-request s t)))
@@ -707,7 +718,7 @@ Connection: close"))
 (= bgthreads* (table) pending-bgthreads* nil)
 
 (def new-bgthread (id f sec)
-  (aif (bgthreads* id) (break-thread it))
+  (aif (bgthreads* id) (kill-thread it))
   (= (bgthreads* id) (new-thread {while t (sleep sec) (f)})))
 
 ; should be a macro for this?

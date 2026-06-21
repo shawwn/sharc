@@ -92,4 +92,5 @@
   (asv))
 
 (when (main)
-  (bsv))
+  (bsv)
+  (repl))
