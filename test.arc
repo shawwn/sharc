@@ -776,6 +776,39 @@ c"
     (test? 'present (h 'k))
     (test? 1 n)))
 
+(define-test w/assign
+  ;; temporarily set a place, restore afterward
+  (= w/assign-g* 'orig)
+  (w/assign w/assign-g* 'temp
+    (test? 'temp w/assign-g*))
+  (test? 'orig w/assign-g*)
+  ;; restores even when the body errors
+  (= w/assign-g* 'orig)
+  (errsafe (w/assign w/assign-g* 'temp (err "boom")))
+  (test? 'orig w/assign-g*)
+  ;; returns the body's last value
+  (= w/assign-g* 'orig)
+  (test? 'result (w/assign w/assign-g* 'temp 'ignored 'result))
+  ;; nested: restores the enclosing value, not a fixed default
+  (= w/assign-g* 'a)
+  (w/assign w/assign-g* 'b
+    (test? 'b w/assign-g*)
+    (w/assign w/assign-g* 'c
+      (test? 'c w/assign-g*))
+    (test? 'b w/assign-g*))
+  (test? 'a w/assign-g*)
+  ;; compound place (table slot)
+  (let h (obj k 'orig)
+    (w/assign (h 'k) 'temp
+      (test? 'temp (h 'k)))
+    (test? 'orig (h 'k)))
+  ;; double-eval protection: a place's subforms evaluate exactly once
+  (withs (h (obj k 'orig) n 0 key (fn () (++ n) 'k))
+    (w/assign (h (key)) 'temp
+      (test? 'temp (h 'k)))
+    (test? 'orig (h 'k))
+    (test? 1 n)))
+
 (define-test thread-local-the
   ;; (the var) returns nil when unset; (= (the var) val) sets it
   (= (the test-tl) nil)

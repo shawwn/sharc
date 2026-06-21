@@ -1694,6 +1694,16 @@
 (mac assert (expr (o msg "Assertion failed"))
   `(or ,expr (err (string ,msg ": " (tostring:pr ',expr)))))
 
+; Non-atomic, otherwise it would hold the lock during body
+
+(mac w/assign (place newval . body)
+  (w/uniq prev
+    (let (binds getter setter) (setforms place)
+      `(withs ,(+ binds (list prev getter))
+         (,setter ,newval)
+         (after (do ,@body)
+           (,setter ,prev))))))
+
 ; ---- Thread-local variables ---------------------------------------
 ;
 ; A per-thread key-value store, with two ergonomic affordances:
@@ -1731,11 +1741,8 @@
   `(thread-local ',var))
 
 (mac w/the (var val . body)
-  (w/uniq prev
-    `(let ,prev (the ,var)
-       (= (the ,var) ,val)
-       (after (do ,@body)
-         (= (the ,var) ,prev)))))
+  `(w/assign (the ,var) ,val
+     ,@body))
 
 ; Referencing the bare symbol `scope` (or `scope%`) compiles to
 ; (%scope env), where ac splices in its compile-time lexical environment.
