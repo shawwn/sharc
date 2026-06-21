@@ -1342,6 +1342,8 @@
   (format t "Use (quit) to quit, (arc:arc-tl) to return here after an interrupt.~%")
   (arc-tl2))
 
+(xdef repl #'arc-tl)
+
 (defun arc-tl2 ()
   (format t "arc> ")
   (force-output *standard-output*)

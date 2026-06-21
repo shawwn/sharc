@@ -101,9 +101,9 @@
 
 (def replpage ()
   (whitepage
-    (repl (readall (or arg!expr "")) "repl")))
+    (replform (readall (or arg!expr "")) "repl")))
 
-(def repl (exprs url)
+(def replform (exprs url)
     (each expr exprs 
       (on-err (fn (c) (push (list expr c t) repl-history*))
               (fn () 
