@@ -84,12 +84,10 @@
       (cons (f (car xs)) (map1 f (cdr xs)))))
 
 (def pair (xs (o f list))
-  (if (no xs)
-       nil
-      (no (cdr xs))
-       (list (list (car xs)))
-      (cons (f (car xs) (cadr xs))
-            (pair (cddr xs) f))))
+  (if (no xs)       nil
+      (no (cdr xs)) (cons (f (car xs)) nil)
+                    (cons (f (car xs) (cadr xs))
+                          (pair (cddr xs) f))))
 
 (assign mac (annotate 'mac
               (fn (name parms . body)
