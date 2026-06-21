@@ -433,7 +433,7 @@
   `(tag (html op (the op))   ; op lets hn.js know which listing it's on
      (tag head
        (gen-css-url)
-       (prn "<link rel=\"shortcut icon\" href=\"" favicon-url* "\">")
+       (gentag link rel "shortcut icon" href favicon-url*)
        (tag (script src (static-src "hn.js")))
        (tag title (pr ,title)))
      (tag body 
