@@ -647,6 +647,29 @@
       `(atwiths ,(+ binds (list gop op) (mix gargs args))
          (,setter (,gop ,val ,@gargs))))))
 
+(mac w/defs body
+  (let names nil
+    (each f body
+      (if (and (acons f) (is (car f) 'def))
+          (push (cadr f) names)))
+    `(with ,(mappend [list _ nil] (rev names))
+       ,@body)))
+
+(mac or= args
+  (w/defs
+    (def or1 (place expr)
+      (if (acons place)
+           ; compound place: use setforms to eval subforms only once
+           (let (binds val setter) (setforms place)
+             `(atwiths ,binds (or ,val (,setter ,expr))))
+          (lex place)
+           ; lexical var: read/write directly
+           `(or ,place (= ,place ,expr))
+           ; plain global symbol: guard against unbound
+           `(or (and (bound ',place) ,place) (= ,place ,expr))))
+    `(do ,@(pair (map1 ssexpand args)
+                 (fn (place expr) `(atomic ,(or1 place expr)))))))
+
 ; Can't simply mod pr to print strings represented as lists of chars,
 ; because empty string will get printed as nil.  Would need to rep strings
 ; as lists of chars annotated with 'string, and modify car and cdr to get
@@ -1611,11 +1634,6 @@
         (when ,g
           ,@(map [list _ g] fs)))
       ,x)))
-
-(mac or= (place expr)
-  (let (binds val setter) (setforms place)
-    `(atwiths ,binds
-       (or ,val (,setter ,expr)))))
 
 (= hooks* (table))
 

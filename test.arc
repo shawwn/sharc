@@ -733,6 +733,49 @@ c"
     (test? 'b (case (f) 0 'a 1 'b 'c)))
   (test? 'b ((fn () (case 2 0 (do) 1 'a 2 'b)))))
 
+(define-test or=
+  ;; sets a global that's currently nil
+  (= or=g1* nil)
+  (or= or=g1* 'default)
+  (test? 'default or=g1*)
+  ;; keeps an already-truthy global
+  (= or=g2* 99)
+  (or= or=g2* 7)
+  (test? 99 or=g2*)
+  ;; unbound global: assigns instead of erroring (idempotent across reruns)
+  (or= or=unbound* 'set)
+  (test? 'set or=unbound*)
+  ;; lexical bound to nil gets set; truthy lexical kept
+  (test? 5 (let v nil (or= v 5) v))
+  (test? 3 (let v 3   (or= v 5) v))
+  ;; variadic: sets the unset ones, keeps the set ones
+  (= or=a* nil or=b* 10 or=c* nil)
+  (or= or=a* 1 or=b* 20 or=c* 3)
+  (test? 1  or=a*)
+  (test? 10 or=b*)
+  (test? 3  or=c*)
+  ;; compound place: assign then keep
+  (let h (table)
+    (or= (h 'k) (list 1 2))
+    (test? '(1 2) (h 'k))
+    (or= (h 'k) (list 9 9))
+    (test? '(1 2) (h 'k)))
+  ;; the default expr is not evaluated when the place is already truthy
+  (with (evaled nil)
+    (= or=e* 1)
+    (or= or=e* (do (= evaled t) 2))
+    (test? nil evaled))
+  ;; eval-once: a place's subforms run exactly once, slot empty
+  (withs (h (table) n 0 key (fn () (++ n) 'k))
+    (or= (h (key)) 'v)
+    (test? 'v (h 'k))
+    (test? 1 n))
+  ;; eval-once: a place's subforms run exactly once, slot already set
+  (withs (h (obj k 'present) n 0 key (fn () (++ n) 'k))
+    (or= (h (key)) 'v)
+    (test? 'present (h 'k))
+    (test? 1 n)))
+
 (define-test thread-local-the
   ;; (the var) returns nil when unset; (= (the var) val) sets it
   (= (the test-tl) nil)

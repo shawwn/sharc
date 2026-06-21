@@ -971,6 +971,8 @@ isn't shadowed by a lexical binding."
 
 (defun lex-p (v) (member v *env* :test #'eq))
 
+(xdef lex #'lex-p)
+
 ;; Compile the args of an immediately-applied fn ((fn PARAMS body) . ARGS).
 ;; An fn-valued arg is named after its (simple) param, so the value fn in
 ;; (let f (fn ...) ...) -- which expands to ((fn (f) ...) (fn ...)) -- is
