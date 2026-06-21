@@ -1339,7 +1339,7 @@
   (force-output stream))
 
 (defun arc-tl ()
-  (format t "Use (quit) to quit, (arc:arc-tl) to return here after an interrupt.~%")
+  (format t "Use (quit) to quit.~%")
   (arc-tl2))
 
 (xdef repl #'arc-tl)
