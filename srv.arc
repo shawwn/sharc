@@ -417,7 +417,7 @@ Connection: close"))
 ; args are belt-and-suspenders over scope capture.
 (def fnid-key (key (t req))
   (list (get-user)
-        req!op
+        (the op)
         (when (is req!type 'get)
           (reassemble-args req))
         key))
