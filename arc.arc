@@ -95,11 +95,11 @@
                      (safeset ,name (annotate 'mac (fn ,parms ,@body)))))))
 
 (mac and args
-  (if args
-      (if (cdr args)
-          `(if ,(car args) (and ,@(cdr args)))
-          (car args))
-      't))
+  (if (cdr args)
+       `(if ,(car args) (and ,@(cdr args)))
+      args
+       (car args)
+       't))
 
 (def assoc (key al)
   (if (atom al)
