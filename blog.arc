@@ -79,7 +79,11 @@
       (each p (map post (rev (range 1 maxid*)))
         (tag li (link p!title (permalink p)))))))
 
-(defop blog
+(defop blog (frontpage))
+
+(defop || (frontpage))
+
+(def frontpage ()
   (blogpage
     (for i 0 4
       (awhen (posts* (- maxid* i))
