@@ -66,8 +66,13 @@ host, so it works against any SMTP-AUTH server.
   URLs (`flink` on error, `"news"` on success) instead of rendering
   inline. Matches the redirector convention from the login-rework
   handoff (`2026-06-21-003`).
-- `newspage`'s `whence` arg is now optional (`(o whence "news")`) so
-  the reset handlers can redirect to it.
+- (`df1c379` briefly made `newspage`'s `whence` optional via
+  `(o whence "news")`; that was a regression and was reverted in
+  `061bc7a`. `newscache` splices its arg list into the cache-fn call
+  site, so an `(o ...)` form becomes a literal call argument and errors
+  at runtime in the logged-out branch. The reset handlers don't need it
+  anyway -- they return the `"news"` redirect string, never `(newspage)`
+  bare.)
 
 ### app.arc
 
