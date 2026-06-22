@@ -2730,9 +2730,9 @@
 (def submitted-url (user) (+ "submitted?id=" user))
        
 (newsop submitted (id)
-  (if id
+  (if (only&profile id)
       (submitted-page id)
-      (pr "No user specified.")))
+      (pr "No such user.")))
 
 (def submitted-page (user)
   (if (profile user)
