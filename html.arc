@@ -341,20 +341,21 @@
 
 (mac inputs args
   `(tag (table border 0)
-     ,@(map (fn ((name label len text))
-              (w/uniq (gl gt)
+     ,@(map (fn ((name label len text . options))
+              (w/uniq gl
                 `(let ,gl ,len
                    (tr (td (pr ',label ":"))
                        (if (isa ,gl 'cons)
                            (td (textarea ',name (car ,gl) (cadr ,gl)
-                                 (let ,gt ,text (if ,gt (pr ,gt)))))
+                                 (aif ,text (pr it))))
                            (td (gentag input type ',(if (is label 'password) 
                                                     'password 
                                                     'text)
                                          name ',name 
                                          size ,len 
-                                         value ,text)))))))
-            (tuples args 4))))
+                                         value ,text
+                                         ,@options)))))))
+            args)))
 
 (def single-input (label name chars btext (o pwd))
   (pr label)

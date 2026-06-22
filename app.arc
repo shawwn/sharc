@@ -216,8 +216,11 @@
        "; SameSite=Lax; Secure; HttpOnly"))
 
 (def pwfields ((o label "login"))
-  (inputs u username 20 nil
-          p password 20 nil)
+  (inputs (acct username 20 nil
+                autocorrect    'off spellcheck 'false
+                autocapitalize 'off
+                autofocus      (is label "login"))
+          (pw   password 20 nil))
   (br)
   (submit label))
 
