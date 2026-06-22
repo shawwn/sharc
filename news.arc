@@ -189,7 +189,7 @@
 ; Could be smarter about preloading by keeping track of popular pages.
 
 (def load-items ()
-  (system (+ "rm " storydir* "*.tmp"))
+  (system (+ "rm -f " storydir* "*.tmp"))
   (pr "load items: ") 
   (with (items (table)
          ids   (sort > (map int (dir storydir*))))
