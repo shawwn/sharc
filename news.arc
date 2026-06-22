@@ -10,11 +10,11 @@
 (declare 'atstrings t)
 
 (= this-site*    "My Forum"
-   site-url*     "http://news.yourdomain.com/"
-   site-email*   "hn@@ycombinator.com"
+   site-url*     "http://localhost:8080" ; no trailing slash
+   site-email*   "hn@@ycombinator.lol"
    parent-url*   "/"
    favicon-url*  ""
-   site-desc*    "What this site is about."               ; for rss feed
+   site-desc*    "What this site is about." ; for rss feed
    site-color*   (color 141 141 190)
    border-color* (color 141 141 190)
    prefer-url*   t)
@@ -848,7 +848,7 @@
 
 ;(newsop index.html () (newspage "index.html"))
 
-(newscache newspage (whence) 90
+(newscache newspage ((o whence "news")) 90
   (listpage (msec) (topstories maxend*) nil nil
             (pageurl whence) t
             [pageurl whence (+ (curpage) 1)]))
@@ -2763,7 +2763,7 @@
       (tag description (pr site-desc*))
       (each s stories
         (tag item
-          (let comurl (+ site-url* (item-url s!id))
+          (let comurl (+ site-url* "/" (item-url s!id))
             (tag title    (pr (eschtml s!title)))
             (tag link     (pr (if (blank s!url) comurl (eschtml s!url))))
             (tag comments (pr comurl))
@@ -2931,15 +2931,16 @@ first asterisk isn't whitespace.
              (pr ". Otherwise you could lose your account if you mistype
                   your new password.")))
     (br2)
-    (uform (try-resetpw arg!p)
+    (urform (try-resetpw arg!p)
       (single-input "New password: " 'p 20 "reset" t))))
 
 (def try-resetpw (newpw)
   (if (no (<= 8 (len newpw) 72))
-      (resetpw-page "Passwords should be between 8 and 72 characters long.
-                     Please choose another.")
+      (flink
+        {resetpw-page "Passwords should be between 8 and 72 characters long.
+                       Please choose another."})
       (do (set-pw (me) newpw)
-          (newspage))))
+          "news")))
 
 
 ; Scrubrules
@@ -3134,6 +3135,71 @@ first asterisk isn't whitespace.
     (tab 
       (each c (dedup (map downcase (trues [uvar _ topcolor] (users))))
         (tr (td c) (tdcolor (hex>color c) (hspace 30)))))))
+
+; Forgot page
+
+(def forgot-url (id)
+  (if (goodname id)
+      (string "forgot?id=" id)
+      "forgot"))
+
+(defhook login-form (afterward acct pw)
+  (link "Forgot your password?" (forgot-url acct)))
+
+(= forgot-msg* "Password reset email sent. If you don't see it, 
+                you might want to check your spam folder.")
+
+(newsop forgot (id)
+  (prbold "Reset your password")
+  (br2)
+  (aform (forgot-user arg!s)
+    (inputs (s username 20 id))
+    (br)
+    (submit "Send reset email")))
+
+(def forgot-user (user)
+  (aif (~profile user)
+        (pr "Unknown user")
+       (check (uvar user email) ~blank)
+        (do (changepw-email user it)
+            (msgpage forgot-msg*))
+        (msgpage
+          (tostring
+            (pr "Sorry, there's no email address in the profile so we can't send you"
+                " a reset link.")
+            (br2)
+            (pr "You're welcome to contact us at @{site-email*}. Assuming you're"
+                " the account owner, there's usually something we can do.")))))
+
+(def changepw-email (user email)
+  (send-email
+    email
+    "@this-site* Password Recovery"
+    (tostring
+      (prn "Someone (hopefully you) requested we reset your password"
+           " for @user at @{this-site*}. Your password has not yet been changed."
+           " If you want to change it, please visit "
+           (+ site-url* (flink {changepw-page user}) "&fnop=passwd-reset."))
+      (prn)
+      (prn "If not, just ignore this message."))))
+
+(def changepw-page (user (o msg))
+  (minipage "Reset Password for @user"
+    (if msg (pr msg))
+    (br2)
+    (arform (try-changepw user arg!pw)
+      (tab
+        (row "New password: " (gentag input type 'password name 'pw size 20))
+        (row "" (submit "Change"))))))
+
+(def try-changepw (user newpw)
+  (if (no (<= 8 (len newpw) 72))
+      (flink {changepw-page user
+               "Passwords should be between 8 and 72 characters long. 
+                Please choose another."})
+      (do (set-pw user newpw)
+          "news")))
+
 
 (when (main)
   (nsv)

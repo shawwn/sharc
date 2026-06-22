@@ -167,7 +167,7 @@
     (pagemessage msg)
     (when (in switch 'login 'both)
       (login-form "Login" switch login-handler afterward acct pw)
-      (hook 'login-form afterward)
+      (hook 'login-form afterward acct pw)
       (br2))
     (when (in switch 'register 'both)
       (login-form "Create Account" switch create-handler afterward acct pw))))

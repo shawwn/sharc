@@ -6,11 +6,12 @@ News web app that powers [Hacker News](https://news.ycombinator.com).
 <img width="751" height="540" alt="image" src="https://github.com/user-attachments/assets/85828774-02bc-4c0b-9915-082b4c66b413" />
 
 In September 2024, Hacker News migrated from Arc-on-Racket to Arc on
-[SBCL](http://www.sbcl.org/) using a compiler called *Clarc* (with a
-`c`) that dang had been developing for years. The port lets HN run on multiple cores
+[SBCL](http://www.sbcl.org/) using a compiler called *Clarc* that dang
+had been developing for years. The port lets HN run on multiple cores
 and was fast enough to retire pagination on long threads. See the
 [announcement thread](https://news.ycombinator.com/item?id=44099006)
-and Vincent Massol's [write-up](https://lisp-journey.gitlab.io/blog/hacker-news-now-runs-on-top-of-common-lisp/).
+and Vincent Massol's
+[write-up](https://lisp-journey.gitlab.io/blog/hacker-news-now-runs-on-top-of-common-lisp/).
 
 This repository is an independent open-source Arc-on-Common-Lisp
 runtime in the same spirit. It boots `arc0.lisp` (a port of Arc's
@@ -43,8 +44,31 @@ echo "myname" > arc/admins
 Then go to [http://localhost:8080](http://localhost:8080).
 
 Click on login and create an account called `myname`. You should now
-be logged in as an admin. Manually give at least 10 karma to your
-initial set of users.
+be logged in as an admin.
+
+## Email
+
+News sends password reset emails via [Amazon
+SES](https://aws.amazon.com/ses/). Ask Claude how to set it up for your
+own domain, or follow AWS's guides: [verify a sending
+domain](https://docs.aws.amazon.com/ses/latest/dg/creating-identities.html),
+[create SMTP
+credentials](https://docs.aws.amazon.com/ses/latest/dg/smtp-credentials.html),
+and [request production
+access](https://docs.aws.amazon.com/ses/latest/dg/request-production-access.html)
+(new accounts are sandboxed to verified recipients until you do).
+
+Then copy `ses.example.json` to `ses.json` and fill in
+`YOUR_SES_SMTP_USERNAME` and `YOUR_SES_SMTP_PASSWORD`. The optional
+`from-name` and `reply-to` fields set the sender's display name and a
+reply address.
+
+Optionally, use [ImprovMX](https://improvmx.com/) to forward incoming
+emails to a personal gmail account, then go to gmail's gear icon (upper
+right) -> See All Settings -> Accounts and Import -> Send mail as ->
+"Add another email address." Point that address's SMTP server at SES
+(`email-smtp.<region>.amazonaws.com`, port 587, your SMTP credentials)
+so replies you send from gmail are signed for your domain.
 
 ## Customizing News
 
@@ -107,3 +131,10 @@ broke along the way, and how each fix was reasoned through.
 
 Copyright (c) Paul Graham and Robert Morris. Released under the MIT
 License with Paul Graham's permission. See [copyright](copyright).
+
+## Acknowledgements
+
+Thanks to [Daniel Gackle aka "dang"](https://github.com/gruseom) for
+coming up with the name Sharc, and for answering dozens of
+[emails](mailto:hn@ycombinator.com) over many months regarding HN and
+Clarc.

@@ -5,4 +5,5 @@
             "srv.arc"
             "app.arc"
             "json.arc"
+            "email.arc"
             "prompt.arc"))
