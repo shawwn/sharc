@@ -3165,11 +3165,12 @@ first asterisk isn't whitespace.
             (msgpage forgot-msg*))
         (msgpage
           (tostring
-            (pr "Sorry, there's no email address in the profile so we can't send you"
-                " a reset link.")
+            (pr "Sorry, there's no email address in the profile so we"
+                " can't send you a reset link.")
             (br2)
-            (pr "You're welcome to contact us at @{site-email*}. Assuming you're"
-                " the account owner, there's usually something we can do.")))))
+            (pr "You're welcome to contact us at @{site-email*}."
+                " Assuming you're the account owner, there's usually"
+                " something we can do.")))))
 
 (def changepw-email (user email)
   (send-email
@@ -3177,9 +3178,10 @@ first asterisk isn't whitespace.
     "@this-site* Password Recovery"
     (tostring
       (prn "Someone (hopefully you) requested we reset your password"
-           " for @user at @{this-site*}. Your password has not yet been changed."
-           " If you want to change it, please visit "
-           (+ site-url* (flink {changepw-page user}) "&fnop=passwd-reset."))
+           " for @user at @{this-site*}. Your password has not yet"
+           " been changed. If you want to change it, please visit "
+           (+ site-url* (flink {changepw-page user})
+              "&fnop=passwd-reset."))
       (prn)
       (prn "If not, just ignore this message."))))
 
