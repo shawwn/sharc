@@ -36,10 +36,11 @@
 ; (me other)  --- the current user, only if it equals other
 ;
 ; Doubles as predicate-and-value: (when (me other) ...) runs the body
-; only when the viewer is `other`, and inside `it` is the username.
-(def me ((o other))
+; only when the viewer is `other`.
+
+(def me args
   (let m (the me)
-    (if other (and (is m other) m) m)))
+    (if args (is m (car args)) m)))
 
 (def ip () (the ip))
 
