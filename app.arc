@@ -162,41 +162,42 @@
 ; classic example of something that should just "return" a val
 ; via a continuation rather than going to a new page.
 
-(def login-page (switch (o msg nil) (o afterward hello-page))
+(def login-page (switch (o msg nil) (o afterward hello-page) (o acct arg!acct) (o pw arg!pw))
   (whitepage
     (pagemessage msg)
     (when (in switch 'login 'both)
-      (login-form "Login" switch login-handler afterward)
+      (login-form "Login" switch login-handler afterward acct pw)
       (hook 'login-form afterward)
       (br2))
     (when (in switch 'register 'both)
-      (login-form "Create Account" switch create-handler afterward))))
+      (login-form "Create Account" switch create-handler afterward acct pw))))
 
-(def login-form (label switch handler afterward)
+(def login-form (label switch handler afterward (o acct arg!acct) (o pw arg!pw))
   (prbold label)
   (br2)
   (fnform {handler switch afterward}
-          {pwfields (downcase label)}
+          {pwfields (downcase label) acct pw}
           (acons afterward)))
 
 (def login-handler (switch afterward)
-  (unless (me arg!u) (logout-user))
-  (aif (good-login arg!u arg!p (ip))
-       (login it (ip) (user->cookie* it) afterward)
-       (failed-login switch "Bad login." afterward)))
+  (with (user arg!acct pw arg!pw)
+    (unless (me user) (logout-user))
+    (aif (good-login user pw (ip))
+         (login it (ip) (user->cookie* it) afterward)
+         (failed-login switch "Bad login." afterward))))
 
 (def create-handler (switch afterward)
-  (logout-user)
-  (with (user arg!u pw arg!p)
+  (with (user arg!acct pw arg!pw)
+    (logout-user)
     (aif (bad-newacct user pw)
          (failed-login switch it afterward)
          (do (create-acct user pw)
              (login user (ip) (cook-user user) afterward)))))
 
 (def login (user ip cookie afterward)
-  (= (logins* user) ip)
   (prcookie cookie)
-  (= (the me) user)
+  (= (logins* user) ip
+     (the me) user)
   (if (acons afterward)
       (let (f url) afterward
         (f)
@@ -204,23 +205,22 @@
       (do (prn)
           (afterward))))
 
-(def failed-login (switch msg afterward)
+(def failed-login (switch msg afterward (o acct arg!acct) (o pw arg!pw))
   (if (acons afterward)
-      (flink {login-page switch msg afterward})
+      (flink {login-page switch msg afterward acct pw})
       (do (prn)
-          (login-page switch msg afterward))))
+          (login-page switch msg afterward acct pw))))
 
 (def prcookie (cook)
   (prn "Set-Cookie: user=" cook
        "; Path=/; expires=Sun, 17-Jan-2038 19:14:07 GMT"
        "; SameSite=Lax; Secure; HttpOnly"))
 
-(def pwfields ((o label "login"))
-  (inputs (acct username 20 nil
+(def pwfields ((o label "login") (o acct arg!acct) (o pw arg!pw))
+  (inputs (acct username 20 acct
                 autocorrect    'off spellcheck 'false
-                autocapitalize 'off
-                autofocus      (is label "login"))
-          (pw   password 20 nil))
+                autocapitalize 'off autofocus  (is label "login"))
+          (pw   password 20 pw))
   (br)
   (submit label))
 
