@@ -15,8 +15,8 @@
    parent-url*   "/"
    favicon-url*  ""
    site-desc*    "What this site is about." ; for rss feed
-   site-color*   (color 141 141 190)
-   border-color* (color 141 141 190)
+   site-color*   (color 170 170 230)
+   border-color* (color 170 170 230)
    prefer-url*   t)
 
 
