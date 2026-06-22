@@ -848,7 +848,7 @@
 
 ;(newsop index.html () (newspage "index.html"))
 
-(newscache newspage ((o whence "news")) 90
+(newscache newspage (whence) 90
   (listpage (msec) (topstories maxend*) nil nil
             (pageurl whence) t
             [pageurl whence (+ (curpage) 1)]))
