@@ -37,9 +37,13 @@
         (class style src) opstring
         (onclick onfocus) opstring
         (width height)    opnum
-        (tabindex)        opnum
         (color bgcolor)   opcolor
-        (aria-hidden)     opbool)))
+        tabindex          opnum
+        aria-hidden       opbool
+        spellcheck        opbool
+        autofocus         opbool
+        autocorrect       oponoff
+        autocapitalize    oponoff)))
 
 (mac attribute (tag opt f)
   `(= (opmeths* (list ',tag ',opt)) ,f))
@@ -68,7 +72,14 @@
   `(aif ,val (pr ,(+ " " key "=\"") it #\")))
 
 (def opbool (key val)
-  `(aif ,val (pr ,(+ " " key "=\"true\""))))
+  `(case (downcase:string ,val)
+     ("true" "t") (pr ,(+ " " key "=\"true\""))
+     ("false")    (pr ,(+ " " key "=\"false\""))))
+
+(def oponoff (key val)
+  `(case (downcase:string ,val)
+     ("on" "t") (pr ,(+ " " key "=\"on\""))
+     ("off")    (pr ,(+ " " key "=\"off\""))))
 
 (def opsel (key val)
   `(if ,val (pr " selected")))
