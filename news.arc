@@ -583,7 +583,7 @@
 
 (def topright (whence (o showkarma t))
   (when (me)
-    (userlink (me) nil)
+    (userlink (me) nil t (if (me) 'me))
     (when showkarma
       (pr " (")
       (tag (span id 'karma)
@@ -600,8 +600,10 @@
                                 (newslog 'top-login)}
                             whence))))))
 
+(= noob-days* 7) ; how long a user's name is colored green
+
 (def noob ((t user me))
-  (and user (< (days-since (uvar user created)) 1)))
+  (and user (< (days-since (uvar user created)) noob-days*)))
 
 
 ; News-Specific Defop Variants
@@ -809,8 +811,7 @@
       (tag (td valign 'top)
         (pr "user:"))
       (tag (td timestamp (uvar user created))
-        (tag (a href (user-url user) class 'hnuser)
-          (pr user))))))
+        (userlink user nil (me user))))))
 
 (def resetpw-link ()
   (tostring (underlink "reset password" "resetpw")))
@@ -1448,9 +1449,9 @@
 
 (= show-avg* nil)
 
-(def userlink (user (o show-avg t))
-  (tag (a href (user-url user) class 'hnuser id (if (me user) 'me))
-    (user-name user))
+(def userlink (user (o show-avg t) (o show-noob t) (o id))
+  (tag (a href (user-url user) class 'hnuser id id)
+    (user-name user show-noob))
   (awhen (and show-avg* (admin) show-avg (uvar user avg))
     (pr " (@(num it 1 t t))")))
 
@@ -1476,10 +1477,10 @@
 
 (= noob-color* (color 60 150 60))
 
-(def user-name (user)
+(def user-name (user (o show-noob t))
   (if (and (editor) (ignored user))
        (fontcolor darkred (pr user))
-      (and (editor) (< (user-age user) 1440))
+      (and show-noob (noob user))
        (fontcolor noob-color* (pr user))
        (pr user)))
 
