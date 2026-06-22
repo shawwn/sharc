@@ -38,13 +38,23 @@ something like `193 passed, 0 failed`.
 ```sh
 mkdir -p arc
 echo "myname" > arc/admins
-./news.arc
+export ARC_RELOAD=t # reload code changes without needing to restart
+./sharc news.arc # prepend with `rlwrap` for repl history
 ```
 
 Then go to [http://localhost:8080](http://localhost:8080).
 
 Click on login and create an account called `myname`. You should now
 be logged in as an admin.
+
+Set `ARC_RELOAD=t` (or run `(set autoreload*)` in the repl) to
+automatically reload code changes without restarting the server.
+
+For production deployments, instead of autoreload, you can manually
+`git pull` and then run `(reload)` in the repl to ship an update.
+(You could use autoreload in production, but then each request is
+slightly slower since it has to check the modification times of every
+arc file.)
 
 ## Email
 
@@ -95,7 +105,7 @@ the password is read at login time from `HN_SCRAPER_PASSWORD`, the
 ```arc
 (= static-max-age* 7200)    ; browsers can cache static files for 7200 sec
 
-(declare 'direct-calls t)   ; you promise not to redefine fns as tables
+(= autoreload* t)           ; reload code changes without restarting
 
 (declare 'explicit-flush t) ; you take responsibility for flushing output
                             ; (all existing news code already does)
