@@ -190,12 +190,13 @@ Connection: close"))
 (each (k v) '((text/plain "text/plain; charset=utf-8")
               (text/html  "text/html; charset=utf-8")
               (css        "text/css; charset=utf-8")
+              (js         "text/javascript; charset=utf-8")
+              (json       "application/json")
               (gif        "image/gif")
               (jpg        "image/jpeg")
               (png        "image/png")
               (svg        "image/svg+xml")
-              (ico        "image/x-icon")
-              (js         "text/javascript; charset=utf-8"))
+              (ico        "image/x-icon"))
   (= (type-header* k) (gen-type-header v)))
 
 (= header*   (type-header* 'text/html)
@@ -306,6 +307,7 @@ Connection: close"))
            "svg"  'svg
            "ico"  'ico
            "js"   'js
+           "json" 'json
            "css"  'css
            "txt"  'text/plain
            "htm"  'text/html
