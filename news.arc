@@ -1480,7 +1480,7 @@
 (def user-name (user (o show-noob t))
   (if (and (editor) (ignored user))
        (fontcolor darkred (pr user))
-      (and show-noob (noob user))
+      (and show-noob (me) (noob user))
        (fontcolor noob-color* (pr user))
        (pr user)))
 
