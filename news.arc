@@ -739,6 +739,11 @@
 
 (def profile-form (user)
   (let prof (profile user)
+    (when (and (me user) (blank prof!email))
+      (alert-msg "Please put a valid address in the email field, or we
+                 won't be able to send you a new password if you
+                 forget yours.  Your address is only visible to you
+                 and us.  Crawlers and other users can't see it."))
     (vars-form (user-fields user)
                (fn (name val)
                  (when (and (is name 'ignore) val (no prof!ignore))
@@ -746,6 +751,12 @@
                  (= (prof name) val))
                {do (save-prof user)
                    (user-url user)})))
+
+(def alert-msg (msg)
+  (zerotable
+    (tr (tdcolor (color 255 255 170)
+          (tag (table cellpadding 5 width "100%")
+            (row msg))))))
 
 (= topcolor-threshold* 0)
 
