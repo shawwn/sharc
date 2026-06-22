@@ -479,7 +479,7 @@
       (link "Lists" "lists")
       (link "API" "https://github.com/HackerNews/API")
       (link "Security" "security.html")
-      (link "Legal" "https://www.ycombinator.com/legal/")
+      (link "DMCA" "dmca.html")
       (link "Apply to YC" "https://www.ycombinator.com/apply/")
       (link "Contact" "mailto:@site-email*"))))
 
