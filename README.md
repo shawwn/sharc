@@ -58,27 +58,24 @@ arc file.)
 
 ## Email
 
-News sends password reset emails via [Amazon
-SES](https://aws.amazon.com/ses/). Ask Claude how to set it up for your
-own domain, or follow AWS's guides: [verify a sending
-domain](https://docs.aws.amazon.com/ses/latest/dg/creating-identities.html),
-[create SMTP
-credentials](https://docs.aws.amazon.com/ses/latest/dg/smtp-credentials.html),
-and [request production
-access](https://docs.aws.amazon.com/ses/latest/dg/request-production-access.html)
-(new accounts are sandboxed to verified recipients until you do).
+News sends password reset emails via [Resend](https://resend.com)'s
+SMTP relay. Ask Claude how to set it up for your own domain, or follow
+Resend's guides: [verify a sending
+domain](https://resend.com/docs/dashboard/domains/introduction),
+[create an API key](https://resend.com/docs/dashboard/api-keys/introduction),
+and [send with SMTP](https://resend.com/docs/send-with-smtp).
 
-Then copy `ses.example.json` to `ses.json` and fill in
-`YOUR_SES_SMTP_USERNAME` and `YOUR_SES_SMTP_PASSWORD`. The optional
-`from-name` and `reply-to` fields set the sender's display name and a
-reply address.
+Then copy `smtp.example.json` to `smtp.json` and fill in your
+`YOUR_RESEND_API_KEY` (the username is the literal string `resend`).
+The optional `from-name` and `reply-to` fields set the sender's display
+name and a reply address.
 
 Optionally, use [ImprovMX](https://improvmx.com/) to forward incoming
 emails to a personal gmail account, then go to gmail's gear icon (upper
 right) -> See All Settings -> Accounts and Import -> Send mail as ->
-"Add another email address." Point that address's SMTP server at SES
-(`email-smtp.<region>.amazonaws.com`, port 587, your SMTP credentials)
-so replies you send from gmail are signed for your domain.
+"Add another email address." Point that address's SMTP server at Resend
+(`smtp.resend.com`, port 587, username `resend`, your API key as the
+password) so replies you send from gmail are signed for your domain.
 
 ## Customizing News
 

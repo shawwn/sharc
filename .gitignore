@@ -1,6 +1,6 @@
 /arc/
 /scrape.json
-/ses.json
+/smtp.json
 *.fasl
 *.fas
 *.lib

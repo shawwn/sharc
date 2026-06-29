@@ -1,8 +1,0 @@
-{
-  "host": "email-smtp.us-east-1.amazonaws.com",
-  "port": 465,
-  "user": "YOUR_SES_SMTP_USERNAME",
-  "pass": "YOUR_SES_SMTP_PASSWORD",
-  "from": "hn@ycombinator.lol",
-  "from-name": "HN Simulator"
-}

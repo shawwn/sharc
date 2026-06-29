@@ -1,10 +1,10 @@
 ; Email via SMTP.  Speaks SMTP over an implicit-TLS connection (port
-; 465), which is what Amazon SES offers; the TLS comes for free from
-; socket-connect (see the http-client handoff).  Auth is AUTH LOGIN,
-; so the only new primitive needed is a standard base64 encoder.
+; 465), which is what Resend offers (smtp.resend.com); the TLS comes
+; for free from socket-connect (see the http-client handoff).  Auth is
+; AUTH LOGIN, so the only new primitive needed is a base64 encoder.
 ;
 ; Configuration is read at send time from the environment, then from
-; ses.json (see ses.example.json).  Nothing here is SES-specific
+; smtp.json (see smtp.example.json).  Nothing here is Resend-specific
 ; beyond the default host, so it works against any SMTP-AUTH server.
 
 (= crlf* (string #\return #\newline))
@@ -40,37 +40,37 @@
 
 ; ----- config -----
 
-(= ses-config-file* "ses.json")
+(= smtp-config-file* "smtp.json")
 
-(def ses-config ()
-  ; merge env overrides over ses.json, falling back to sane defaults.
+(def smtp-config ()
+  ; merge env overrides over smtp.json, falling back to sane defaults.
   ; env wins so secrets can stay out of the file in production.
-  (let cfg (or (and (file-exists ses-config-file*)
-                    (load-json ses-config-file*))
+  (let cfg (or (and (file-exists smtp-config-file*)
+                    (load-json smtp-config-file*))
                (table))
-    (withs (port (let p (or (getenv "SES_SMTP_PORT") cfg!port 465)
+    (withs (port (let p (or (getenv "SMTP_PORT") cfg!port 465)
                    (if (isa p 'string) (int p) p))
             ; implicit TLS for SMTPS (and the https port); socket-connect
             ; only auto-enables SSL for 443, so 465 needs it spelled out.
-            ; SES_SMTP_TLS=0 forces plaintext (e.g. talking to a relay).
-            tls (let v (or (getenv "SES_SMTP_TLS") cfg!tls 'auto)
+            ; SMTP_TLS=0 forces plaintext (e.g. talking to a relay).
+            tls (let v (or (getenv "SMTP_TLS") cfg!tls 'auto)
                   (if (in v "0" "false" 'false) nil
                       (in v "1" "true" 'true)  t
                                                (in port 465 443))))
-      (obj host (or (getenv "SES_SMTP_HOST") cfg!host
-                    "email-smtp.us-east-1.amazonaws.com")
+      (obj host (or (getenv "SMTP_HOST") cfg!host
+                    "smtp.resend.com")
            port port
            tls  tls
-           user (or (getenv "SES_SMTP_USER") cfg!user)
-           pass (or (getenv "SES_SMTP_PASS") cfg!pass)
-           from (or (getenv "SES_FROM") cfg!from (errsafe site-email*))
+           user (or (getenv "SMTP_USER") cfg!user)
+           pass (or (getenv "SMTP_PASS") cfg!pass)
+           from (or (getenv "SMTP_FROM") cfg!from (errsafe site-email*))
            ; optional display name shown to recipients when `from` is a
            ; bare address (e.g. "HN Simulator").  Ignored if `from`
            ; already carries its own "Name <addr>" form.
-           from-name (or (getenv "SES_FROM_NAME") cfg!from-name)
+           from-name (or (getenv "SMTP_FROM_NAME") cfg!from-name)
            ; replies go here instead of From, so you can send from a
            ; noreply address but still receive human replies.
-           reply-to (or (getenv "SES_REPLY_TO") cfg!reply-to)))))
+           reply-to (or (getenv "SMTP_REPLY_TO") cfg!reply-to)))))
 
 
 ; ----- date header -----
@@ -179,13 +179,13 @@
 
 (def send-email (to subject body . opts)
   ; opts is a plist; recognized keys: from, from-name, reply-to, headers
-  ; (each overrides the ses.json default).  `to` may be a single address
+  ; (each overrides the smtp.json default).  `to` may be a single address
   ; string or a list of them.  `from` may carry a display name
   ; ("HN Simulator <hn@x.com>") or be a bare address; a separate
   ; `from-name` wraps a bare address into that display form.  Returns t,
   ; or errors.
   (withs (o     (listtab (pair opts))
-          cfg   (ses-config)
+          cfg   (smtp-config)
           raw-from (or o!from cfg!from)
           from-name (or o!from-name cfg!from-name)
           from-addr (and raw-from (email-addr raw-from))
@@ -199,9 +199,9 @@
           headers  o!headers
           recips (if (alist to) to (list to))
           ehlo  (or (email-domain (or from-addr "")) "localhost"))
-    (unless cfg!user (err "smtp: no SMTP_USER (set SES_SMTP_USER or ses.json)"))
-    (unless cfg!pass (err "smtp: no SMTP_PASS (set SES_SMTP_PASS or ses.json)"))
-    (unless raw-from (err "smtp: no from address (set SES_FROM or ses.json)"))
+    (unless cfg!user (err "smtp: no SMTP_USER (set SMTP_USER or smtp.json)"))
+    (unless cfg!pass (err "smtp: no SMTP_PASS (set SMTP_PASS or smtp.json)"))
+    (unless raw-from (err "smtp: no from address (set SMTP_FROM or smtp.json)"))
     (let s (socket-connect cfg!host cfg!port (if cfg!tls (obj ssl t)))
       (after
         (do (smtp-cmd s nil 220)

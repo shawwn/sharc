@@ -1,0 +1,8 @@
+{
+  "host": "smtp.resend.com",
+  "port": 465,
+  "user": "resend",
+  "pass": "YOUR_RESEND_API_KEY",
+  "from": "hn@ycombinator.lol",
+  "from-name": "HN Simulator"
+}
