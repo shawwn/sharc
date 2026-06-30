@@ -575,6 +575,11 @@
                            (do (pr #\*) (++ i))
                            (pr #\\))
                       (and (is (s i) #\*)
+                           (~atend i s) (is (s (+ i 1)) #\*))
+                       ; a doubled ** is a literal asterisk, not emphasis
+                       ; (even inside italics: *foo*** -> <i>foo*</i>)
+                       (do (pr #\*) (++ i))
+                      (and (is (s i) #\*)
                            (or ital
                                (atend i s)
                                (and (~whitec (s (+ i 1)))

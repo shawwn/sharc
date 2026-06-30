@@ -2913,11 +2913,13 @@
 
 (= formatdoc* 
 "Blank lines separate paragraphs.
-<p> Text after a blank line that is indented by two or more spaces is 
-reproduced verbatim.  (This is intended for code.)
-<p> Text surrounded by asterisks is italicized, if the character after the 
-first asterisk isn't whitespace.
-<p> Urls become links, except in the text field of a submission.<br><br>")
+<p>Text surrounded by asterisks is italicized. To get a literal
+asterisk, use \\* or **.
+<p> Text after a blank line that is indented by two or more spaces is
+formatted as code.
+<p> Urls become links, except in the text field of a submission.
+<p> If your url gets linked incorrectly, put it in &lt;angle
+brackets&gt; and it should work.<br><br>")
 
 
 ; Noprocrast

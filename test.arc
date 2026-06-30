@@ -1062,7 +1062,26 @@ c"
   ; \\ is a literal backslash, then the next \* escapes the asterisk
   (test? "<i>foo\\*bar</i>" (markdown "*foo\\\\*bar*"))
   ; a backslash before anything but * is just a literal backslash
-  (test? "\\baz"          (markdown "\\baz")))
+  (test? "\\baz"          (markdown "\\baz"))
+  ; a doubled ** is also a literal asterisk (not empty emphasis),
+  ; even inside italics
+  (test? "*"              (markdown "**"))
+  (test? "a*b"            (markdown "a**b"))
+  (test? "*foo*"          (markdown "**foo**"))
+  (test? "*foo*"          (markdown "**foo\\*"))
+  (test? "<i>foo*</i>"    (markdown "*foo***"))
+  (test? "* foo*"         (markdown "** foo**"))
+  (test? "<i>foo*bar</i>" (markdown "*foo**bar*")))
+
+(define-test markdown-canonicalize
+  ; submitting markdown runs it through markdown then unmarkdown, which
+  ; should normalize ** / *** escapes into backslash-escaped asterisks
+  (each (in want) '(("*foo*"      "*foo*")
+                    ("**foo\\*"   "\\*foo\\*")
+                    ("*foo***"    "*foo\\**")
+                    ("** foo**"   "\\* foo\\*")
+                    ("*foo**bar*" "*foo\\*bar*"))
+    (test? want (unmarkdown (markdown in)))))
 
 (define-test markdown-roundtrip
   ; markdown -> unmarkdown should recover the original text, including
