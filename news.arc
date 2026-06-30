@@ -985,7 +985,7 @@
   (retrieve n [cansee&bynoob _] source))
 
 (def bynoob (i)
-  (< (- (user-age i!by) (item-age i)) 2880))
+  (< (- (user-age i!by) (item-age i)) (* 60 24 noob-days*)))
 
 (newsop from (site kind next)
   (w/the listpage-body
