@@ -170,8 +170,15 @@
       (hook 'login-form afterward acct pw)
       (br2))
     (when (in switch 'register 'both)
-      (login-form "Create Account" switch create-handler afterward acct pw
-                  (when (recaptcha-required (ip)) recaptcha-widget)))))
+      ; whenever the captcha is shown, HN prefaces the form with a bare
+      ; "Validation required." (the same text regardless of why), so do
+      ; the same here rather than a success/failure-specific message.
+      (let need-captcha (recaptcha-required (ip))
+        (when need-captcha
+          (pr "Validation required.")
+          (br2))
+        (login-form "Create Account" switch create-handler afterward acct pw
+                    (and need-captcha recaptcha-widget))))))
 
 (def login-form (label switch handler afterward (o acct arg!acct) (o pw arg!pw) (o extra))
   (prbold label)
@@ -196,9 +203,9 @@
     (logout-user)
     (if (and (recaptcha-required (ip))
              (no (recaptcha-pass (arg "g-recaptcha-response") (ip))))
-         (failed-login 'register
-                       "Please complete the captcha and try again."
-                       afterward)
+         ; re-render with no message; the register page prints its own
+         ; "Validation required." whenever the captcha is shown.
+         (failed-login 'register nil afterward)
         (aif (bad-newacct user pw)
              (failed-login 'register it afterward)
              (do (create-acct user pw)
