@@ -701,12 +701,12 @@
 (mac whenlet (var expr . body)
   `(iflet ,var ,expr (do ,@body)))
 
-(mac aif (expr . body)
+(mac aif (expr . args)
   `(let it ,expr
      (if it
-         ,@(if (cddr body)
-               `(,(car body) (aif ,@(cdr body)))
-               body))))
+         ,@(if (cddr args)
+               `(,(car args) (aif ,@(cdr args)))
+               args))))
 
 (mac awhen (expr . body)
   `(let it ,expr (if it (do ,@body))))
