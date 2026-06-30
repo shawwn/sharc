@@ -77,6 +77,48 @@ right) -> See All Settings -> Accounts and Import -> Send mail as ->
 (`smtp.resend.com`, port 587, username `resend`, your API key as the
 password) so replies you send from gmail are signed for your domain.
 
+## Captcha
+
+To slow down bulk signups, News can show a
+[reCAPTCHA](https://www.google.com/recaptcha) v2 ("I'm not a robot")
+challenge on account creation. It is **conditional**: like Hacker News,
+the create-account form looks normal until an IP has created a few
+accounts in a day, after which submitting it returns a "Validation
+required." page with the checkbox. When no keys are configured the
+feature is off entirely, so this is optional.
+
+Create a key pair, then copy `recaptcha.example.json` to
+`recaptcha.json` and fill in the `site-key` and `secret`. `threshold`
+is how many accounts one IP may create per day before the captcha kicks
+in (default `2`). The file is re-read on each request, so changes take
+effect without restarting the server.
+
+**Important: use a *legacy* key, not a Cloud/Enterprise one.** News
+verifies tokens against the classic endpoint
+`https://www.google.com/recaptcha/api/siteverify`, which Google's newer
+reCAPTCHA (created in the Google Cloud console) no longer supports.
+Create the key from the **classic** admin instead:
+[google.com/recaptcha/admin/create](https://www.google.com/recaptcha/admin/create)
+-> reCAPTCHA v2 -> "I'm not a robot" Checkbox. Add `localhost` and
+`127.0.0.1` to the key's allowed domains for local testing, plus your
+real domain for production.
+
+You can check whether a secret works with the classic endpoint without a
+browser; a working legacy key rejects a bogus token with
+`invalid-input-response`, while a migrated key returns a `Migrate your
+key ...` error:
+
+```
+curl -sS -X POST https://www.google.com/recaptcha/api/siteverify \
+  --data-urlencode "secret=YOUR_SECRET" --data-urlencode "response=test"
+```
+
+The keys may also be supplied via the `RECAPTCHA_SITE_KEY`,
+`RECAPTCHA_SECRET`, and `RECAPTCHA_THRESHOLD` environment variables,
+which override `recaptcha.json`. To exercise the flow locally without
+making real accounts, start the server with `RECAPTCHA_THRESHOLD=0` so
+every signup attempt is challenged.
+
 ## Customizing News
 
 Change the variables at the top of `news.arc`.
