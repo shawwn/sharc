@@ -162,7 +162,7 @@
 ; classic example of something that should just "return" a val
 ; via a continuation rather than going to a new page.
 
-(def login-page (switch (o msg nil) (o afterward hello-page) (o acct arg!acct) (o pw arg!pw))
+(def login-page (switch (o msg nil) (o afterward hello-page) (o acct arg!acct) (o pw arg!pw) (o validate))
   (whitepage
     (pagemessage msg)
     (when (in switch 'login 'both)
@@ -170,15 +170,15 @@
       (hook 'login-form afterward acct pw)
       (br2))
     (when (in switch 'register 'both)
-      ; whenever the captcha is shown, HN prefaces the form with a bare
-      ; "Validation required." (the same text regardless of why), so do
-      ; the same here rather than a success/failure-specific message.
-      (let need-captcha (recaptcha-required (ip))
-        (when need-captcha
-          (pr "Validation required.")
-          (br2))
-        (login-form "Create Account" switch create-handler afterward acct pw
-                    (and need-captcha recaptcha-widget))))))
+      ; validate is set only when create-handler bounces a signup back
+      ; for a captcha (never on the initial form).  Like HN, the page
+      ; then prefaces the form with a bare "Validation required." and
+      ; shows the widget, the same regardless of why it bounced.
+      (when validate
+        (pr "Validation required.")
+        (br2))
+      (login-form "Create Account" switch create-handler afterward acct pw
+                  (and validate recaptcha-widget)))))
 
 (def login-form (label switch handler afterward (o acct arg!acct) (o pw arg!pw) (o extra))
   (prbold label)
@@ -201,16 +201,18 @@
 (def create-handler (switch afterward)
   (with (user arg!acct pw arg!pw)
     (logout-user)
-    (if (and (recaptcha-required (ip))
-             (no (recaptcha-pass (arg "g-recaptcha-response") (ip))))
-         ; re-render with no message; the register page prints its own
-         ; "Validation required." whenever the captcha is shown.
-         (failed-login 'register nil afterward)
-        (aif (bad-newacct user pw)
-             (failed-login 'register it afterward)
-             (do (create-acct user pw)
-                 (note-acct-creation (ip))
-                 (login user (ip) (cook-user user) afterward))))))
+    ; an over-threshold IP must solve a captcha.  show it on any bounce
+    ; back to the form (a POST), but never on the initial form (a GET);
+    ; tokens are single-use, so even a username error needs a fresh one.
+    (let need-captcha (recaptcha-required (ip))
+      (if (and need-captcha
+               (no (recaptcha-pass (arg "g-recaptcha-response") (ip))))
+           (failed-login 'register nil afterward t)
+          (aif (bad-newacct user pw)
+               (failed-login 'register it afterward need-captcha)
+               (do (create-acct user pw)
+                   (note-acct-creation (ip))
+                   (login user (ip) (cook-user user) afterward)))))))
 
 (def login (user ip cookie afterward)
   (prcookie cookie)
@@ -223,11 +225,11 @@
       (do (prn)
           (afterward))))
 
-(def failed-login (switch msg afterward (o acct arg!acct) (o pw arg!pw))
+(def failed-login (switch msg afterward (o validate) (o acct arg!acct) (o pw arg!pw))
   (if (acons afterward)
-      (flink {login-page switch msg afterward acct pw})
+      (flink {login-page switch msg afterward acct pw validate})
       (do (prn)
-          (login-page switch msg afterward acct pw))))
+          (login-page switch msg afterward acct pw validate))))
 
 (def prcookie (cook)
   (prn "Set-Cookie: user=" cook
