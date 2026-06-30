@@ -1261,7 +1261,7 @@
                   :direction :input)))
     (read-byte urandom-stream)))
 
-(xdef dir (name)
+(defun arc-dir (name)
   (let* ((base (if (or (zerop (length name))
                        (eql (char name (1- (length name))) #\/))
                    name
@@ -1272,18 +1272,30 @@
      (loop for p in files
            for n = (file-namestring p)
            unless (or (null n) (string= n "")) collect n)
-     (mapcar (lambda (p) (car (last (pathname-directory p))))
+     (mapcar (lambda (p)
+               (concatenate 'string (car (last (pathname-directory p))) "/"))
              subdirs))))
 
-(xdef file-exists (name) (if (probe-file name) name nil))
+(xdef dir (name) (arc-dir name))
 
-(xdef dir-exists (name)
+(defun arc-file-exists (name)
+  (if (probe-file name) name nil))
+
+(xdef file-exists (name) (arc-file-exists name))
+
+(defun arc-dir-exists (name)
   (let ((p (probe-file name)))
     (if (and p (cl:pathname-name p) (string= (cl:pathname-name p) ""))
         nil
         (if (and p (null (pathname-name p))) name nil))))
 
-(xdef rmfile (name) (delete-file name) nil)
+(xdef dir-exists (name) (arc-dir-exists name))
+
+(defun arc-rmfile (name)
+  (delete-file name)
+  nil)
+
+(xdef rmfile (name) (arc-rmfile name))
 
 (xdef mvfile (old new)
   ; CL rename-file merges new-name with old's truename, which can
