@@ -730,6 +730,22 @@
       (user-page id)
       (pr "No such user.")))
 
+(def prjson (x)
+  (to-json x (is (downcase arg!print) "pretty")))
+
+(newsopr user.json (id)
+  (responding type-header*!json (prn)
+    (prjson:user-api id)))
+
+(def user-api (user)
+  (w/me nil
+    (whenlet p (profile user)
+      (obj about     (check p!about ~blank)
+           created   p!created
+           id        p!id
+           karma     p!karma
+           submitted (keep cansee:item p!submitted)))))
+
 (def user-page (user)
   (shortpage nil nil (+ "Profile: " user) (user-url user)
     (profile-form user)
@@ -1460,9 +1476,11 @@
 
 (def itemscore (i)
   (tag (span class 'score id (+ "score_" i!id))
-    (pr (plural (if (is i!type 'pollopt) (realscore i) i!score)
-                "point")))
+    (pr (plural (scoreof i) "point")))
   (hook 'itemscore i))
+
+(def scoreof (i)
+  (if (is i!type 'pollopt) (realscore i) i!score))
 
 ; redefined later
 
@@ -2216,6 +2234,31 @@
             (item-page s))
         (do (note-baditem)
             (pr "No such item.")))))
+
+(newsopr item.json (id)
+  (responding type-header*!json (prn)
+    (prjson:item-api id)))
+
+(def item-api (id)
+  (w/me nil
+    (whenlet i (safe-item id)
+      (when (news-type i)
+        (obj by          i!by
+             dead        (~live i)
+             deleted     i!deleted
+             descendants (if (in i!type 'story 'poll)
+                             (- (visible-family i) 1))
+             id          i!id
+             kids        (keep cansee:item i!kids)
+             parent      (if (~in i!type 'pollopt) i!parent)
+             parts       (keep cansee:item i!parts)
+             poll        (if (in i!type 'pollopt) i!parent)
+             score       (if (cansee-score i) (scoreof i))
+             text        (check i!text ~empty)
+             time        i!time
+             title       (check i!title ~empty)
+             type        i!type
+             url         (check i!url ~empty))))))
 
 (or= baditemreqs* (table))
 
