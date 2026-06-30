@@ -48,23 +48,7 @@
 (or= scrape-last-fetch* (table))     ; id -> unix seconds when last fetched
 
 
-; ----- Shell + curl -----
-;
-; `shell` drops nils from the arg list so callers can conditionally
-; include flags inline: `(shell 'curl (if quiet '-sS) url)`.
-
-(def shellquote (str)
-  (string "'" (multisubst (list (list "'" "'\"'\"'")) (string str)) "'"))
-
-(def shellargs (cmd (o args))
-  (string cmd " " (intersperse #\space (map shellquote:string (rem nil args)))))
-
-(def shell (cmd . args)
-  ; runs cmd with args, returns stdout as a string.
-  (allchars (pipe-from (shellargs cmd args))))
-
-(def shellsafe (cmd . args)
-  (errsafe (apply shell cmd args)))
+; Curl.
 
 (def curl-args () (list "-sS" "--connect-timeout" "20" "--max-time" "120"
                         "-A" scrape-user-agent*))

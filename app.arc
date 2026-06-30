@@ -151,6 +151,25 @@
   (whitepage (prs "hello" (me) "at" (ip))))
 
 
+; Shell.
+;
+; `shell` drops nils from the arg list so callers can conditionally
+; include flags inline: `(shell 'curl (if quiet '-sS) url)`.
+
+(def shellquote (str)
+  (string "'" (multisubst (list (list "'" "'\"'\"'")) (string str)) "'"))
+
+(def shellargs (cmd (o args))
+  (string cmd " " (intersperse #\space (map shellquote:string (rem nil args)))))
+
+(def shell (cmd . args)
+  ; runs cmd with args, returns stdout as a string.
+  (allchars (pipe-from (shellargs cmd args))))
+
+(def shellsafe (cmd . args)
+  (errsafe (apply shell cmd args)))
+
+
 ; Auth tokens.
 
 ; Per-user token for authenticating action links (e.g. hide).  Derived
