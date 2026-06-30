@@ -16,8 +16,7 @@
    favicon-url*  ""
    site-desc*    "What this site is about." ; for rss feed
    site-color*   (color 170 170 230)
-   border-color* (color 170 170 230)
-   prefer-url*   t)
+   border-color* (color 170 170 230))
 
 
 ; Structures
@@ -1838,33 +1837,26 @@
 
 (newsop submit ()
   (if user
-      (submit-page "" "" t)
-      (submit-login-warning "" "" t)))
+      (submit-page)
+      (submit-login-warning)))
 
-(def submit-login-warning ((o url) (o title) (o showtext) (o text))
+(def submit-login-warning ((o url "") (o title "") (o text ""))
   (login-page 'both "You have to be logged in to submit."
               {do (ensure-news-user)
                   (newslog 'submit-login)
-                  (submit-page url title showtext text)}))
+                  (submit-page url title text)}))
 
-(def submit-page ((o url) (o title) (o showtext) (o text "") (o msg))
+(def submit-page ((o url "") (o title "") (o text "") (o msg))
   (minipage "Submit"
     (pagemessage msg)
-    (urform (process-story (clean-url arg!u)
-                           (striptags arg!t)
-                           showtext
-                           (and showtext (md-from-form arg!x t)))
+    (urform (process-story (clean-url arg!url)
+                           (striptags arg!title)
+                           arg!text)
       (tab
-        (row "title"  (input "t" title 50))
-        (if prefer-url*
-            (do (row "url" (input "u" url 50))
-                (when showtext
-                  (row "" "<b>or</b>")
-                  (row "text" (textarea "x" 4 50 (only&pr text)))))
-            (do (row "text" (textarea "x" 4 50 (only&pr text)))
-                (row "" "<b>or</b>")
-                (row "url" (input "u" url 50))))
-        (row "" (submit))
+        (row "title"  (input "title" title 50))
+        (row "url"    (input "url" url 50))
+        (row "text"   (textarea "text" 4 50 (only&pr text)))
+        (row ""       (submit))
         (spacerow 20)
         (row "" submit-instructions*)))))
 
@@ -1877,10 +1869,10 @@
 ; http://news.domain.com/submitlink?u=http://foo.com&t=Foo
 ; Added a confirm step to avoid xss hacks.
 
-(newsop submitlink (u t)
+(newsop submitlink (url title text)
   (if user
-      (submit-page u t)
-      (submit-login-warning u t)))
+      (submit-page url title text)
+      (submit-login-warning url title text)))
 
 (= title-limit* 80
    retry*       "Please try again."
@@ -1896,28 +1888,32 @@
 
 (disktable big-spamsites* (+ newsdir* "big-spamsites"))
 
-(def process-story (url title showtext text)
+(def process-story (url title text)
   (aif (and (~blank url) (live-story-w/url url))
        (do (vote-for it)
            (item-url it!id))
        (if (no (me))
-            (flink {submit-login-warning url title showtext text})
+            (flink {submit-login-warning url title text})
            (no (and (or (blank url) (valid-url url))
                     (~blank title)))
-            (flink {submit-page url title showtext text retry*})
+            (flink {submit-page url title text retry*})
            (len> title title-limit*)
-            (flink {submit-page url title showtext text toolong*})
+            (flink {submit-page url title text toolong*})
            (and (blank url) (blank text))
-            (flink {submit-page url title showtext text bothblank*})
+            (flink {submit-page url title text bothblank*})
            ; could also match (recent-spam:sitename url)
            (big-spamsites*:sitename url)
             (flink {msgpage spammage*})
            (oversubmitting 'story url)
             (flink {msgpage toofast*})
-           (let s (create-story url (process-title title) text)
+           (withs (septext (and (~blank url) (~blank text))
+                   s (create-story url (process-title title)
+                                   (unless septext text))
+                   c (if septext (create-comment s text)))
              (story-ban-test s url)
              (when (ignored (me)) (kill s 'ignored))
              (submit-item s)
+             (when c (submit-item c))
              (maybe-ban-ip s)
              "newest"))))
 
@@ -2010,7 +2006,8 @@
 (def create-story (url title text)
   (newslog 'create url (list title))
   (let s (inst 'item 'type 'story 'id (new-item-id)
-                     'url url 'title title 'text text
+                     'url url 'title title
+                     'text (only&md-from-form text t)
                      'by (me) 'ip (ip))
     (save-item s)
     (= (items* s!id) s)
