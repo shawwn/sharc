@@ -1062,7 +1062,14 @@
 ;;;; ============================================================
 
 (xdef system (cmd)
+  ;; give the child arc's current stdin, so e.g.
+  ;;   (fromstring "foo" (system "cat"))  prints "foo".
+  ;; *standard-input* may be the real fd-stream (the child inherits it,
+  ;; tty and all) or an in-memory stream like a string-input-stream
+  ;; (SBCL copies it to the child through a pipe in the background, so
+  ;; reading the child's output below can't deadlock against the write).
   (let* ((proc (sb-ext:run-program "/bin/sh" (list "-c" cmd)
+                                   :input *standard-input*
                                    :output :stream :wait nil))
          (out  (sb-ext:process-output proc)))
     (loop for c = (read-char out nil nil)
