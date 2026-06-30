@@ -2005,7 +2005,7 @@
 (= long-domains* '("blogspot" "wordpress" "livejournal" "blogs" "typepad" 
                    "weebly" "posterous" "blog-city" "supersized" "dreamhosters"
                    ; "sampasite"  "multiply" "wetpaint" ; all spam, just ban
-                   "eurekster" "blogsome" "edogo" "blog" "com"))
+                   "eurekster" "blogsome" "edogo" "ycombinator" "blog" "com"))
 
 (def create-story (url title text)
   (newslog 'create url (list title))
