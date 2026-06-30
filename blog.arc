@@ -70,7 +70,8 @@
 
 (def edit-page (p)
   (whitepage
-    (vars-form `((string title ,p!title t t) (text text ,p!text t t))
+    (vars-form `((string title ,p!title t t)
+                 (text   text  ,p!text  t t))
                (fn (name val) (= (p name) val))
                {do (save-post p)
                    (permalink p)})))
