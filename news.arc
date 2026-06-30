@@ -2248,23 +2248,25 @@
 (def item-api (id)
   (w/me nil
     (whenlet i (safe-item id)
-      (when (news-type i)
-        (obj by          i!by
-             dead        (~live i)
-             deleted     i!deleted
-             descendants (if (in i!type 'story 'poll)
-                             (- (visible-family i) 1))
-             id          i!id
-             kids        (keep cansee:item i!kids)
-             parent      (if (~in i!type 'pollopt) i!parent)
-             parts       (keep cansee:item i!parts)
-             poll        (if (in i!type 'pollopt) i!parent)
-             score       (if (cansee-score i) (scoreof i))
-             text        (check i!text ~empty)
-             time        i!time
-             title       (check i!title ~empty)
-             type        i!type
-             url         (check i!url ~empty))))))
+      (let del i!deleted
+        (when (news-type i)
+          (obj by          (unless del i!by)
+               dead        (unless del (~live i))
+               deleted     i!deleted
+               descendants (unless del
+                             (if (in i!type 'story 'poll)
+                               (- (visible-family i) 1)))
+               id          i!id
+               kids        (unless del (keep cansee:item i!kids))
+               parent      (if (~in i!type 'pollopt) i!parent)
+               parts       (unless del (keep cansee:item i!parts))
+               poll        (if (in i!type 'pollopt) i!parent)
+               score       (unless del (if (cansee-score i) (scoreof i)))
+               text        (unless del (check i!text ~empty))
+               time        i!time
+               title       (unless del (check i!title ~empty))
+               type        i!type
+               url         (unless del (check i!url ~empty))))))))
 
 (or= baditemreqs* (table))
 
