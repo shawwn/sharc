@@ -1082,8 +1082,15 @@
   ;; one Arc char.  Matches the file I/O defaults (see infile/outfile)
   ;; and keeps UTF-8 subprocess output round-trippable through Latin-1
   ;; files (each byte preserved literally).
+  ;;
+  ;; :input *standard-input* mirrors (system): the child gets arc's
+  ;; current stdin.  A real fd-stream is inherited; an in-memory stream
+  ;; (e.g. fromstring's) is copied to the child in the background, which
+  ;; works even though the caller reads our returned stream later -- SBCL
+  ;; captured the stream here and feeds it independently of the binding.
   (sb-ext:process-output
    (sb-ext:run-program "/bin/sh" (list "-c" cmd)
+                       :input *standard-input*
                        :output :stream :wait nil
                        :external-format :latin-1)))
 
