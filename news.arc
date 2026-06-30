@@ -591,14 +591,9 @@
       (pr ")"))
     (pr " | "))
   (if (me)
-      (tag (span id 'logout)
-        (urlink 'logout (logout-user) whence))
-      (tag (span id 'login)
-        (onlink "login"
-          (login-page 'both nil
-                      (list {do (ensure-news-user)
-                                (newslog 'top-login)}
-                            whence))))))
+      (link "logout" (string "logout?goto=" (urlencode:safe-goto whence)
+                             "&auth=" (auth-for (me) "logout")))
+      (link "login" (string "login?goto=" (urlencode:safe-goto whence)))))
 
 (= noob-days* 7) ; how long a user's name is colored green
 
@@ -1265,55 +1260,6 @@
              (logvote i)
              whence)
          (flink {pr "Can't make that vote."}))))
-
-
-; Safe redirects.
-
-; A goto value comes straight from the query string, so before using it
-; as a redirect target we make sure it points back into the site (a
-; relative path, no scheme or //host).  Otherwise action links like
-; hide could be turned into open redirects to phishing pages.
-
-; goto arrives already url-decoded (parseargs decodes every query value),
-; so we don't decode it again here.
-
-(def safe-goto (goto (o default "news"))
-  (if (and goto (relative-url goto)) goto default))
-
-(def relative-url (s)
-  (and (~blank s)
-       (~begins s "/")             ; rejects "/path" and protocol-relative "//host"
-       (~find #\\ s)
-       (let colon (pos #\: s)
-         (or (no colon)            ; no scheme at all, or
-             (aand (pos #\/ s)     ; the ':' only appears after the first '/'
-                   (< it colon))))))
-
-
-; Auth tokens.
-
-; Per-user token for authenticating action links (e.g. hide).  Derived
-; from a server secret so it can't be forged, stable per user so links
-; keep working across restarts, and (unlike the cookie) safe to put in a
-; url.
-
-(diskvar hmac-key* (+ newsdir* "hmac-key"))
-
-(def auth-key ()
-  (or hmac-key*
-      (do (= hmac-key* (rand-string 64))
-          (todisk hmac-key*)
-          hmac-key*)))
-
-; The token is bound to the user and the item id, so a token issued for
-; one story can't be replayed to act on another.  It's the same for hide
-; and un-hide of a given item (the un flag isn't part of the token).
-
-(def auth-for (user id)
-  (and user (downcase (sha1::hmac-sha1-hex (auth-key) (string user "/" id)))))
-
-(def good-auth (user id auth)
-  (and user auth (is auth (auth-for user id))))
 
 
 ; Hiding.
@@ -3218,6 +3164,9 @@ first asterisk isn't whitespace.
       (do (set-pw user newpw)
           "news")))
 
+(defhook login ()
+  (ensure-news-user)
+  (newslog 'top-login))
 
 (when (main)
   (nsv)
