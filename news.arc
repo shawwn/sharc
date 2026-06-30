@@ -2517,7 +2517,7 @@
   (catch
     (each k parent!kids
       (whenlet i (item k)
-        (when (and (cansee i) (me i!by) (is (unmarkdown i!text) text))
+        (when (and (me i!by) (cansee i) (is (unmarkdown i!text) text))
           (throw i))))))
 
 (def bad-user ((t u me))
