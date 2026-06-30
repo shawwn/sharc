@@ -1289,13 +1289,11 @@
 ; hn.js reads id/how/auth/goto from the vote link's href.
 
 (def vote-url (i dir whence)
-  (let whence (if (begins whence "item")
-                  (string whence "#" i!id)
-                  whence)
-    (+ "vote?id=" i!id
-              "&how=" dir
-              (aif (me) (+ "&auth=" (auth-for it i!id)))
-              "&goto=" (urlencode whence))))
+  (+ "vote?id=" i!id
+     "&how=" dir
+     (aif (me) (+ "&auth=" (auth-for it i!id)))
+     "&goto=" (urlencode (string whence (if (begins whence "item")
+                                            (string "#" i!id))))))
 
 (= lowest-score* -4)
 
