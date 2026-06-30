@@ -256,6 +256,22 @@ Connection: close"))
 
 (or= max-age*      (table))
 
+(def prheader (name . value)
+  (w/stdout (the headers)
+    (apply prn name ": " (keep idfn value))))
+
+(def flush-headers ()
+  (aif (errsafe:inside (the headers)) (pr it))
+  (= (the headers) (stdout))
+  nil)
+
+(mac responding (headers . body)
+  `(do (set (the responded))
+       (prn ,headers)
+       (flush-headers)
+       ,@body
+       nil))
+
 (def respond (str op args cooks ip)
   (w/stdout str
     (iflet f (srvops* op)
@@ -268,22 +284,19 @@ Connection: close"))
              (= (the req) req
                 (the ip)  ip
                 (the op)  (string op)
-                (the me)  (errsafe (get-user)))
+                (the me)  (errsafe (get-user))
+                (the headers) (outstring)
+                (the responded) nil)
              (if (redirector* op)
-                 (do (prn rdheader*)
-                     ; an empty location (e.g. a blank whence) or a
-                     ; location like ?p=2 would make the browser
-                     ; reload /y itself; send it home instead
-                     (prn "Location: " (let loc (f str req)
-                                         (if (or (empty loc)
-                                                 (is (pos #\? loc) 0))
-                                             (string "/" loc)
-                                             loc)))
-                     (prn))
-                 (do (prn header*)
-                     (awhen (max-age* op)
-                       (prn "Cache-Control: max-age=" it))
-                     (f str req))))
+                 (whenlet loc (default-loc (f str req))
+                   (unless (the responded)
+                     (responding rdheader*
+                       (prn "Location: " loc)
+                       (prn))))
+                 (responding header*
+                   (awhen (max-age* op)
+                     (prn "Cache-Control: max-age=" it))
+                   (f str req))))
            (let filetype (static-filetype op)
              (aif (and filetype (file-exists (string staticdir* op)))
                   (do (prn (or (type-header* filetype)
@@ -295,6 +308,16 @@ Connection: close"))
                         (whilet b (readb i)
                           (writeb b str))))
                   (respond-err str unknown-msg*))))))
+
+(def default-loc (loc)
+  ; an empty location (e.g. a blank whence) or a
+  ; location like ?p=2 would make the browser
+  ; reload /y itself; send it home instead
+  (when loc
+    (if (or (empty loc)
+            (is (pos #\? loc) 0))
+        (string "/" loc)
+        loc)))
 
 (def static-filetype (sym)
   (let fname (coerce sym 'string)

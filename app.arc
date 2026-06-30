@@ -294,9 +294,10 @@
           (login-page switch msg afterward acct pw validate))))
 
 (def prcookie (cook)
-  (prn "Set-Cookie: user=" cook
-       "; Path=/; expires=Sun, 17-Jan-2038 19:14:07 GMT"
-       "; SameSite=Lax; Secure; HttpOnly"))
+  (prheader "Set-Cookie"
+            "user=" cook
+            "; Path=/; expires=Sun, 17-Jan-2038 19:14:07 GMT"
+            "; SameSite=Lax; Secure; HttpOnly"))
 
 (def pwfields ((o label "login") (o acct arg!acct) (o pw arg!pw))
   (inputs (acct username 20 acct
