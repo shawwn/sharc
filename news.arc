@@ -841,7 +841,8 @@
         (sp)
         (tag i
           (pr " (publicly visible)")))
-      (link "favorites" (favorites-url user))))
+      (tostring
+        (underlink "favorites" (favorites-url user)))))
 
 
 ; Main Operators
