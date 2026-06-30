@@ -761,10 +761,10 @@
 (= topcolor-threshold* 0)
 
 (= email-msg*
-  (+ "<font size=\"2\">"
-     "Only admins see your email below. To share publicly,"
-     " add to the 'about' box."
-     "</font>"))
+  (tostring
+    (tag (font size 2)
+      (pr "Only admins see your email below. To share publicly,"
+          " add to the 'about' box."))))
 
 (def user-fields (user)
   (withs (e (editor)
