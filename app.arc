@@ -568,9 +568,15 @@
                (iflet newi (parabreak s i (if (is i 0) 1 0))
                       (do (unless (is i 0) (pr "<p>"))
                           (= i (- newi 1)))
+                      (is (s i) #\\)
+                       ; a backslash escapes a following * into a literal
+                       ; asterisk; otherwise it's a literal backslash.
+                       (if (and (~atend i s) (is (s (+ i 1)) #\*))
+                           (do (pr #\*) (++ i))
+                           (pr #\\))
                       (and (is (s i) #\*)
-                           (or ital 
-                               (atend i s) 
+                           (or ital
+                               (atend i s)
                                (and (~whitec (s (+ i 1)))
                                     (pos #\* s (+ i 1)))))
                        (do (pr (if ital "</i>" "<i>"))
@@ -705,6 +711,10 @@
            (awhen (findsubseq "</code></pre>" s (+ i 12))
              (pr (uneschtml (cut s (+ i 11) it)))
              (= i (+ it 12)))
+          (is (s i) #\*)
+           ; a literal asterisk in the html (i.e. not an <i>/</i> tag)
+           ; must be escaped so it re-renders as a literal, not italics.
+           (pr "\\*")
           (let (c newi) (uneschtml-char s i)
             (writec c)
             (= i (- newi 1)))))))

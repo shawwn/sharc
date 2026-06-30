@@ -1053,13 +1053,28 @@ c"
   (test? "<a> & \"x\" '/'"
          (uneschtml "&lt;a&gt; &amp; &quot;x&quot; &#x27;&#x2F;&#x27;")))
 
+(define-test markdown-escape
+  ; a backslash escapes a following * into a literal asterisk
+  (test? "<i>foo</i>"     (markdown "*foo*"))
+  (test? "*foo*"          (markdown "\\*foo\\*"))
+  (test? "<i>foo*</i>"    (markdown "*foo\\**"))
+  (test? "* foo*"         (markdown "\\* foo\\*"))
+  ; \\ is a literal backslash, then the next \* escapes the asterisk
+  (test? "<i>foo\\*bar</i>" (markdown "*foo\\\\*bar*"))
+  ; a backslash before anything but * is just a literal backslash
+  (test? "\\baz"          (markdown "\\baz")))
+
 (define-test markdown-roundtrip
   ; markdown -> unmarkdown should recover the original text, including
   ; slashes, angle brackets, ampersands, and quotes
   (each s (list "path /a/b and it's <fine> & \"ok\""
                 "http://x.com/p?q=1&r=2"
                 "plain text no specials")
-    (test? s (unmarkdown (markdown s)))))
+    (test? s (unmarkdown (markdown s))))
+  ; re-rendering an unmarkdown'd doc reproduces the same html, so
+  ; escaped asterisks survive an edit round-trip
+  (each html (list "<i>foo</i>" "*foo*" "<i>foo*</i>" "* foo*")
+    (test? html (markdown (unmarkdown html)))))
 
 (when (main)
   (run-tests))
