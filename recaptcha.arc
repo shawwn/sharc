@@ -41,15 +41,15 @@
 
 (or= acct-creations* (table))
 
-(def note-acct-creation (ip (o t (seconds)))
+(def note-acct-creation ((t ip) (o t (seconds)))
   ; record a creation and prune entries older than the look-back window.
   (= (acct-creations* ip)
      (cons t (keep [> _ (- t recaptcha-day*)] (acct-creations* ip)))))
 
-(def recent-acct-creations (ip (o now (seconds)))
+(def recent-acct-creations ((t ip) (o now (seconds)))
   (len (keep [> _ (- now recaptcha-day*)] (acct-creations* ip))))
 
-(def recaptcha-required (ip)
+(def recaptcha-required ((t ip))
   ; true iff the feature is configured and this IP is at/over threshold.
   (whenlet cfg (recaptcha-keys)
     (>= (recent-acct-creations ip) cfg!threshold)))
@@ -68,7 +68,7 @@
 
 ; ----- server-side verification (siteverify) -----
 
-(def recaptcha-url (secret token (o ip))
+(def recaptcha-url (secret token (t ip))
   ; siteverify accepts GET query params.  urlencode emits only
   ; unreserved chars, so every value is shell-safe (no quote/space/
   ; semicolon survives) and the curl string can wrap the URL in single
@@ -78,7 +78,7 @@
           "&response="  (urlencode token)
           (if ip (string "&remoteip=" (urlencode ip)))))
 
-(def recaptcha-siteverify (secret token (o ip))
+(def recaptcha-siteverify (secret token (t ip))
   ; returns Google's raw JSON reply, or nil on any failure.  curl is a
   ; runtime dependency (already used by the scraper); self-contained
   ; here so this works without scrape.arc loaded.
@@ -88,7 +88,7 @@
         (string "curl -sS --max-time 15 '"
                 (recaptcha-url secret token ip) "'")))))
 
-(def recaptcha-pass (token (o ip) (o cfg (recaptcha-config)))
+(def recaptcha-pass (token (t ip) (o cfg (recaptcha-config)))
   ; fail closed: a missing token, network/curl error, or success=false
   ; all yield nil.  Only a genuine success=true returns t.
   (and cfg!secret token (~empty token)

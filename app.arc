@@ -170,13 +170,6 @@
       (hook 'login-form afterward acct pw)
       (br2))
     (when (in switch 'register 'both)
-      ; validate is set only when create-handler bounces a signup back
-      ; for a captcha (never on the initial form).  Like HN, the page
-      ; then prefaces the form with a bare "Validation required." and
-      ; shows the widget, the same regardless of why it bounced.
-      (when validate
-        (pr "Validation required.")
-        (br2))
       (login-form "Create Account" switch create-handler afterward acct pw
                   (and validate recaptcha-widget)))))
 
@@ -204,15 +197,11 @@
     ; an over-threshold IP must solve a captcha.  show it on any bounce
     ; back to the form (a POST), but never on the initial form (a GET);
     ; tokens are single-use, so even a username error needs a fresh one.
-    (let need-captcha (recaptcha-required (ip))
-      (if (and need-captcha
-               (no (recaptcha-pass (arg "g-recaptcha-response") (ip))))
-           (failed-login 'register nil afterward t)
-          (aif (bad-newacct user pw)
-               (failed-login 'register it afterward need-captcha)
-               (do (create-acct user pw)
-                   (note-acct-creation (ip))
-                   (login user (ip) (cook-user user) afterward)))))))
+    (aif (bad-newacct user pw)
+         (failed-login 'register it afterward (recaptcha-required))
+         (do (create-acct user pw)
+             (note-acct-creation)
+             (login user (ip) (cook-user user) afterward)))))
 
 (def login (user ip cookie afterward)
   (prcookie cookie)
@@ -275,7 +264,10 @@
   (dc-usernames* (downcase user)))
 
 (def bad-newacct (user pw)
-  (if (no (goodname user 2 15))
+  (if (and (recaptcha-required)
+           (~recaptcha-pass (arg "g-recaptcha-response")))
+       "Validation required."
+      (no (goodname user 2 15))
        "Usernames can only contain letters, digits, dashes and 
         underscores, and should be between 2 and 15 characters long.  
         Please choose another."
