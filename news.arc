@@ -2018,20 +2018,27 @@
     (push s stories*)
     s))
 
-(def register-story (s)
-  (unless (blank s!url)
-    (process-url s s!url)
+(def register-story (s (o url s!url) (o urlname (sitename url)))
+  (unless (blank url)
+    (process-url s url urlname)
     (todisk sitename->items*)
-    (register-url s s!url)))
+    (register-url s url)))
 
 (disktable sitename->items* (+ newsdir* "sitename-items"))
 
-(def process-url (i url)
-  (awhen (sitename url)
+(def process-url (i (o url i!url) (o urlname (sitename url)))
+  (awhen urlname
     (pushnew i!id (sitename->items* it))
     ; for e.g. "github.com/antirez", also register "github.com"
     (whenlet p (pos #\/ it)
       (pushnew i!id (sitename->items* (cut it 0 p))))))
+
+(def unregister-item (s (o url s!url) (o urlname (sitename url)))
+  (awhen urlname
+    (pull s!id (sitename->items* it))
+    (whenlet p (pos #\/ it)
+      (pull s!id (sitename->items* (cut it 0 p)))))
+  (todisk sitename->items*))
 
 
 ; Bans
@@ -2426,9 +2433,11 @@
                    (unless (ignore-edit i name val)
                      (when (and (is name 'dead) val (no i!dead))
                        (log-kill i))
+                     (= (i name) val)
                      (when (and (is name 'text) (acomment i))
                        (register-comment i (unmarkdown val)))
-                     (= (i name) val)))
+                     (when (and (is name 'url) (metastory i))
+                       (register-story i))))
                  {do (if (admin) (pushnew 'locked i!keys))
                      (save-item i)
                      (metastory&adjust-rank i)
