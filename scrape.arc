@@ -218,19 +218,6 @@
       (whenlet e (posmatch pat-close src s)
         (list (cut src s e) e)))))
 
-; ----- HTML entity decoding -----
-
-(def html-unescape (s)
-  (multisubst '(("&amp;"  "&")
-                ("&lt;"   "<")
-                ("&gt;"   ">")
-                ("&quot;" "\"")
-                ("&#x27;" "'")
-                ("&#x2F;" "/")
-                ("&#x3D;" "=")
-                ("&nbsp;" " "))
-              s))
-
 
 ; ----- Front page ordering -----
 ;
@@ -252,12 +239,12 @@
        (withs (inner (car it)
                m-url (between inner "<a href=\"" "\"" 0)
                m-title (and m-url (between inner ">" "</a>" (cadr m-url)))
-               url    (and m-url (html-unescape (car m-url))))
+               url    (and m-url (uneschtml (car m-url))))
          ; an "item?id=N" href on the title means this is an Ask/text
          ; submission with no external URL.
          (when (and url (no (begins url "item?id=")))
            (= rec!url url))
-         (when m-title (= rec!title (html-unescape (car m-title)))))))
+         (when m-title (= rec!title (uneschtml (car m-title)))))))
 
 (def parse-subtext-row! (html start rec open-pat close-pat)
   (aif (between html open-pat close-pat start)
@@ -318,7 +305,7 @@
         (parse-titleline! html p rec)
         (parse-subtext-row! html p rec "<td class=\"subtext\">" "</tr>")
         (aif (between html "<div class=\"toptext\">" "</div>" p)
-             (= rec!text (html-unescape (car it))))))
+             (= rec!text (uneschtml (car it))))))
     rec))
 
 (def parse-comments (html story-id)
@@ -383,7 +370,7 @@
            (let inner (car it)
              ; strip the "c00\">" prefix
              (aif (posmatch ">" inner)
-                  (= rec!text (html-unescape (trim (cut inner (+ it 1)) 'end))))))
+                  (= rec!text (uneschtml (trim (cut inner (+ it 1)) 'end))))))
       rec)))
 
 

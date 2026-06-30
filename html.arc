@@ -368,23 +368,49 @@
        ,@body
        (pr "]]>")))
 
+(def eschtml-char (c)
+  (case c
+    #\<  "&lt;"
+    #\>  "&gt;"
+    #\&  "&amp;"
+    #\"  "&quot;"
+    #\'  "&#x27;"
+    #\/  "&#x2F;"
+    c))
+
+(def uneschtml-char (s (o i))
+  (if (litmatch "&lt;" s i)   (list #\< (+ i 4))
+      (litmatch "&gt;" s i)   (list #\> (+ i 4))
+      (litmatch "&amp;" s i)  (list #\& (+ i 5))
+      (litmatch "&quot;" s i) (list #\" (+ i 6))
+      (litmatch "&#x27;" s i) (list #\' (+ i 6))
+      (litmatch "&#x2F;" s i) (list #\/ (+ i 6))
+                              (list (s i) (+ i 1))))
+
+
 (def eschtml (str)
   (tostring 
     (each c str
-      (pr (case c #\<  "&#60;" 
-                  #\>  "&#62;"
-                  #\"  "&#34;"
-                  #\'  "&#39;"
-                  #\&  "&#38;"
-                        c)))))
+      (pr (eschtml-char c)))))
 
 (def esc-tags (str)
   (tostring 
     (each c str
-      (pr (case c #\<  "&#60;" 
-                  #\>  "&#62;"
-                  #\&  "&#38;"
+      (pr (case c #\<  "&lt;"
+                  #\>  "&gt;"
+                  #\&  "&amp;"
                         c)))))
+
+(def uneschtml (str)
+  (multisubst '(("&amp;"  "&")
+                ("&lt;"   "<")
+                ("&gt;"   ">")
+                ("&quot;" "\"")
+                ("&#x27;" "'")
+                ("&#x2F;" "/")
+                ("&#x3D;" "=")
+                ("&nbsp;" " "))
+              str))
 
 (def nbsp () (pr "&nbsp;"))
 

@@ -1037,5 +1037,29 @@ c"
     (test? "{\"about\":\"hi\",\"flag\":true,\"id\":\"pg\",\"karma\":157316,\"submitted\":[1,2,3]}"
            (tostring (to-json h)))))
 
+(define-test html-escape
+  ; eschtml encodes the special chars as named/hex entities
+  (test? "&lt;a&gt;"            (eschtml "<a>"))
+  (test? "&amp;"               (eschtml "&"))
+  (test? "&quot;&#x27;&#x2F;"   (eschtml "\"'/"))
+  ; esc-tags only touches < > &
+  (test? "&lt;a&gt;&amp;\"'/"   (esc-tags "<a>&\"'/"))
+  ; every char eschtml-char escapes round-trips back through uneschtml-char
+  (each c '(#\< #\> #\& #\" #\' #\/)
+    (let (back end) (uneschtml-char (eschtml-char c) 0)
+      (test? c back)
+      (test? (len (eschtml-char c)) end)))
+  ; uneschtml decodes a whole string (the / case regressed twice before)
+  (test? "<a> & \"x\" '/'"
+         (uneschtml "&lt;a&gt; &amp; &quot;x&quot; &#x27;&#x2F;&#x27;")))
+
+(define-test markdown-roundtrip
+  ; markdown -> unmarkdown should recover the original text, including
+  ; slashes, angle brackets, ampersands, and quotes
+  (each s (list "path /a/b and it's <fine> & \"ok\""
+                "http://x.com/p?q=1&r=2"
+                "plain text no specials")
+    (test? s (unmarkdown (markdown s)))))
+
 (when (main)
   (run-tests))

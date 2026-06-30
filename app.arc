@@ -553,7 +553,7 @@
 ; http://daringfireball.net/projects/markdown/syntax
 
 (def md-from-form (str (o nolinks))
-  (markdown (trim (rem #\return (esc-tags str)) 'end) 60 nolinks))
+  (markdown (trim (rem #\return str) 'end) 60 nolinks))
 
 (def markdown (s (o maxurl) (o nolinks))
   (let ital nil
@@ -562,7 +562,7 @@
         (iflet (newi spaces) (indented-code s i (if (is i 0) 2 0))
                (do (pr  "<p><pre><code>")
                  (let cb (code-block s (- newi spaces 1))
-                   (pr cb)
+                   (pr (eschtml cb))
                    (= i (+ (- newi spaces 1) (len cb))))
                  (pr "</code></pre>"))
                (iflet newi (parabreak s i (if (is i 0) 1 0))
@@ -583,7 +583,7 @@
                          (tag (a href url rel 'nofollow)
                            (pr (if (no maxurl) url (ellipsize url maxurl))))
                          (= i (- n 1)))
-                       (writec (s i))))))))
+                       (pr (eschtml-char (s i)))))))))
 
 (def indented-code (s i (o newlines 0) (o spaces 0))
   (let c (s i)
@@ -703,9 +703,11 @@
                  (writec (s i))))
           (litmatch "<pre><code>" s i)
            (awhen (findsubseq "</code></pre>" s (+ i 12))
-             (pr (cut s (+ i 11) it))
+             (pr (uneschtml (cut s (+ i 11) it)))
              (= i (+ it 12)))
-          (writec (s i))))))
+          (let (c newi) (uneschtml-char s i)
+            (writec c)
+            (= i (- newi 1)))))))
 
 
 (def english-time (min)
