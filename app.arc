@@ -638,11 +638,6 @@
 ; Returns the index of the first char not part of the url beginning
 ; at i, or len of string if url goes all the way to the end.
 
-; Note that > immediately after a url (http://foo.com>) will cause
-; an odd result, because the > gets escaped to something beginning
-; with &, which is treated as part of the url.  Perhaps the answer
-; is just to esc-tags after markdown instead of before.
-
 ; Treats a delimiter as part of a url if it is (a) an open delimiter
 ; not followed by whitespace or eos, or (b) a close delimiter 
 ; balancing a previous open delimiter.
