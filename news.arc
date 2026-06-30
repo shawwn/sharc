@@ -2496,17 +2496,29 @@
 ; the vals coming in from any form, e.g. in aform.
 
 (def process-comment (parent text whence)
-  (if (~me)
-       (flink {comment-login-warning parent whence text})
-      (empty text)
-       (flink {addcomment-page parent whence text retry*})
-      (oversubmitting 'comment)
-       (flink {msgpage toofast*})
-       (atlet c (create-comment parent text)
-         (comment-ban-test c text comment-kill* comment-ignore*)
-         (if (bad-user) (kill c 'ignored/karma))
-         (submit-item c)
-         (string whence "#" c!parent))))
+  (aif (~me)
+        (flink {comment-login-warning parent whence text})
+       (empty text)
+        (flink {addcomment-page parent whence text retry*})
+       (oversubmitting 'comment)
+        (flink {msgpage toofast*})
+       (find-duplicate-comment parent (normalize-text text))
+        (string whence "#" it!id)
+        (atlet c (create-comment parent text)
+          (comment-ban-test c text comment-kill* comment-ignore*)
+          (if (bad-user) (kill c 'ignored/karma))
+          (submit-item c)
+          (string whence "#" c!parent))))
+
+(def normalize-text (text)
+  (unmarkdown (md-from-form text)))
+
+(def find-duplicate-comment (parent text)
+  (catch
+    (each k parent!kids
+      (whenlet i (item k)
+        (when (and (cansee i) (me i!by) (is (unmarkdown i!text) text))
+          (throw i))))))
 
 (def bad-user ((t u me))
   (or (ignored u) (< (karma u) comment-threshold*)))
