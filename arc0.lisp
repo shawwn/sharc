@@ -934,18 +934,117 @@
                    (if ssl 443 80))))
     (values host port path ssl)))
 
+;; The HTTP response is read as raw octets and only decoded to characters
+;; after the transfer framing has been removed.  Decoding earlier (e.g.
+;; per SSL_read buffer, as stream-read-char does) breaks on multi-byte
+;; UTF-8 characters that straddle a chunk boundary or a transport read
+;; boundary: the leading byte ends up followed by chunk framing (CRLF, a
+;; hex size, CRLF) instead of its continuation bytes.
+
+(defun http-slurp-octets (stream)
+  "Read the entire response from STREAM into a fresh adjustable
+   (unsigned-byte 8) vector, with no character decoding."
+  (let ((out (make-array 8192 :element-type '(unsigned-byte 8)
+                              :adjustable t :fill-pointer 0)))
+    (if (typep stream 'arc-ssl-stream)
+        ;; Read raw bytes straight from SSL, bypassing the stream's
+        ;; per-buffer UTF-8 decoding.
+        (let ((buf (make-array 8192 :element-type '(unsigned-byte 8))))
+          (sb-sys:with-pinned-objects (buf)
+            (loop for n = (ssl-read (ssl-stream-ssl stream)
+                                    (sb-sys:vector-sap buf) 8192)
+                  while (> n 0)
+                  do (dotimes (i n) (vector-push-extend (aref buf i) out)))))
+        ;; Plain socket: bivalent stream (:element-type :default), so we
+        ;; can read raw bytes to EOF.
+        (loop for b = (read-byte stream nil nil)
+              while b do (vector-push-extend b out)))
+    out))
+
+(defun octets->latin1 (v start end)
+  "Decode V[start:end] as latin-1 (one octet = one char).  Used for the
+   ASCII header block, where every octet maps to itself."
+  (sb-ext:octets-to-string v :start start :end end :external-format :latin-1))
+
+(defun octets-find-crlf (v start)
+  "Index of the CR of the first CRLF at or after START, or nil."
+  (loop for i from start below (1- (length v))
+        when (and (= (aref v i) 13) (= (aref v (1+ i)) 10))
+          return i))
+
+(defun octets-find-crlfx2 (v)
+  "Index of the CR of the first CRLFCRLF (header terminator), or nil."
+  (loop for i from 0 below (- (length v) 3)
+        when (and (= (aref v i) 13) (= (aref v (+ i 1)) 10)
+                  (= (aref v (+ i 2)) 13) (= (aref v (+ i 3)) 10))
+          return i))
+
+(defun split-crlf (str)
+  "Split STR on CRLF into a list of lines."
+  (let ((crlf (coerce (list #\return #\newline) 'string)))
+    (loop with start = 0
+          for pos = (search crlf str :start2 start)
+          collect (subseq str start (or pos (length str)))
+          while pos
+          do (setf start (+ pos 2)))))
+
+(defun parse-http-headers (header-str)
+  "Alist of (lowercased-name . value) for the header block, excluding the
+   status line."
+  (let ((result '()))
+    (dolist (line (cdr (split-crlf header-str)) (nreverse result))
+      (let ((colon (position #\: line)))
+        (when colon
+          (push (cons (string-downcase (string-trim '(#\space #\tab)
+                                                    (subseq line 0 colon)))
+                      (string-trim '(#\space #\tab) (subseq line (1+ colon))))
+                result))))))
+
+(defun dechunk-octets (body)
+  "Decode a chunked transfer-encoding payload (octet vector) into a fresh
+   octet vector with the chunk framing removed."
+  (let ((out (make-array (length body) :element-type '(unsigned-byte 8)
+                                       :adjustable t :fill-pointer 0))
+        (i 0)
+        (len (length body)))
+    (loop
+      (let ((line-end (octets-find-crlf body i)))
+        (unless line-end (return))
+        (let* ((size-str (octets->latin1 body i line-end))
+               (semi (position #\; size-str)) ; ignore chunk extensions
+               (size (parse-integer size-str :radix 16 :junk-allowed t
+                                    :end (or semi (length size-str)))))
+          (when (or (null size) (zerop size)) (return)) ; last/invalid chunk
+          (setf i (+ line-end 2))             ; past the size line's CRLF
+          (loop for k from 0 below size
+                while (< i len)
+                do (vector-push-extend (aref body i) out)
+                   (incf i))
+          (setf i (+ i 2)))))                 ; past the chunk data's CRLF
+    out))
+
 (defun http-parse-response (raw)
-  "Split an HTTP response into (values status-code headers body)."
-  (let* ((header-end (search (format nil "~C~C~C~C"
-                                     #\return #\newline #\return #\newline)
-                             raw))
-         (header-str (subseq raw 0 header-end))
-         (body (subseq raw (+ header-end 4)))
-         (first-line-end (position #\return header-str))
-         (status-line (subseq header-str 0 first-line-end))
-         ;; "HTTP/1.1 200 OK" -> 200
-         (status-code (parse-integer status-line :start 9 :end 12)))
-    (values status-code header-str body)))
+  "RAW is an (unsigned-byte 8) vector holding a full HTTP response.  Return
+   (values status-code header-string body-octets), with any chunked
+   transfer-encoding decoded and the body trimmed to Content-Length when
+   present.  BODY-OCTETS is left undecoded."
+  (let ((header-end (octets-find-crlfx2 raw)))
+    (unless header-end
+      (error "Malformed HTTP response: no header terminator"))
+    (let* ((header-str (octets->latin1 raw 0 header-end))
+           (body (subseq raw (+ header-end 4)))
+           (headers (parse-http-headers header-str))
+           (status-line (car (split-crlf header-str)))
+           ;; "HTTP/1.1 200 OK" -> 200
+           (status-code (parse-integer status-line :start 9 :end 12))
+           (te (cdr (assoc "transfer-encoding" headers :test #'string=)))
+           (cl (cdr (assoc "content-length" headers :test #'string=))))
+      (cond ((and te (search "chunked" (string-downcase te)))
+             (setf body (dechunk-octets body)))
+            (cl (let ((n (parse-integer cl :junk-allowed t)))
+                  (when (and n (< n (length body)))
+                    (setf body (subseq body 0 n))))))
+      (values status-code header-str body))))
 
 (defun arc-http-fetch (url &optional opts)
   "Fetch URL via HTTP. Returns the response body as a string.
@@ -1000,16 +1099,16 @@
              ;; Body
              (when reqbody (write-string reqbody stream))
              (force-output stream)
-             ;; Read response
-             (let ((raw (with-output-to-string (buf)
-                          (loop for c = (read-char stream nil nil)
-                                while c do (write-char c buf)))))
+             ;; Read response as raw octets; decode only after the transfer
+             ;; framing is stripped (see http-slurp-octets / http-parse-response).
+             (let ((raw (http-slurp-octets stream)))
                (multiple-value-bind (code headers body)
                    (http-parse-response raw)
                  (declare (ignore headers))
                  (unless (<= 200 code 299)
                    (error "HTTP ~D from ~A" code url))
-                 body)))
+                 (sb-ext:octets-to-string
+                  body :external-format '(:utf-8 :replacement #\?)))))
         (close stream)))))
 
 (xdef http-fetch (url &rest args)
