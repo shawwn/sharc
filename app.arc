@@ -190,7 +190,7 @@
   (with (user arg!acct pw arg!pw)
     (logout-user)
     (aif (bad-newacct user pw)
-         (failed-login switch it afterward)
+         (failed-login 'register it afterward)
          (do (create-acct user pw)
              (login user (ip) (cook-user user) afterward)))))
 
