@@ -162,7 +162,8 @@
 ; classic example of something that should just "return" a val
 ; via a continuation rather than going to a new page.
 
-(def login-page (switch (o msg nil) (o afterward hello-page) (o acct arg!acct) (o pw arg!pw) (o validate))
+(def login-page (switch (o msg nil) (o afterward hello-page)
+                        (o acct arg!acct) (o pw arg!pw) (o validate))
   (whitepage
     (pagemessage msg)
     (when (in switch 'login 'both)
@@ -173,7 +174,8 @@
       (login-form "Create Account" switch create-handler afterward acct pw
                   (and validate recaptcha-widget)))))
 
-(def login-form (label switch handler afterward (o acct arg!acct) (o pw arg!pw) (o extra))
+(def login-form (label switch handler afterward
+                       (o acct arg!acct) (o pw arg!pw) (o extra))
   (prbold label)
   (br2)
   ; extra, if given, is a thunk rendered inside the form after the
@@ -214,7 +216,8 @@
       (do (prn)
           (afterward))))
 
-(def failed-login (switch msg afterward (o validate) (o acct arg!acct) (o pw arg!pw))
+(def failed-login (switch msg afterward (o validate)
+                    (o acct arg!acct) (o pw arg!pw))
   (if (acons afterward)
       (flink {login-page switch msg afterward acct pw validate})
       (do (prn)
