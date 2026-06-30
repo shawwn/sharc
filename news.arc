@@ -282,10 +282,9 @@
 
 (mac each-loaded-item (var . body)
   (w/uniq g
-    `(let ,g nil
-       (loop (= ,g maxid*) (> ,g 0) (-- ,g)
-         (whenlet ,var (items* ,g)
-           ,@body)))))
+    `(each ,g (sort > (keys items*))
+       (whenlet ,var (items* ,g)
+         ,@body))))
 
 (def loaded-items (test)
   (accum a (each-loaded-item i (test&a i))))
