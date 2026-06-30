@@ -746,6 +746,8 @@
                (fn (name val)
                  (when (and (is name 'ignore) val (no prof!ignore))
                    (log-ignore user 'profile))
+                 (when (and (is name 'topcolor) (is val (hexrep site-color*)))
+                   (wipe val))
                  (= (prof name) val))
                {do (save-prof user)
                    (user-url user)})))
