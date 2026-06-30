@@ -6,8 +6,10 @@ A review-and-commit session: the user staged changes one at a time and
 asked "what do you think of the staged changes?" for each, iterating on
 a few until they were correct, then had each land as its own commit.
 Several review rounds caught real bugs before they were committed (see
-Key decisions). Session range on `main`: `6064950..f6f4a41` (parent
-`6064950` was the prior handoff's last commit). Interleaved with two
+Key decisions). Session range on `main`: `6064950..41b0d9a` (parent
+`6064950` was the prior handoff's last commit; `41b0d9a` was added in a
+later review-and-commit pass that finished the markdown url escaping).
+Interleaved with two
 user-made commits (`44bcc3d` the prior handoff doc, `d5a8009` a
 `vote-url` refactor). Themes: JSON encoder pretty-printing; consolidate
 HTML entity escaping/unescaping; backslash- and `**`-escaping of
@@ -59,6 +61,17 @@ endpoints.
   `?print=pretty` (case-insensitive, via `downcase arg!print`). New
   `scoreof` helper extracted from `itemscore` (pollopt-aware score),
   reused by `item-api`'s `score` field.
+- **`41b0d9a`** `app.arc`: the URL branch of `markdown`/`unmarkdown` now
+  follows the same output-time escaping as `c01406d`. Inline urls run
+  through `eschtml` (preserving `"`/`<`/`>`/`&` as entities, and escaping
+  the visible link text) instead of `clean-url` (which silently stripped
+  those chars); `ellipsize` runs on the **raw** url *before* escaping so
+  truncation can't split an entity. `markdown` now uses the `link` helper
+  rather than an inline `(tag (a ...))`, which intentionally **drops
+  `rel=nofollow`** on inline urls to match HN behavior (story links in
+  `news.arc:1246,2695` keep their nofollow). `unmarkdown` decodes the
+  href via `uneschtml` so urls round-trip. Covered by the existing
+  `markdown-roundtrip` test (`http://x.com/p?q=1&r=2`).
 
 ## Key decisions
 
