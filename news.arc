@@ -2261,7 +2261,7 @@
                              (if (in i!type 'story 'poll)
                                (- (visible-family i) 1)))
                id          i!id
-               kids        (unless del (keep cansee:item i!kids))
+               kids        (unless del (map !id (keep cansee (ranked-kids i))))
                parent      (if (~in i!type 'pollopt) i!parent)
                parts       (unless del (keep cansee:item i!parts))
                poll        (if (in i!type 'pollopt) i!parent)
