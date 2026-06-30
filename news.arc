@@ -2171,8 +2171,8 @@
   (let p (inst 'item 'type 'poll 'id (new-item-id)
                      'title title 'text text
                      'by (me) 'ip (ip))
-    (= p!parts (map get!id (map [create-pollopt p nil nil _]
-                                (paras opts))))
+    (= p!parts (map !id (map [create-pollopt p nil nil _]
+                             (paras opts))))
     (save-item p)
     (= (items* p!id) p)
     (push p stories*)
