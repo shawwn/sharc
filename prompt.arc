@@ -4,11 +4,17 @@
 
 (defop prompt
   (if (admin)
-      (prompt-page)
+      (prompt-page arg!msg)
       (pr "Sorry.")))
 
+(def prompt-url msg
+  (let m (apply string msg)
+    (if (empty m)
+        "prompt"
+        (string "prompt?msg=" (urlencode m)))))
+
 (def prompt-page msg
-  (let user (me)
+  (withs (user (me) m (apply string msg))
     (ensure-dir appdir*)
     (ensure-dir (string appdir* user))
     (whitepage
@@ -16,7 +22,7 @@
       (hspace 20)
       (pr user " | ")
       (link "logout")
-      (when msg (hspace 10) (apply pr msg))
+      (unless (blank m) (hspace 10) (pr:eschtml m))
       (br2)
       (tag (table border 0 cellspacing 10)
         (each app (dir (+ appdir* user))
@@ -26,9 +32,9 @@
               (td (hspace 40)
                   (ulink 'delete (del-app  app))))))
       (br2)
-      (uform (aif (goodname arg!app)
-                  (edit-app it)
-                  (prompt-page "Bad name."))
+      (urform (aif (goodname arg!app)
+                   (responding header* (prn) (edit-app it))
+                   (prompt-url "Bad name."))
         (tab (row "name:" (input "app" nil 20) (submit "create app")))))))
 
 (def app-path (app (t user me))
@@ -47,9 +53,9 @@
 (def del-app (app)
   (tab
     (tr (td)
-        (td (uform (if (is arg!b "Yes")
-                       (rem-app app)
-                       (prompt-page))
+        (td (urform (if (is arg!b "Yes")
+                        (rem-app app)
+                        (prompt-url))
                (prn "Do you want program " app " to be deleted?")
                (br2)
                (but "Yes" "b") (sp) (but "No" "b"))))))
@@ -59,16 +65,16 @@
   (let file (app-path app)
     (if (file-exists file)
         (do (rmfile file)
-            (prompt-page "Program " app " deleted."))
-        (prompt-page "No such app."))))
+            (prompt-url "Program " app " deleted."))
+        (prompt-url "No such app."))))
 
 (def edit-app (app)
   (whitepage
     (pr "user: " (me) " app: " app)
     (br2)
-    (uform (do (when (is arg!cmd "save")
-                 (write-app app (readall arg!exprs)))
-               (prompt-page))
+    (urform (do (when (is arg!cmd "save")
+                  (write-app app (readall arg!exprs)))
+                (prompt-url))
       (textarea "exprs" 10 82
         (pprcode (read-app app)))
       (br2)
@@ -100,20 +106,20 @@
 
 (defop repl
   (if (admin)
-      (replpage)
+      (replpage "repl")
       (pr "Sorry.")))
 
-(def replpage ()
+(def replpage (whence)
   (whitepage
-    (replform (readall (or arg!expr "")) "repl")))
+    (replform (readall (or arg!expr "")) whence)))
 
-(def replform (exprs url)
+(def replform (exprs whence)
     (each expr exprs 
       (on-err (fn (c) (push (list expr c t) repl-history*))
               (fn () 
                 (= that (eval expr) thatexpr expr)
                 (push (list expr that) repl-history*))))
-    (form url
+    (form whence
       (textarea "expr" 8 60)
       (sp) 
       (submit))
