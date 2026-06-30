@@ -49,6 +49,7 @@
   topcolor   nil
   keys       nil
   hidden     nil   ; ids of items this user has hidden from their listings
+  favorites  nil   ; ids of items this user has marked as favorite
   delay      0)
 
 (deftem item
@@ -798,6 +799,7 @@
       (string  nil         ,(user-comments-link user)                t   nil)
       (string  nil         ,(user-hidden-link user)                 ,u   nil)
       (string  nil         ,(upvoted-links user)                    ,u   nil)
+      (string  nil         ,(favorited-links u user)                 t   nil)
       )))
 
 (def user-field (user)
@@ -827,6 +829,17 @@
       (underlink "upvoted submissions" (upvoted-url user))
       (pr " / ")
       (underlink "comments" (upvoted-url user t)))))
+
+(def favorited-links ((o u) (t user me))
+  (if u
+      (tostring
+        (underlink "favorite submissions" (favorites-url user))
+        (pr " / ")
+        (underlink "comments" (favorites-url user t))
+        (sp)
+        (tag i
+          (pr " (publicly visible)")))
+      (link "favorites" (favorites-url user))))
 
 
 ; Main Operators
@@ -1015,6 +1028,8 @@
   (pr " chosen by active users"))
 
 
+; Upvoted page
+
 (def voted-items (test (t user me))
   (keep test (keep [cansee _ user] (map item (keys:votes user)))))
 
@@ -1038,6 +1053,68 @@
                   [nexturl (upvoted-url user comments) _
                            (unless comments (+ (cur-n) perpage*))]))
       (pr "Can't display that.")))
+
+
+; Favorites
+
+(def favorite-items (test (t user me))
+  (keep test (keep [cansee _ user] (map item (uvar user favorites)))))
+
+(def favorites-url (user (o comments))
+  (string "favorites?id=" user (if comments "&comments=t")))
+
+(newsop favorites (id comments) 
+  (if (only&profile id)
+      (favorites-page id (in comments "t" "T"))
+      (pr "No such user.")))
+
+(def favorites-page (user comments)
+  (with (items (favorite-items (if comments acomment metastory) user)
+         title "@{user}'s favorites")
+    (w/the listpage-body
+           {tag (div style "margin-left:14px; margin-top:6px; margin-bottom:12px")
+             (w/bars
+               (link "submissions" (favorites-url user))
+               (link "comments" (favorites-url user t)))
+             (unless items
+               (para (string user " hasn't added any favorite "
+                             (if (in arg!comments "t" "T") 'comments 'submissions)
+                             " yet."))
+               (para "To add one to your own favorites, click on its timestamp"
+                     " to go to its page, then click 'favorite' at the top."))}
+      (listpage (msec) items "favorites" title
+                (nexturl (favorites-url user comments)) (no comments)
+                [nexturl (favorites-url user comments) _
+                         (unless comments (+ (cur-n) perpage*))]))))
+
+(def fave-url (id (o auth arg!auth) (o un (in arg!un "t" "T")))
+  (let auth (or auth (auth-for (or (me) "") id))
+    (string "fave?id=" (urlencode:string id)
+            (if un "&un=t")
+            (if auth (string "&auth=" (urlencode auth))))))
+
+; The (good-auth "" id auth) branch lets a favorite survive logging in:
+; the logged-out "favorite" link carries an auth token bound to "" (no
+; user), so after the login redirect the fave still goes through.  That
+; "" token is the same for every logged-out visitor, so it's effectively
+; public and lets an attacker CSRF a logged-in user into favoriting an
+; arbitrary item.  We accept that intentionally: favoriting is a benign,
+; public, easily-undone action, and keeping fave-on-login is worth it.
+
+(newsopr fave (id auth)
+  (let i (safe-item id)
+    (if (~me)
+         (string "login?goto=" (urlencode (fave-url id auth)))
+        (and i (or (good-auth (me) id auth)
+                   (good-auth "" id auth))) ; "" = fave on login (see above)
+         (do (set-favorite (me) id)
+             (favorites-url (me) (acomment i)))
+         (favorites-url (me)))))
+
+(def set-favorite (user id (o un (in arg!un "t" "T")))
+  (aand (safe-id id)
+        (do (= (mem it (uvar user favorites)) (no un))
+            (save-prof user))))
 
 
 ; Story Display
@@ -1089,9 +1166,10 @@
           (spanclass subline
             (hook 'itemline s)
             (itemline s whence)
-            (when (in s!type 'story 'poll) (commentlink s))
             (editlink s)
             (hidelink s whence)
+            (favelink s)
+            (when (in s!type 'story 'poll) (commentlink s))
             (when (apoll s) (addoptlink s))
             (unless i (flaglink s whence))
             (killlink s whence)
@@ -1477,6 +1555,14 @@
   (when (canedit i)
     (pr bar*)
     (link "edit" (edit-url i))))
+
+(def favelink (i)
+  (when (or (and (is (op) "item") (is arg!id (string i!id)))
+            (and (is (op) "favorites") (me) (is arg!id (me))))
+    (pr bar*)
+    (let un (and (me) (mem i!id (uvar (me) favorites)))
+      (link "@(if un 'un-)favorite"
+            (fave-url i!id (auth-for (or (me) "") i!id) un)))))
 
 (def addoptlink (p)
   (when (or (admin) (author p))
@@ -2485,6 +2571,7 @@
             (prevlink c whence)
             (nextlink c whence))
           (editlink c)
+          (favelink c)
           (let whenceid (if astree (string whence "#" c!id) whence)
             (killlink c whenceid)
             (blastlink c whenceid)
