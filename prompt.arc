@@ -85,11 +85,15 @@
     (br2)
     (tag xmp (pprcode (read-app app)))))
 
+(def report-prompt-error (c)
+  (br)
+  (tag pre
+    (report-error c (stdout))))
+
 (def run-app (app)
   (let exprs (read-app app)
     (if exprs
-        (on-err (fn (c) (pr "Error: " (details c)))
-          (fn () (map eval exprs)))
+        (on-err report-prompt-error {map eval exprs})
         (prompt-page "Error: No application " app " for user " (me)))))
 
 (wipe repl-history*)

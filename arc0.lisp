@@ -1322,35 +1322,50 @@
 ;;;; REPL
 ;;;; ============================================================
 
-(defvar *arc-last-err* nil)
+(defun arc-report-frame (frame &optional (stream *error-output*))
+  ;; Print frames under :invert readtable case so mixed-case
+  ;; symbol names (like arc--CAR) come out without |...| escapes.
+  ;; All-lowercase and all-uppercase names still print in their
+  ;; canonical form; only mixed-case ones change.
+  (let ((text (with-output-to-string (s)
+                (let ((*print-pretty* nil)
+                      (*readtable* (copy-readtable *readtable*)))
+                  (setf (readtable-case *readtable*) :invert)
+                  (sb-debug::print-frame-call frame s :number nil)))))
+    (format stream "~A~%" text)))
 
-(defun arc-report-error (c &optional (stream *error-output*))
-  (setf *arc-last-err* c)
-  (format stream "Error: ~A~%" c)
+(xdef report-frame #'arc-report-frame)
+
+(defun arc-map-backtrace (fn)
+  (sb-debug:map-backtrace fn))
+
+(xdef map-backtrace #'arc-map-backtrace)
+
+(defun arc-report-backtrace (&optional (stream *error-output*) (report-frame #'arc-report-frame))
   (format stream "Backtrace for: ~A~%" sb-thread:*current-thread*)
   (let ((i 0)
         (count 30)
         (stop nil))
-    (sb-debug:map-backtrace
+    (arc-map-backtrace
      (lambda (frame)
        (when (and (not stop) (< i count))
-         ;; Print frames under :invert readtable case so mixed-case
-         ;; symbol names (like arc--CAR) come out without |...| escapes.
-         ;; All-lowercase and all-uppercase names still print in their
-         ;; canonical form; only mixed-case ones change.
-         (let ((text (with-output-to-string (s)
-                       (let ((*print-pretty* nil)
-                             (*readtable* (copy-readtable *readtable*)))
-                         (setf (readtable-case *readtable*) :invert)
-                         (sb-debug::print-frame-call frame s :number nil)))))
-           (format stream "~D: ~A~%" i text)
-           (incf i)
-           (let ((name (sb-di:debug-fun-name (sb-di:frame-debug-fun frame))))
-             (when (and (symbolp name)
-                        (string= (symbol-name name) "ARC-BOOT"))
-               (setf stop t))))))))
+         (format stream "~D: " i)
+         (funcall report-frame frame stream)
+         (incf i)
+         (let ((name (sb-di:debug-fun-name (sb-di:frame-debug-fun frame))))
+           (when (and (symbolp name)
+                      (string= (symbol-name name) "ARC-BOOT"))
+             (setf stop t)))))))
   (terpri stream)
   (force-output stream))
+
+(xdef report-backtrace #'arc-report-backtrace)
+
+(defun arc-report-error (c &optional (stream *error-output*))
+  (format stream "Error: ~A~%" c)
+  (arc-report-backtrace stream))
+
+(xdef report-error #'arc-report-error)
 
 (defun arc-tl ()
   (format t "Use (quit) to quit.~%")
