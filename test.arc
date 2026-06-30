@@ -985,6 +985,23 @@ c"
   (test? "{\"a\":1,\"b\":2}"   (tostring (to-json (obj b 2 a 1))))
   (test? "{\"nest\":[1,2]}"    (tostring (to-json (obj nest '(1 2))))))
 
+(define-test json-encode-pretty
+  ; an empty object stays on one line (nil is always "null", not "[]")
+  (test? "{}" (tostring (to-json (table) t)))
+  ; default two-space indent
+  (test? "[\n  1,\n  2\n]"
+         (tostring (to-json '(1 2) t)))
+  (test? "{\n  \"a\": 1,\n  \"b\": 2\n}"
+         (tostring (to-json (obj b 2 a 1) t)))
+  ; nesting indents cumulatively
+  (test? "{\n  \"nest\": [\n    1,\n    2\n  ]\n}"
+         (tostring (to-json (obj nest '(1 2)) t)))
+  ; int gives that many spaces; string is used verbatim
+  (test? "[\n    1\n]"   (tostring (to-json '(1) 4)))
+  (test? "[\n\t1\n]"     (tostring (to-json '(1) "\t")))
+  ; no pretty arg stays compact
+  (test? "[1,2]" (tostring (to-json '(1 2)))))
+
 (define-test json-decode-primitives
   (test? nil   (from-json "null"))
   (test? t     (from-json "true"))

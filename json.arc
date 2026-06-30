@@ -1,7 +1,10 @@
 ; JSON encoder + decoder.
 ;
-;   (to-json x)        ; print x as JSON to current stdout
-;   (to-json x stream) ; print x as JSON to `stream`
+;   (to-json x)             ; print x as JSON to current stdout
+;   (to-json x nil stream)  ; print x as JSON to `stream`
+;   (to-json x t stream)    ; pretty-print, indenting with two spaces
+;   (to-json x 4 stream)    ; pretty-print, indenting with four spaces
+;   (to-json x "\t" stream) ; pretty-print, indenting with a string
 ;   (save-json x path) ; write x as JSON to a file (atomic via .tmp)
 ;   (from-json s)      ; parse string s into Arc values
 ;   (load-json path)   ; parse a JSON file
@@ -23,10 +26,23 @@
 
 ; ----- Encoder -----
 
-(def to-json (x (o stream (stdout)))
-  (w/stdout stream (json-write x)))
+; `pretty` controls indentation: nil (the default) produces compact
+; output; t indents each level by two spaces; an int indents by that
+; many spaces; a string is used verbatim as the per-level indent.
 
-(def json-write (x)
+(def to-json (x (o pretty) (o stream (stdout)))
+  (w/stdout stream (json-write x (json-indent-step pretty) "")))
+
+(def json-indent-step (pretty)
+  (if (no pretty)         nil
+      (is pretty t)       "  "
+      (isa pretty 'int)   (newstring pretty #\space)
+                          pretty))
+
+; `step` is the per-level indent string (nil for compact output) and
+; `ind` is the indentation accumulated so far.
+
+(def json-write (x (o step) (o ind ""))
   (if (no x)        (pr "null")
       (is x t)      (pr "true")
       (isa x 'int)  (pr x)
@@ -34,8 +50,8 @@
       (isa x 'string) (json-write-string x)
       (isa x 'sym)  (json-write-string (string x))
       (isa x 'char) (json-write-string (string x))
-      (isa x 'table)(json-write-object x)
-      (acons x)     (json-write-array x)
+      (isa x 'table)(json-write-object x step ind)
+      (acons x)     (json-write-array x step ind)
                     (json-write-string (string x))))
 
 (def json-write-string (s)
@@ -55,30 +71,48 @@
                        (writec c)))))
   (pr "\""))
 
-(def json-write-array (xs)
-  (pr "[")
-  (let first t
-    (each x xs
-      (if first (= first nil) (pr ","))
-      (json-write x)))
-  (pr "]"))
+(def json-write-array (xs (o step) (o ind ""))
+  (if (no xs)
+      (pr "[]")
+      (let ind2 (and step (+ ind step))
+        (pr "[")
+        (let first t
+          (each x xs
+            (if first (= first nil) (pr ","))
+            (json-newline step ind2)
+            (json-write x step ind2)))
+        (json-newline step ind)
+        (pr "]"))))
 
-(def json-write-object (h)
-  (pr "{")
-  (let first t
-    (each k (sort json-key-order (keys h))
-      (if first (= first nil) (pr ","))
-      (json-write-string (string k))
-      (pr ":")
-      (json-write (h k))))
-  (pr "}"))
+(def json-write-object (h (o step) (o ind ""))
+  (if (empty h)
+      (pr "{}")
+      (let ind2 (and step (+ ind step))
+        (pr "{")
+        (let first t
+          (each k (sort json-key-order (keys h))
+            (if first (= first nil) (pr ","))
+            (json-newline step ind2)
+            (json-write-string (string k))
+            (pr (if step ": " ":"))
+            (json-write (h k) step ind2)))
+        (json-newline step ind)
+        (pr "}"))))
+
+; In pretty mode, break the line and emit the current indentation;
+; in compact mode (step nil) this is a no-op.
+
+(def json-newline (step ind)
+  (when step
+    (writec #\newline)
+    (pr ind)))
 
 (def json-key-order (a b)
   (< (string a) (string b)))
 
-(def save-json (x file)
+(def save-json (x file (o pretty))
   (let tmp (+ file ".tmp")
-    (w/outfile o tmp (to-json x o))
+    (w/outfile o tmp (to-json x pretty o))
     (mvfile tmp file))
   x)
 
