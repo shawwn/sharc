@@ -1,6 +1,7 @@
 /arc/
 /scrape.json
 /smtp.json
+/recaptcha.json
 *.fasl
 *.fas
 *.lib

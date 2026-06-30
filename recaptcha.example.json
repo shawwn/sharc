@@ -1,0 +1,5 @@
+{
+  "site-key": "YOUR_RECAPTCHA_SITE_KEY",
+  "secret": "YOUR_RECAPTCHA_SECRET",
+  "threshold": 2
+}

@@ -170,13 +170,18 @@
       (hook 'login-form afterward acct pw)
       (br2))
     (when (in switch 'register 'both)
-      (login-form "Create Account" switch create-handler afterward acct pw))))
+      (login-form "Create Account" switch create-handler afterward acct pw
+                  (when (recaptcha-required (ip)) recaptcha-widget)))))
 
-(def login-form (label switch handler afterward (o acct arg!acct) (o pw arg!pw))
+(def login-form (label switch handler afterward (o acct arg!acct) (o pw arg!pw) (o extra))
   (prbold label)
   (br2)
+  ; extra, if given, is a thunk rendered inside the form after the
+  ; username/password fields (e.g. a captcha widget), so whatever it
+  ; emits posts along with the fnid form.
   (fnform {handler switch afterward}
-          {pwfields (downcase label) acct pw}
+          {do (pwfields (downcase label) acct pw)
+              (if extra (extra))}
           (acons afterward)))
 
 (def login-handler (switch afterward)
@@ -189,10 +194,16 @@
 (def create-handler (switch afterward)
   (with (user arg!acct pw arg!pw)
     (logout-user)
-    (aif (bad-newacct user pw)
-         (failed-login 'register it afterward)
-         (do (create-acct user pw)
-             (login user (ip) (cook-user user) afterward)))))
+    (if (and (recaptcha-required (ip))
+             (no (recaptcha-pass (arg "g-recaptcha-response") (ip))))
+         (failed-login 'register
+                       "Please complete the captcha and try again."
+                       afterward)
+        (aif (bad-newacct user pw)
+             (failed-login 'register it afterward)
+             (do (create-acct user pw)
+                 (note-acct-creation (ip))
+                 (login user (ip) (cook-user user) afterward))))))
 
 (def login (user ip cookie afterward)
   (prcookie cookie)

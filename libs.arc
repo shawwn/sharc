@@ -5,5 +5,6 @@
             "srv.arc"
             "app.arc"
             "json.arc"
+            "recaptcha.arc"
             "email.arc"
             "prompt.arc"))
