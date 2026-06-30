@@ -590,9 +590,11 @@
                            (or (litmatch "http://" s i) 
                                (litmatch "https://" s i)))
                        (withs (n   (urlend s i)
-                               url (clean-url (cut s i n)))
-                         (tag (a href url rel 'nofollow)
-                           (pr (if (no maxurl) url (ellipsize url maxurl))))
+                               url (cut s i n))
+                         (link (eschtml (if (no maxurl)
+                                            url
+                                            (ellipsize url maxurl)))
+                               (eschtml url))
                          (= i (- n 1)))
                        (pr (eschtml-char (s i)))))))))
 
@@ -707,7 +709,7 @@
           (litmatch "<a href=" s i)
            (let endurl (posmatch [in _ #\> #\space] s (+ i 9))
              (if endurl
-                 (do (pr (cut s (+ i 9) (- endurl 1)))
+                 (do (pr (uneschtml (cut s (+ i 9) (- endurl 1))))
                      (= i (aif (posmatch "</a>" s endurl)
                                (+ it 3)
                                endurl)))
