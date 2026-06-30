@@ -592,9 +592,15 @@
       (pr ")"))
     (pr " | "))
   (if (me)
-      (link "logout" (string "logout?goto=" (urlencode:safe-goto whence)
-                             "&auth=" (auth-for (me) "logout")))
-      (link "login" (string "login?goto=" (urlencode:safe-goto whence)))))
+      (link "logout" (logout-url whence) "logout")
+      (link "login" (login-url whence) "login")))
+
+(def logout-url (whence)
+  (string "logout?goto=" (urlencode:safe-goto whence)
+          "&auth=" (auth-for (me) "logout")))
+
+(def login-url (whence)
+  (string "login?goto=" (urlencode:safe-goto whence)))
 
 (= noob-days* 7) ; how long a user's name is colored green
 
