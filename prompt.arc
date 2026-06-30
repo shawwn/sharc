@@ -29,7 +29,7 @@
       (uform (aif (goodname arg!app)
                   (edit-app it)
                   (prompt-page "Bad name."))
-        (tab (row "name:" (input "app") (submit "create app")))))))
+        (tab (row "name:" (input "app" nil 20) (submit "create app")))))))
 
 (def app-path (app (t user me))
   (and user app (+ appdir* user "/" app)))
