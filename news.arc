@@ -2140,14 +2140,14 @@
 (def newpoll-page ((o title "Poll: ") (o text "") (o opts "") (o msg))
   (minipage "New Poll"
     (pagemessage msg)
-    (urform (process-poll (striptags arg!t)
-                          (md-from-form arg!x t)
-                          (striptags arg!o))
+    (urform (process-poll (striptags arg!title)
+                          (md-from-form arg!text t)
+                          (striptags arg!choices))
       (tab
-        (row "title"   (input "t" title 50))
-        (row "text"    (textarea "x" 4 50 (only&pr text)))
+        (row "title"   (input "title" title 50))
+        (row "text"    (textarea "text" 4 50 (only&pr text)))
         (row ""        "Use blank lines to separate choices:")
-        (row "choices" (textarea "o" 7 50 (only&pr opts)))
+        (row "choices" (textarea "choices" 7 50 (only&pr opts)))
         (row ""        (submit))))))
 
 (= fewopts* "A poll must have at least two options.")
