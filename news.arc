@@ -1155,8 +1155,8 @@
       (pr:eschtml s!title))))
       
 (def pseudo-text (i)
-  (if (flagged i) "[flagged]"
-      i!deleted   "[deleted]"
+  (if i!deleted   "[deleted]"
+      (flagged i) "[flagged]"
       (delayed i) "[delayed]"
                   "[dead]"))
 
