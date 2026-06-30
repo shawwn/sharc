@@ -966,17 +966,17 @@
 (mac insort (test elt seq)
   `(zap [insert-sorted ,test ,elt _] ,seq))
 
-(def reinsert-sorted (test elt seq)
+(def reinsert-sorted (test elt seq (o cmp id))
   (if (no seq) 
        (list elt) 
-      (is elt (car seq))
-       (reinsert-sorted test elt (cdr seq))
+      (cmp elt (car seq))
+       (reinsert-sorted test elt (cdr seq) cmp)
       (test elt (car seq)) 
        (cons elt (rem elt seq))
-      (cons (car seq) (reinsert-sorted test elt (cdr seq)))))
+      (cons (car seq) (reinsert-sorted test elt (cdr seq) cmp))))
 
-(mac insortnew (test elt seq)
-  `(zap [reinsert-sorted ,test ,elt _] ,seq))
+(mac insortnew (test elt seq . cmp)
+  `(zap [reinsert-sorted ,test ,elt _ ,@cmp] ,seq))
 
 ; Could make this look at the sig of f and return a fn that took the 
 ; right no of args and didn't have to call apply (or list if 1 arg).
@@ -1693,8 +1693,8 @@
                           (,load ,gf)
                           ,init))))))
 
-(mac diskvar (var file)
-  `(fromdisk ,var ,file nil readfile1 writefile))
+(mac diskvar (var file (o init 'nil))
+  `(fromdisk ,var ,file ,init readfile1 writefile))
 
 (mac disktable (var file)
   `(fromdisk ,var ,file (table) load-table save-table))
