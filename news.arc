@@ -215,11 +215,12 @@
 (def apoll    (i) (is i!type 'poll))
 
 (def load-item (id)
-  (let i (temload 'item (+ storydir* id))
-    (= (items* id) i)
-    (awhen (and (astory&live i) (check i!url ~blank))
-      (register-url i it))
-    i))
+  (when (isa id 'int)
+    (let i (temload 'item (+ storydir* id))
+      (= (items* id) i)
+      (awhen (and (astory&live i) (check i!url ~blank))
+        (register-url i it))
+      i)))
 
 ; Note that duplicates are only prevented of items that have at some 
 ; point been loaded. 
