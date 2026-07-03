@@ -1197,6 +1197,7 @@
             (when (apoll s) (addoptlink s))
             (unless i (flaglink s whence))
             (killlink s whence)
+            (unless (blank s!text) (linklink s whence))
             (blastlink s whence)
             (blastlink s whence t)
             (deletelink s whence)
@@ -1640,6 +1641,19 @@
                  (save-item i)
                  whence)
       (pr "@(if i!dead 'un)kill"))))
+
+(def nolinks (s)
+  (~mem 'links s!keys))
+
+(def linklink (i whence)
+  (when (admin)
+    (pr bar*)
+    (w/rlink (do (togglemem 'links i!keys)
+                 (let md (unmarkdown i!text)
+                   (= i!text (md-from-form md (nolinks i))))
+                 (save-item i)
+                 whence)
+      (pr "@(if (nolinks i) 'allow 'disable) links"))))
 
 ; Blast kills the submission and bans the user.  Nuke also bans the 
 ; site, so that all future submitters will be ignored.  Does not ban 
@@ -2378,10 +2392,11 @@
 
 (= (fieldfn* 'story)
    (fn (s)
-     (with (a (admin)  e (editor)  x (canedit s))
+     (with (a (admin)  e (editor)  x (canedit s)
+            md (if (nolinks s) 'mdtext2 'mdtext))
        `((string1 title     ,s!title        t ,x)
          (url     url       ,s!url          t ,e)
-         (mdtext2 text      ,s!text         t ,x)
+         (,md     text      ,s!text         t ,x)
          ,@(standard-item-fields s a e x)))))
 
 (= (fieldfn* 'comment)
