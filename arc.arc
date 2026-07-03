@@ -1296,6 +1296,27 @@
 (def temread (tem (o str (stdin)))
   (templatize tem (read str)))
 
+; temquote converts the read-time symbols 't/'T to t and 'nil to nil.
+; Applied in templatize (so field values read back from disk get
+; real t/nil instead of bare symbols). Fixes a bug where the json
+; api was giving "deleted": "t" instead of "deleted": true.
+;
+; No need for deep comparison unless a list or table stores t someday,
+; which currently doesn't
+; happen.
+
+(def temquote (x (o deep))
+  (if (isa x 'sym)
+       (case (string x)
+         ("t" "T") t
+         "nil" nil
+         x)
+      (and (acons x) deep)
+       (map [temquote _ deep] x)
+      (and (isa x 'table) deep)
+       (table {each (k v) x (= (_ k) (temquote v deep))})
+       x))
+
 ; Converts alist to inst; ugly; maybe should make this part of coerce.
 ; Note: discards fields not defined by the template.
 
@@ -1303,7 +1324,7 @@
   (with (x (inst tem) fields (if (acons tem) tem (templates* tem)))
     (each (k v) raw
       (when (assoc k fields)
-        (= (x k) v)))
+        (= (x k) (temquote v))))
     x))
 
 (def temload (tem file)
