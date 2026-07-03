@@ -1894,9 +1894,6 @@
 (= title-limit* 80
    retry*       "Please try again."
    toolong*     "Please make title < @title-limit* characters."
-   bothblank*   "The url and text fields can't both be blank.  Please
-                 either supply a url, or if you're asking a question,
-                 put it in the text field."
    toofast*     "You're submitting too fast.  Please slow down.  Thanks."
    spammage*    "Stop spamming us.  You're wasting your time.")
 
@@ -1916,8 +1913,6 @@
             (flink {submit-page url title text retry*})
            (len> title title-limit*)
             (flink {submit-page url title text toolong*})
-           (and (blank url) (blank text))
-            (flink {submit-page url title text bothblank*})
            ; could also match (recent-spam:sitename url)
            (big-spamsites*:sitename url)
             (flink {msgpage spammage*})
