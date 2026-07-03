@@ -1198,7 +1198,7 @@
             (when (apoll s) (addoptlink s))
             (unless i (flaglink s whence))
             (killlink s whence)
-            (unless (blank s!text) (linklink s whence))
+            (unless (blank s!text) (linkslink s whence))
             (blastlink s whence)
             (blastlink s whence t)
             (deletelink s whence)
@@ -1643,10 +1643,12 @@
                  whence)
       (pr "@(if i!dead 'un)kill"))))
 
+; Allow links turns on clickable urls in story text.
+
 (def nolinks (s)
   (~mem 'links s!keys))
 
-(def linklink (i whence)
+(def linkslink (i whence)
   (when (admin)
     (pr bar*)
     (w/rlink (do (togglemem 'links i!keys)
