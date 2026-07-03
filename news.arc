@@ -49,6 +49,7 @@
   keys       nil
   hidden     nil   ; ids of items this user has hidden from their listings
   favorites  nil   ; ids of items this user has marked as favorite
+  collapsed  nil   ; ids of comments this user has collapsed
   delay      0)
 
 (deftem item
@@ -1606,7 +1607,7 @@
 
 (def flaglink (i whence)
   (when (and (me)
-             (~me i!by)
+             (or (admin) (~me i!by))
              (or (admin) (> (karma) flag-threshold*)))
     (pr bar*)
     (w/rlink (do (if (admin)
