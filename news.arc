@@ -2559,29 +2559,55 @@
 
 ; Comment Display
 
+; A comment is collapsed if an admin marks it as collapsed with the
+; "collapse" link or the user collapsed it with the [-] button.
+
+(def collapsed (c (o user (me)))
+  (or (mem 'collapsed c!keys)
+      (and user (mem c!id (uvar user collapsed)))))
+
+; hn.js sends this on every [-]/[+] toggle (when logged in) so the choice
+; persists across page loads.  Fire-and-forget: the response is ignored.
+
+(newsop collapse (id un)
+  (when user
+    (whenlet c (safe-item id)
+      (if un
+          (pull c!id (uvar user collapsed))
+          (pushnew c!id (uvar user collapsed)))
+      (save-prof user))))
+
 (def display-comments (cs whence (o indent 0) (o initialpar t) (o initialon t))
   (w/the comment-nav (comment-navs cs)
     (each c cs
       (display-comment-tree c whence indent initialpar initialon))))
 
-(def display-comment-tree (c whence (o indent 0) (o initialpar) (o initialon))
-  (when (cansee-descendant c)
-    (display-1comment c whence indent initialpar initialon)
-    (display-subcomments c whence (+ indent 1))))
+; collhidden is true when an ancestor is collapsed, so this comment starts
+; out hidden (noshow); its own collapsed state hides its body and descendants.
 
-(def display-1comment (c whence indent showpar showon)
-  (tag (tr class "athing comtr" id c!id)
+(def display-comment-tree (c whence (o indent 0) (o initialpar) (o initialon)
+                                     (o collhidden))
+  (when (cansee-descendant c)
+    (display-1comment c whence indent initialpar initialon collhidden)
+    (display-subcomments c whence (+ indent 1) (or collhidden (collapsed c)))))
+
+(def display-1comment (c whence indent showpar showon (o collhidden))
+  (tag (tr class (+ "athing comtr" (if (collapsed c) " coll" "")
+                                   (if collhidden " noshow" ""))
+           id c!id)
     (td (tab (display-comment nil c whence t indent showpar showon)))))
 
-(def display-subcomments (c whence (o indent 0))
+(def display-subcomments (c whence (o indent 0) (o collhidden))
   (each k (ranked-kids c)
-    (display-comment-tree k whence indent (> indent 0))))
+    (display-comment-tree k whence indent (> indent 0) nil collhidden)))
 
 (def display-comment (n c whence (o astree) (o indent 0)
                                  (o showpar) (o showon))
   (tr (display-item-number n)
       (when astree (tag (td class 'ind indent indent) (hspace (* indent 40))))
-      (tag (td valign 'top class 'votelinks) (votelinks c whence t))
+      (tag (td valign 'top class (+ "votelinks" (if (and astree (collapsed c))
+                                                     " nosee" "")))
+        (votelinks c whence t))
       (display-comment-body c whence astree indent showpar showon)))
 
 ; Comment caching doesn't make generation of comments significantly
@@ -2609,6 +2635,7 @@
            astree (no showpar) (no showon)
            (live c)
            (nor (admin) (editor) (author c))
+           (~collapsed c) ; per-user state; don't bake into the shared cache
            (< (- maxid* c!id) cc-window*)
            (> (- (seconds) c!time) 60)) ; was 3600
       (pr (cached-comment-body c whence indent))
@@ -2660,14 +2687,15 @@
             (unless (or astree (~me))
               (flaglink c whenceid))
             (when astree
-              (colllink c)))
+              (collapsebutton c))
+            (collapselink c whenceid))
           (spanclass onstory
             (when showon
               (pr " | on: ")
               (let s (superparent c)
                 (link (ellipsize s!title 50) (item-url s!id))))))))
     (br)
-    (tag (div class 'comment)
+    (tag (div class (+ "comment" (if (and astree (collapsed c)) " noshow" "")))
       (if (~cansee c)
           (pr (pseudo-text c))
           (tag (div class (string "commtext " (comment-class c)))
@@ -2748,11 +2776,22 @@
     (pr bar*)
     (clickylink "next" (string whence "#" next))))
 
-(def colllink (c)
+(def collapsebutton (c)
   (pr " ")
   (tag (a class "togg clicky" id c!id n (cnav c 'n)
           href "javascript:void(0)")
-    (pr "[–]")))
+    (pr (if (collapsed c) "[@(cnav c 'n) more]" "[–]"))))
+
+; Admin-only: toggle whether this comment is collapsed by default for
+; everyone.
+
+(def collapselink (c whence)
+  (when (admin)
+    (pr bar*)
+    (w/rlink (do (togglemem 'collapsed c!keys)
+                 (save-item c)
+                 whence)
+      (pr "@(if (mem 'collapsed c!keys) 'un)collapse"))))
 
 ; For really deeply nested comments, caching could add another reply 
 ; delay, but that's ok.
