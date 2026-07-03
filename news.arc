@@ -2681,7 +2681,7 @@
             (killlink c whenceid)
             (blastlink c whenceid)
             (deletelink c whenceid)
-            (unless (or astree (~me))
+            (unless (and (~admin) (or astree (~me)))
               (flaglink c whenceid))
             (when astree
               (collapsebutton c))
