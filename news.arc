@@ -2624,7 +2624,7 @@
 
 (= comment-caching* t) 
 
-; Cache comments generated for nil user that are over an hour old.
+; Cache comments generated for nil user that are over a minute old.
 ; Only try to cache most recent 10k items.  But this window moves,
 ; so if server is running a long time could have more than that in
 ; cache.  Probably should actively gc expired cache entries.
