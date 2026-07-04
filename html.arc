@@ -184,11 +184,7 @@
         (if (all [isa _ 'string] opts)
             `(pr ,(string "<" (car spec) (apply string opts) ">"))
             `(do (pr ,(string "<" (car spec)))
-                 ,@(map (fn (opt)
-                          (if (isa opt 'string)
-                              `(pr ,opt)
-                              opt))
-                        opts)
+                 ,@(map [if (isa _ 'string) `(pr ,_) _] opts)
                  (pr ">"))))))
 
 (def end-tag (spec)
