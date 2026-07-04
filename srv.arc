@@ -398,7 +398,7 @@ Connection: close"))
 ;   arg!id       ; equivalent to (arg 'id)
 (def arg (key)
   (let req (the req)
-    (alref req!args (if (isa key 'sym) (string key) key))))
+    (alref req!args (if (isa!sym key) (string key) key))))
 
 ; reassemble-args urlencodes each key and value for safety
 
@@ -413,7 +413,7 @@ Connection: close"))
        ""))
 
 (def valid-scopeval (x)
-  (if (isa x 'table)
+  (if (isa!table x)
       (isnt x (the req))
       (in (type x) 'string 'vector 'sym 'cons 'int 'num 'char 'table)))
 

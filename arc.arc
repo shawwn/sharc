@@ -211,7 +211,7 @@
    start))
 
 (def testify (x (o cmp is))
-  (if (isa x 'fn) x [cmp _ x]))
+  (if (isa!fn x) x [cmp _ x]))
 
 ; Like keep, seems like some shouldn't testify.  But find should,
 ; and all probably should.
@@ -235,7 +235,10 @@
         (reclist   [if (f:car _) (car _)] seq)
         (recstring [if (f:seq _) (seq _)] seq))))
 
-(def isa (x y) (is (type x) y))
+(def isa (x . y)
+  (if y
+      (is (type x) (car y)) ; (is x 'int)
+      [is (type _) x]))     ; (isa!int x)
 
 ; Possible to write map without map1, but makes News 3x slower.
 
@@ -251,7 +254,7 @@
 
 
 (def map (f . seqs)
-  (if (some [isa _ 'string] seqs) 
+  (if (some isa!string seqs)
        (withs (n   (apply min (map len seqs))
                new (newstring n))
          ((afn (i)
@@ -376,7 +379,7 @@
 
 (def setforms (expr0)
   (let expr (macex expr0)
-    (if (isa expr 'sym)
+    (if (isa!sym expr)
          (if (ssyntax expr)
              (setforms (ssexpand expr))
              (w/uniq (g h)
@@ -420,7 +423,7 @@
        (cons f args)))
 
 (def expand= (place val)
-  (if (and (isa place 'sym) (~ssyntax place))
+  (if (and (isa!sym place) (~ssyntax place))
       `(assign ,place ,val)
       (let (vars prev setter) (setforms place)
         (w/uniq g
@@ -468,7 +471,7 @@
                  (let ,var (car ,gv) ,@body)
                  (,gf (cdr ,gv))))
              ,gseq)
-           (isa ,gseq 'table)
+           (isa!table ,gseq)
             (maptable (fn ,var ,@body)
                       ,gseq)
             (for ,gv 0 (- (len ,gseq) 1)
@@ -480,7 +483,7 @@
   (let end (if (no end)   (len seq)
                (< end 0)  (+ (len seq) end) 
                           end)
-    (if (isa seq 'string)
+    (if (isa!string seq)
         (let s2 (newstring (- end start))
           (for i 0 (- end start 1)
             (= (s2 i) (seq (+ start i))))
@@ -616,7 +619,7 @@
           (~mem ,gx ,place ,@(if args (list gargs)))))))
 
 (mac ++ (place (o i 1))
-  (if (isa place 'sym)
+  (if (isa!sym place)
       `(= ,place (+ ,place ,i))
       (w/uniq gi
         (let (binds val setter) (setforms place)
@@ -624,7 +627,7 @@
              (,setter (+ ,val ,gi)))))))
 
 (mac -- (place (o i 1))
-  (if (isa place 'sym)
+  (if (isa!sym place)
       `(= ,place (- ,place ,i))
       (w/uniq gi
         (let (binds val setter) (setforms place)
@@ -749,7 +752,7 @@
 ;  (if (atom e)
 ;      e
 ;      (let op (and (atom (car e)) (eval (car e)))
-;        (if (isa op 'mac)
+;        (if (isa!mac op)
 ;            (apply (rep op) (cdr e))
 ;            e))))
 
@@ -845,7 +848,7 @@
 (def readstring1 (s (o eof nil)) (w/instring i s (read i eof)))
 
 (def read ((o x (stdin)) (o eof nil))
-  (if (isa x 'string) (readstring1 x eof) (sread x eof)))
+  (if (isa!string x) (readstring1 x eof) (sread x eof)))
 
 ; inconsistency between names of readfile[1] and writefile
 
@@ -859,7 +862,7 @@
       (if (is x eof)
           nil
           (cons x (self i)))))
-   (if (isa src 'string) (instring src) src)))
+   (if (isa!string src) (instring src) src)))
 
 (def allchars (str)
   (tostring (whiler c (readc str nil) no
@@ -1306,14 +1309,14 @@
 ; happen.
 
 (def temquote (x (o deep))
-  (if (isa x 'sym)
+  (if (isa!sym x)
        (case (string x)
          ("t" "T") t
          "nil" nil
          x)
       (and (acons x) deep)
        (map [temquote _ deep] x)
-      (and (isa x 'table) deep)
+      (and (isa!table x) deep)
        (table {each (k v) x (= (_ k) (temquote v deep))})
        x))
 
@@ -1365,7 +1368,7 @@
            {do ,expr}))
 
 (def saferead (arg)
-  (if (isa arg 'string) (errsafe:read arg) arg))
+  (if (isa!string arg) (errsafe:read arg) arg))
 
 (def safe-load-table (filename) 
   (or (errsafe:load-table filename)
@@ -1814,7 +1817,7 @@
 
 (mac %scope (env)
   `(list ,@(accum a
-             (each x (dedup:keep [isa _ 'sym] env)
+             (each x (dedup:keep isa!sym env)
                (w/uniq h
                  (a `(list ',x
                            (fn () ,x)

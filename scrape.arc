@@ -380,7 +380,7 @@
   ; returns parsed user table, or nil
   (aand (curl-get-public (+ scrape-api-host* "/user/" id ".json"))
         (from-json it)
-        (and (isa it 'table) it)))
+        (and (isa!table it) it)))
 
 
 
@@ -610,7 +610,7 @@
   (load-userinfo)
   (with (cfg (load-scrape-config))
     (= scrape-flagger* (or cfg!username "hnscraper"))
-    (when (isa cfg!dev-password 'string)
+    (when (isa!string cfg!dev-password)
       (= scrape-dev-password* cfg!dev-password)))
   (let ranked nil
     ; users first (so items have authors)

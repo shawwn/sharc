@@ -215,7 +215,7 @@
 (def apoll    (i) (is i!type 'poll))
 
 (def load-item (id)
-  (when (isa id 'int)
+  (when (isa!int id)
     (let i (temload 'item (+ storydir* id))
       (= (items* id) i)
       (awhen (and (astory&live i) (check i!url ~blank))
@@ -1981,7 +1981,7 @@
                  host  (downcase parts!1) ; hosts are case-insensitive
                  path1 parts!2            ; first path segment, if any
                  toks  (rev (tokens host #\.)))
-           (if (isa (saferead (car toks)) 'int)
+           (if (isa!int (saferead (car toks)))
                (tostring (prall toks "" "."))
                (let (t1 t2 t3 . rest) toks
                  (let suffix (and t2 (+ t2 "." t1))

@@ -36,7 +36,7 @@
 (def json-indent-step (pretty)
   (if (no pretty)         nil
       (is pretty t)       "  "
-      (isa pretty 'int)   (newstring pretty #\space)
+      (isa!int pretty)    (newstring pretty #\space)
                           pretty))
 
 ; `step` is the per-level indent string (nil for compact output) and
@@ -46,12 +46,12 @@
   (if (in x nil 'null) (pr "null")
       (in x t 'true)   (pr "true")
       (is x 'false)    (pr "false")
-      (isa x 'int)     (pr x)
-      (isa x 'num)     (pr x)
-      (isa x 'string)  (json-write-string x)
-      (isa x 'sym)     (json-write-string (string x))
-      (isa x 'char)    (json-write-string (string x))
-      (isa x 'table)   (json-write-object x step ind)
+      (isa!int x)      (pr x)
+      (isa!num x)      (pr x)
+      (isa!string x)   (json-write-string x)
+      (isa!sym x)      (json-write-string (string x))
+      (isa!char x)     (json-write-string (string x))
+      (isa!table x)    (json-write-object x step ind)
       (acons x)        (json-write-array x step ind)
                        (json-write-string (string x))))
 

@@ -19,7 +19,7 @@
   ; encode a string (as its UTF-8 bytes) or a byte vector to base64.
   ; we have no bit ops at the arc level, so the 24-bit group is built
   ; with arithmetic and sliced into 6-bit indices the same way.
-  (let bytes (if (isa input 'string) (string->bytes input) input)
+  (let bytes (if (isa!string input) (string->bytes input) input)
     (tostring
       (with (n (len bytes) i 0)
         (while (< i n)
@@ -49,7 +49,7 @@
                     (load-json smtp-config-file*))
                (table))
     (withs (port (let p (or (getenv "SMTP_PORT") cfg!port 465)
-                   (if (isa p 'string) (int p) p))
+                   (if (isa!string p) (int p) p))
             ; implicit TLS for SMTPS (and the https port); socket-connect
             ; only auto-enables SSL for 443, so 465 needs it spelled out.
             ; SMTP_TLS=0 forces plaintext (e.g. talking to a relay).

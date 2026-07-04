@@ -213,10 +213,10 @@
   (if (atom spec)
       `(pr ,(string "<" spec ">"))
       (let opts (tag-options (car spec) (pair (cdr spec)))
-        (if (all [isa _ 'string] opts)
+        (if (all isa!string opts)
             `(pr ,(string "<" (car spec) (apply string opts) ">"))
             `(do (pr ,(string "<" (car spec)))
-                 ,@(map [if (isa _ 'string) `(pr ,_) _] opts)
+                 ,@(map [if (isa!string _) `(pr ,_) _] opts)
                  (pr ">"))))))
 
 (def end-tag (spec)
@@ -373,7 +373,7 @@
               (w/uniq gl
                 `(let ,gl ,len
                    (tr (td (pr ',label ":"))
-                       (if (isa ,gl 'cons)
+                       (if (isa!cons ,gl)
                            (td (textarea ',name (car ,gl) (cadr ,gl)
                                  (aif ,text (pr it))))
                            (td (gentag input type ',(if (is label 'password) 

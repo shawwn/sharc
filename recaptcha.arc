@@ -23,7 +23,7 @@
          ; how many accounts one IP may create per day before a captcha
          ; starts being required on the next signup from that IP.
          threshold (let n (or (getenv "RECAPTCHA_THRESHOLD") cfg!threshold 2)
-                     (if (isa n 'string) (int n) n)))))
+                     (if (isa!string n) (int n) n)))))
 
 (def recaptcha-keys ()
   ; the config iff both keys are present, else nil (feature disabled).
