@@ -38,7 +38,7 @@ something like `193 passed, 0 failed`.
 ```sh
 mkdir -p arc
 echo "myname" > arc/admins
-export ARC_RELOAD=t # reload code changes without needing to restart
+export DEV=t # reload code changes without needing to restart
 ./sharc news.arc # prepend with `rlwrap` for repl history
 ```
 
@@ -47,8 +47,8 @@ Then go to [http://localhost:8080](http://localhost:8080).
 Click on login and create an account called `myname`. You should now
 be logged in as an admin.
 
-Set `ARC_RELOAD=t` (or run `(set autoreload*)` in the repl) to
-automatically reload code changes without restarting the server.
+Set `DEV=t` (or run `(set autoreload*)` in the repl) to automatically
+reload code changes without restarting the server.
 
 For production deployments, instead of autoreload, you can manually
 `git pull` and then run `(reload)` in the repl to ship an update.

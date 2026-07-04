@@ -17,9 +17,9 @@
 
 (= logdir* (string arcdir* "logs/"))
 
-; set ARC_RELOAD=t to reload source files whenever they change.
+; set DEV=t to reload source files whenever they change.
 
-(or= breaksrv* nil autoreload* (in (getenv "ARC_RELOAD") "t" "1"))
+(or= breaksrv* nil autoreload* (in (getenv "DEV") "t" "1"))
 
 (= quitsrv* nil)
 
