@@ -1301,26 +1301,21 @@
 (def temread (tem (o str (stdin)))
   (templatize tem (read str)))
 
-; temquote converts the read-time symbols 't/'T to t and 'nil to nil.
+; Converts the read-time symbols 't/'T to t and 'nil to nil.
 ; Applied in templatize (so field values read back from disk get
 ; real t/nil instead of bare symbols). Fixes a bug where the json
 ; api was giving "deleted": "t" instead of "deleted": true.
 ;
-; No need for deep comparison unless a list or table stores t someday,
-; which currently doesn't
-; happen.
+; No need for deep comparison unless someday lists containing t are
+; serialized to disk.
 
-(def temquote (x (o deep))
+(def temquote (x)
   (if (isa!sym x)
-       (case (string x)
-         ("t" "T") t
-         "nil" nil
-         x)
-      (and (acons x) deep)
-       (map [temquote _ deep] x)
-      (and (isa!table x) deep)
-       (table {each (k v) x (= (_ k) (temquote v deep))})
-       x))
+      (case (string x)
+        ("t" "T") t
+        "nil" nil
+        x)
+      x))
 
 ; Converts alist to inst; ugly; maybe should make this part of coerce.
 ; Note: discards fields not defined by the template.
@@ -1761,9 +1756,10 @@
 ;   (def f ((t me)) ...)        --- me defaults to (the me) if not passed
 ;   (def f ((t local var)) ...) --- local defaults to (the var)
 ;
-; Modeled on dang's news.arc thread-local trick (HN id 11242977) for
-; passing per-request context like the current user without threading
-; it through every function signature.
+; Modeled on dang's news.arc thread-local trick
+; (https://news.ycombinator.com/item?id=11242977) for passing
+; per-request context like the current user without threading it
+; through every function signature.
 ;
 ; (the var) is a macro so the var name is taken literally (no quote at
 ; the call site). It expands to a call to the underlying `thread-local`
