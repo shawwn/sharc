@@ -39,9 +39,9 @@
         (color bgcolor)   opcolor
         (width height)    opnum
         tabindex          opnum
-        aria-hidden       opbool
-        spellcheck        opbool
-        autofocus         opbool
+        aria-hidden       opyesno
+        spellcheck        opyesno
+        autofocus         opyesno
         autocorrect       oponoff
         autocapitalize    oponoff)))
 
@@ -71,7 +71,7 @@
 (def opsym (key val)
   `(aif ,val (pr ,(+ " " key "=\"") it #\")))
 
-(def opbool (key val)
+(def opyesno (key val)
   `(case (downcase:string ,val)
      ("true" "t") (pr ,(+ " " key "=\"true\""))
      ("false")    (pr ,(+ " " key "=\"false\""))))
