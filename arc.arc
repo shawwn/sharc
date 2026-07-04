@@ -74,6 +74,8 @@
 
 (def idfn (x) x)
 
+(def only (x . args) x) ; (only&pr maybe-nil)
+
 ; Maybe later make this internal.  Useful to let xs be a fn?
 
 (def map1 (f xs)
@@ -1441,11 +1443,7 @@
 ; Cleaner thus, but may only ever need in 2 arg case.
 
 ;(def compare (comparer scorer)
-;  (fn args (apply comparer map scorer args)))
-
-; (def only (f g . args) (aif (apply g args) (f it)))
-
-(def only (x . args) x)
+;  (fn args (apply comparer (map scorer args))))
 
 (mac conswhen (f x y)
   (w/uniq (gf gx)
