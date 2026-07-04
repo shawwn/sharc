@@ -64,8 +64,10 @@ My daily driver for News is:
 DEV=t lwrap ./sharc news.arc
 ```
 
-where [lwrap](https://github.com/shawwn/scrap/blob/master/lwrap) is a
-wrapper over rlwrap that makes editing nicer for lisp. ("lisp-wrap.")
+[lwrap](https://github.com/shawwn/scrap/blob/master/lwrap) is a
+wrapper over rlwrap that makes it nicer for lisp repl work.
+("lisp-wrap.") Just put it in your PATH, install rlwrap, and you're
+good to go.
 
 ## Email
 
