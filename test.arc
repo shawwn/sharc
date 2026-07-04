@@ -1093,5 +1093,159 @@ c"
   (each html (list "<i>foo</i>" "*foo*" "<i>foo*</i>" "* foo*")
     (test? html (markdown (unmarkdown html)))))
 
+; ---------------------------------------------------------------------------
+; t / nil / symbol identity corner cases.
+;
+; This project distinguishes two things spelled "t":
+;
+;   * the TRUTH VALUE t -- what a top-level t, 't, or `t evaluates to.
+;   * the bindable SYMBOL named t -- what you get from a t sitting inside
+;     quoted list data ((car '(t))) or built at runtime ((sym "t")).  It's
+;     an ordinary symbol you can bind as a parameter; it is NOT the truth
+;     value -- they are distinct objects.
+;
+; nil is simpler: nil anywhere is the empty value, EXCEPT (sym "nil") which,
+; like (sym "t"), builds a distinct bindable symbol.
+;
+; Symbols are case-insensitive: 'foo, 'FOO and (sym "FOO") are one symbol, and
+; (sym "t") / (sym "T") are the one bindable t-symbol (see arc-str->sym).
+;
+; Each assertion is its own test so one failure never masks the next.
+
+; one named test asserting a single expected value; keeps the matrix DRY
+; without letting an early failure hide later assertions.
+(mac test-is (name expected expr)
+  `(define-test ,name (test? ,expected ,expr)))
+
+; NOTE: test names avoid differing only by letter case -- since symbol case is
+; folded, two names like `write-sym-t` / `write-sym-T` would collapse into one
+; and clobber each other.  The upper/lower distinction lives in words, not case.
+
+; --- the TRUTH VALUE t (top-level t / 't / `t) ---
+(test-is t-self            true  (is t t))
+(test-is t-quote           true  (is t 't))
+(test-is quote-t-vs-t      true  (is 't t))
+(test-is quote-t-self      true  (is 't 't))
+(test-is t-qq              true  (is t `t))
+(test-is qq-t-vs-t         true  (is `t t))
+(test-is qq-t-quote        true  (is `t 't))
+(test-is t-not-string      false (is t "t"))
+(test-is no-t              false (no t))
+(test-is no-quote-t        false (no 't))
+(test-is no-qq-t           false (no `t))
+(test-is type-t-is-sym     true  (is (type t) 'sym))
+(test-is write-t           "t"   (writes t))
+
+; --- the bindable SYMBOL t (in list data / via sym) is NOT the truth value ---
+(test-is t-not-list-t         false (is t (car '(t))))
+(test-is t-not-sym-t          false (is t (sym "t")))
+(test-is quote-t-not-sym-t    false (is 't (sym "t")))
+(test-is list-t-not-t         false (is (car '(t)) t))
+(test-is no-list-t            false (no (car '(t))))   ; a symbol, hence truthy
+(test-is no-sym-t             false (no (sym "t")))
+(test-is type-sym-t-is-sym    true  (is (type (sym "t")) 'sym))
+
+; --- ...but every bindable-symbol path is the SAME symbol (case-insensitive) ---
+(test-is list-t-eq-sym-t      true  (is (car '(t)) (sym "t")))
+(test-is list-t-eq-qq-t       true  (is (car '(t)) (car `(t))))
+(test-is sym-t-self           true  (is (sym "t") (sym "t")))
+(test-is sym-lc-t-eq-sym-upcase-t  true  (is (sym "t") (sym "T")))
+(test-is list-t-eq-sym-upcase-t    true  (is (car '(t)) (sym "T")))
+(test-is t-not-sym-upcase-t   false (is t (sym "T")))   ; still the symbol, not truth
+(test-is write-sym-lc-t       "t"   (writes (sym "t")))
+(test-is write-sym-upcase-t   "t"   (writes (sym "T")))
+
+; --- unquote injects the VALUE, flipping list-t from symbol to truth value ---
+(test-is qq-list-t-symbol     false (is (cadr `(a t)) t))       ; literal t: symbol
+(test-is qq-list-unquote-t    true  (is (cadr `(a ,t)) t))      ; ,t: the truth value
+(test-is qq-vs-quote-list-t   true  (is (cadr `(a t)) (cadr '(a t)))) ; qq == quote
+
+; --- nil: one value everywhere (only (sym "nil") makes a distinct symbol) ---
+(test-is nil-self          true  (is nil nil))
+(test-is nil-quote         true  (is nil 'nil))
+(test-is nil-qq            true  (is nil `nil))
+(test-is nil-empty-list    true  (is nil '()))
+(test-is nil-paren         true  (is nil ()))
+(test-is nil-in-list       true  (is (car '(nil)) nil))   ; nil in data IS nil (unlike t)
+(test-is nil-is-false      true  (is nil false))
+(test-is no-nil            true  (no nil))
+(test-is no-quote-nil      true  (no 'nil))
+(test-is no-empty-list     true  (no '()))
+(test-is no-list-nil       true  (no (car '(nil))))
+(test-is type-nil-is-sym   true  (is (type nil) 'sym))
+(test-is write-nil         "nil" (writes nil))
+(test-is nil-eq-quote-upcase-nil true (is nil 'NIL))       ; case-insensitive
+(test-is write-quote-upcase-nil  "nil" (writes 'NIL))
+; (sym "nil") is a distinct bindable symbol, not the empty value
+(test-is nil-not-sym-nil       false (is nil (sym "nil")))
+(test-is quote-nil-not-sym-nil false (is 'nil (sym "nil")))
+(test-is no-sym-nil            false (no (sym "nil")))      ; a symbol, hence truthy
+(test-is nil-not-sym-upcase-nil false (is nil (sym "NIL")))
+(test-is sym-nil-eq-sym-upcase-nil true (is (sym "nil") (sym "NIL"))) ; case-insensitive
+
+; --- quasiquote agrees with quote for plain data ---
+(test-is qq-nil            true  (is `nil nil))
+(test-is qq-list-nil       true  (is `(a nil) '(a nil)))
+(test-is qq-unquote-t      true  (is `,t t))
+
+; --- general symbol case: case-insensitive + construction agreement ---
+(test-is sym-foo-self         true (is 'foo 'foo))
+(test-is sym-foo-agree        true (is 'foo (sym "foo")))
+(test-is quote-upcase-foo-agree      true (is 'FOO (sym "FOO")))
+(test-is foo-eq-upcase-foo    true (is 'foo 'FOO))
+(test-is foo-eq-cap-foo       true (is 'foo 'Foo))
+(test-is sym-foo-eq-sym-upcase-foo   true (is (sym "foo") (sym "FOO")))
+(test-is quote-foo-eq-sym-upcase-foo true (is 'foo (sym "FOO")))
+(test-is write-quote-lc-foo   "foo" (writes 'foo))
+(test-is write-quote-upcase-foo      "foo" (writes 'FOO))
+
+; ---------------------------------------------------------------------------
+; (eval ...) round-trips: which "t" you feed a binder decides the result.
+;
+; A bindable t as the parameter name binds like any symbol.  But 't is the
+; TRUTH VALUE, so building code with 't puts the truth value where you might
+; have wanted the symbol -- illegal as a parameter (compile error), and in
+; body position it is just that value, not the binding.  To construct a
+; bindable t at runtime, use (sym "t") (the symbol), not 't (the value).
+
+; eval FORM but muffle SBCL's compile-error chatter and turn a failed
+; compile/eval into the sentinel 'ERROR, so a mismatch is a value, not noise.
+
+(def mute (thunk)
+  #`(cl::let ((cl::*error-output* (cl::make-broadcast-stream)))
+      (arc::arc-call0 #,thunk)))
+
+(def eval-quiet (form)
+  (on-err (fn (e) 'ERROR) (fn () (mute (fn () (eval form))))))
+
+; sanity: eval of code that doesn't bind t behaves normally
+(test-is eval-plain            5    (eval-quiet '(+ 2 3)))
+(test-is eval-is-t-quote-t     true (eval-quiet '(is t 't)))
+(test-is eval-is-nil-quote-nil true (eval-quiet '(is nil 'nil)))
+(test-is eval-quote-t-form     true (is (eval-quiet '(quote t)) t))
+
+; a bindable t as the parameter binds and returns fine, however constructed
+(test-is eval-quote-let-t    5  (eval-quiet '(let t 5 t)))       ; list-t is bindable
+(test-is eval-qq-let-t       5  (eval-quiet `(let t 5 t)))
+(test-is eval-list-sym-let-t 5  (eval-quiet (list 'let (sym "t") 5 (sym "t"))))
+(test-is eval-with-t         5  (eval-quiet '(with (t 5) t)))
+(test-is eval-quote-fn-t     42 (eval-quiet '((fn (t) t) 42)))
+(test-is eval-qq-fn-t        42 (eval-quiet `((fn (t) t) 42)))
+(test-is eval-list-sym-fn-t  42 (eval-quiet (list (list 'fn (list (sym "t")) (sym "t")) 42)))
+
+; the TRUTH value t ('t) as a parameter name is illegal -> compile error
+(test-is eval-list-quote-let-t 'ERROR (eval-quiet (list 'let 't 5 't)))
+(test-is eval-qq-unquote-bind  'ERROR (eval-quiet `(let ,'t 5 t)))
+(test-is eval-list-fn-t        'ERROR (eval-quiet (list (list 'fn (list 't) 't) 42)))
+
+; the truth value t in the body is that value, not the bound variable
+(test-is eval-qq-unquote-body  true (is (eval-quiet `(let t 5 ,'t)) t))
+(test-is eval-body-binds       5    (eval-quiet `(let t 5 t)))   ; contrast: bindable t
+
+; construction paths agree with each other and with direct evaluation
+(test-is eval-quote-eq-direct  true (is (let t 5 t) (eval-quiet '(let t 5 t))))
+(test-is eval-quote-eq-qq      true (is (eval-quiet '(let t 5 t))
+                                        (eval-quiet `(let t 5 t))))
+
 (when (main)
   (run-tests))

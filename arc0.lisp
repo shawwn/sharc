@@ -41,6 +41,14 @@
   "Case-insensitive comparison of symbol X to string NAME."
   (and (symbolp x) (string-equal (symbol-name x) name)))
 
+(defun arc-str->sym (str)
+  "String -> Arc symbol, case-folded to lowercase so (sym ...) / coerce agree
+with the reader (symbols are case-insensitive here): (sym \"FOO\") is 'foo.
+t and nil are NOT canonicalized to the truth/empty values: (sym \"t\") is the
+bindable symbol named t, the same object the t inside '(t) is -- distinct from
+the truth value t.  See the identity tests in test.arc."
+  (intern (string-downcase str) :arc))
+
 ;;;; ============================================================
 ;;;; Global variable table  (key = lowercase string)
 ;;;; ============================================================
@@ -498,7 +506,7 @@
       ((characterp x)
        (cond ((string= tname "int")    (char-code x))
              ((string= tname "string") (string x))
-             ((string= tname "sym")    (intern (string x) :arc))
+             ((string= tname "sym")    (arc-str->sym (string x)))
              (t (error "Can't coerce char ~S to ~S" x type))))
       ((and (integerp x) (= x (truncate x)))
        (cond ((string= tname "num")    x)
@@ -514,7 +522,7 @@
              ((string= tname "string") (format nil "~A" x))
              (t (error "Can't coerce num ~S to ~S" x type))))
       ((stringp x)
-       (cond ((string= tname "sym")    (intern x :arc))
+       (cond ((string= tname "sym")    (arc-str->sym x))
              ((string= tname "cons")   (coerce x 'list))
              ((string= tname "char")
               (if (= (length x) 1)

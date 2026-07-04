@@ -503,7 +503,7 @@ errors out clearly rather than polluting (often locked) CL packages."
     ;; ((function fn) args...) above, but lets you drop the #'.
     ((foreign-cl-call-p s)
      (cons (car s) (mapcar #'ac (cdr s))))
-    ((arc-sym= (arc-car? s) "quote") (list 'quote (ac-quoted (cadr s))))
+    ((arc-sym= (arc-car? s) "quote") (list 'quote (ac-quoted (cadr s) t)))
     ((arc-sym= (arc-car? s) "quasiquote") (ac-qq (cadr s)))
     ((arc-sym= (arc-car? s) "quasisyntax") (ac-qs (cadr s)))
     ((arc-sym= (arc-car? s) "unsyntax")
@@ -612,9 +612,11 @@ isn't shadowed by a lexical binding."
         ((arc-package-symbol-p x) (cl-sym x))
         (t x)))
 
-(defun ac-quoted (x)
+(defun ac-quoted (x &optional fold-t)
   (cond ((null x) nil)
         ((eq x t) t)
+        ; needed for (is t 't) to return t, and (eval '(let t 5 t)) to work.
+        ((and fold-t (arc-sym= x "t")) t)
         ((consp x)                (arc-imap #'ac-quoted x))
         ((arc-package-symbol-p x) (arc-sym x))
         (t x)))
@@ -627,7 +629,7 @@ isn't shadowed by a lexical binding."
 
 (defun ac-qq (x)
   "Entry: compile Arc (quasiquote x) to list-building CL code."
-  (ac-qq1 1 x))
+  (if (arc-sym= x "t") t (ac-qq1 1 x)))
 
 (defun ac-qq1 (level x)
   (cond
