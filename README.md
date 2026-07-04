@@ -56,6 +56,17 @@ For production deployments, instead of autoreload, you can manually
 slightly slower since it has to check the modification times of every
 arc file.)
 
+## How I run News
+
+My daily driver for News is:
+
+```
+DEV=t lwrap ./sharc news.arc
+```
+
+where [lwrap](https://github.com/shawwn/scrap/blob/master/lwrap) is a
+wrapper over rlwrap that makes editing nicer for lisp. ("lisp-wrap.")
+
 ## Email
 
 News sends password reset emails via [Resend](https://resend.com)'s
