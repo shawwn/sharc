@@ -63,13 +63,13 @@
        (pr ,(string " " key "=\"#") (hexrep ,gv) #\"))))
 
 (def opstring (key val)
-  `(aif ,val (pr ,(+ " " key "=\"") it #\")))
+  `(aif ,val (pr ,(+ " " key "=\"") (sanitize it) #\")))
 
 (def opnum (key val)
-  `(aif ,val (pr ,(+ " " key "=\"") it #\")))
+  `(aif ,val (pr ,(+ " " key "=\"") (sanitize it) #\")))
 
 (def opsym (key val)
-  `(aif ,val (pr ,(+ " " key "=\"") it #\")))
+  `(aif ,val (pr ,(+ " " key "=\"") (sanitize it) #\")))
 
 (def opyesno (key val)
   `(case (downcase:string ,val)
@@ -88,20 +88,52 @@
   `(if ,val (pr " checked")))
 
 (def opesc (key val)
-  `(awhen ,val
-     (pr ,(string " " key "=\""))
-     (if (isa it 'string) (pr-escaped it) (pr it))
-     (pr  #\")))
+  `(awhen ,val (pr ,(string " " key "=\"")) (presc it) (pr  #\")))
 
-; need to escape more?  =?
+(def uneschtml (str)
+  (multisubst '(("&lt;"   "<")
+                ("&gt;"   ">")
+                ("&amp;"  "&")
+                ("&quot;" "\"")
+                ("&#x27;" "'")
+                ("&#x2F;" "/")
+                ("&#x3D;" "=")
+                ("&nbsp;" " "))
+              str))
 
-(def pr-escaped (x)
-  (each c x 
-    (pr (case c #\<  "&#60;"  
-                #\>  "&#62;"  
-                #\"  "&#34;"  
-                #\&  "&#38;"
-                c))))
+(def uneschtml-char (s (o i))
+  (if (litmatch "&lt;" s i)   (list #\< (+ i 4))
+      (litmatch "&gt;" s i)   (list #\> (+ i 4))
+      (litmatch "&amp;" s i)  (list #\& (+ i 5))
+      (litmatch "&quot;" s i) (list #\" (+ i 6))
+      (litmatch "&#x27;" s i) (list #\' (+ i 6))
+      (litmatch "&#x2F;" s i) (list #\/ (+ i 6))
+                              (list (s i) (+ i 1))))
+
+(def eschtml-char (c)
+  (case c
+    #\<  "&lt;"
+    #\>  "&gt;"
+    #\&  "&amp;"
+    #\"  "&quot;"
+    #\'  "&#x27;"
+    #\/  "&#x2F;"
+    c))
+
+(def eschtml (str)
+  (tostring
+    (each c str
+      (pr (eschtml-char c)))))
+
+(def sanitize (val)
+  (case (type val)
+    sym    (sym:sanitize:string val)
+    char   (eschtml-char val)
+    string (eschtml val)
+           val))
+
+(def presc args
+  (apply pr (map sanitize args)))
 
 (attribute a          href           opstring)
 (attribute a          rel            opstring)
@@ -265,7 +297,7 @@
   (tag (select name name)
     (each i items
       (tag (option selected (is i sel))
-        (pr i)))))
+        (presc i)))))
 
 (mac whitepage body
   `(tag html 
@@ -364,58 +396,14 @@
        ,@body
        (pr "]]>")))
 
-(def eschtml-char (c)
-  (case c
-    #\<  "&lt;"
-    #\>  "&gt;"
-    #\&  "&amp;"
-    #\"  "&quot;"
-    #\'  "&#x27;"
-    #\/  "&#x2F;"
-    c))
-
-(def uneschtml-char (s (o i))
-  (if (litmatch "&lt;" s i)   (list #\< (+ i 4))
-      (litmatch "&gt;" s i)   (list #\> (+ i 4))
-      (litmatch "&amp;" s i)  (list #\& (+ i 5))
-      (litmatch "&quot;" s i) (list #\" (+ i 6))
-      (litmatch "&#x27;" s i) (list #\' (+ i 6))
-      (litmatch "&#x2F;" s i) (list #\/ (+ i 6))
-                              (list (s i) (+ i 1))))
-
-
-(def eschtml (str)
-  (tostring 
-    (each c str
-      (pr (eschtml-char c)))))
-
-(def esc-tags (str)
-  (tostring 
-    (each c str
-      (pr (case c #\<  "&lt;"
-                  #\>  "&gt;"
-                  #\&  "&amp;"
-                        c)))))
-
-(def uneschtml (str)
-  (multisubst '(("&amp;"  "&")
-                ("&lt;"   "<")
-                ("&gt;"   ">")
-                ("&quot;" "\"")
-                ("&#x27;" "'")
-                ("&#x2F;" "/")
-                ("&#x3D;" "=")
-                ("&nbsp;" " "))
-              str))
-
 (def nbsp () (pr "&nbsp;"))
 
 (def link (text (o dest text) (o id))
   (tag (a id id href dest)
-    (pr text)))
+    (presc text)))
 
 (def underlink (text (o dest text))
-  (tag (a href dest) (tag u (pr text))))
+  (tag (a href dest) (tag u (presc text))))
 
 (def striptags (s)
   (let intag nil
@@ -424,9 +412,6 @@
         (if (is c #\<) (set intag)
             (is c #\>) (wipe intag)
             (no intag) (pr c))))))
-
-(def clean-url (u)
-  (rem [in _ #\" #\' #\< #\>] u))
 
 (def shortlink (url)
   (unless (or (no url) (< (len url) 7))
@@ -456,8 +441,7 @@
 (defmemo valid-url (url)
   (and (len> url 10)
        (or (begins url "http://")
-           (begins url "https://"))
-       (~find [in _ #\< #\> #\" #\'] url)))
+           (begins url "https://"))))
 
 (mac fontcolor (c . body)
   (w/uniq g

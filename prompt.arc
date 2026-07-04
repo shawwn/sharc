@@ -22,7 +22,7 @@
       (hspace 20)
       (pr user " | ")
       (link "logout")
-      (unless (blank m) (hspace 10) (pr:eschtml m))
+      (unless (blank m) (hspace 10) (presc m))
       (br2)
       (tag (table border 0 cellspacing 10)
         (each app (dir (+ appdir* user))

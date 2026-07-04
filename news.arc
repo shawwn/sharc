@@ -438,7 +438,7 @@
        (gen-css-url)
        (gentag link rel "shortcut icon" href favicon-url*)
        (tag (script src (static-src "hn.js")))
-       (tag title (pr ,title)))
+       (tag title (presc ,title)))
      (tag body 
        (center
          (tag (table id 'hnmain border 0 cellpadding 0 cellspacing 0 width "85%"
@@ -1002,7 +1002,7 @@
                 "from"
                 (string (when (is kind 'story)
                           "Submissions from ")
-                        (eschtml site))
+                        site)
                 (fromurl site) nil
                 [fromurl site _]))))
 
@@ -1251,7 +1251,7 @@
                       nil)
             rel  (unless (or toself (> (realscore s) follow-threshold*))
                    'nofollow)) 
-      (pr:eschtml s!title))))
+      (presc s!title))))
       
 (def pseudo-text (i)
   (if i!deleted   "[deleted]"
@@ -1866,9 +1866,7 @@
 (def submit-page ((o url "") (o title "") (o text "") (o msg))
   (minipage "Submit"
     (pagemessage msg)
-    (urform (process-story (clean-url arg!url)
-                           (striptags arg!title)
-                           arg!text)
+    (urform (process-story arg!url arg!title arg!text)
       (tab
         (row "title"  (input "title" title 50))
         (row "url"    (input "url" url 50))
@@ -2152,9 +2150,9 @@
 (def newpoll-page ((o title "Poll: ") (o text "") (o opts "") (o msg))
   (minipage "New Poll"
     (pagemessage msg)
-    (urform (process-poll (striptags arg!title)
+    (urform (process-poll arg!title
                           (md-from-form arg!text t)
-                          (striptags arg!choices))
+                          arg!choices)
       (tab
         (row "title"   (input "title" title 50))
         (row "text"    (textarea "text" 4 50 (only&pr text)))
@@ -2201,7 +2199,7 @@
 
 (def add-pollopt-page (p)
   (minipage "Add Poll Choice"
-    (urform (do (add-pollopt p (striptags arg!x))
+    (urform (do (add-pollopt p arg!x)
                 (item-url p!id))
       (tab
         (row "text" (textarea "x" 4 50))
@@ -2227,10 +2225,10 @@
       (tag (div style "margin-top:1px;margin-bottom:0px")
         (if (~cansee o) (pr (pseudo-text o))
             (~live o)        (spanclass cdd
-                               (pr (if (~blank o!title) o!title o!text)))
+                               (presc (if (~blank o!title) o!title o!text)))
                              (if (and (~blank o!title) (~blank o!url))
                                  (link o!title o!url)
-                                 (fontcolor black (pr o!text)))))))
+                                 (fontcolor black (presc o!text)))))))
   (tr (if n (td))
       (td)
       (tag (td class 'default)
@@ -2740,7 +2738,7 @@
 
 (def clickylink (text (o url text) (o class 'clicky) (o aria-hidden t))
   (tag (a href url class class aria-hidden aria-hidden)
-    (pr text)))
+    (presc text)))
 
 (def rootlink (c whence)
   (whenlet root (root-comment c)
@@ -2930,9 +2928,9 @@
       (each s stories
         (tag item
           (let comurl (+ site-url* "/" (item-url s!id))
-            (tag title    (pr (eschtml s!title)))
-            (tag link     (pr (if (blank s!url) comurl (eschtml s!url))))
-            (tag comments (pr comurl))
+            (tag title    (presc s!title))
+            (tag link     (presc (if (blank s!url) comurl s!url)))
+            (tag comments (presc comurl))
             (tag description
               (cdata (link "Comments" comurl)))))))))
 

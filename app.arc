@@ -396,14 +396,14 @@
                      size formwid*)
       (in typ 'syms 'text 'doc 'mdtext 'mdtext2 'lines 'bigtoks)
        (let text (if (in typ 'syms 'bigtoks)
-                      (tostring (apply prs val))
+                      (tostring (apply prs (map sanitize val)))
                      (is typ 'lines)
-                      (tostring (apply pr (intersperse #\newline val)))
+                      (tostring (apply pr (intersperse #\newline (map sanitize val))))
                      (in typ 'mdtext 'mdtext2)
-                      (unmarkdown val)
+                      (sanitize:unmarkdown val)
                      (no val)
                       ""
-                     val)
+                     (sanitize val))
          (tag (textarea name id
                         cols (if (is typ 'doc) bigformwid* formwid*) 
                         rows (needrows text formwid* 4)
@@ -442,15 +442,16 @@
               (roundup (/ (len text) (- cols 5))))))
 
 (def varline (typ id val (o liveurls))
-  (if (in typ 'users 'syms 'toks 'bigtoks)  (apply prs val)
-      (is typ 'lines)                       (map prn val)
+  (if (in typ 'users 'syms 'toks 'bigtoks)  (apply prs (map sanitize val))
+      (is typ 'lines)                       (map prn:sanitize val)
       (is typ 'yesno)                       (pr (if val 'yes 'no))
       (caris typ 'choice)                   (varline (cadr typ) nil val)
       (is typ 'url)                         (if (and liveurls (valid-url val))
-                                                (link val val)
-                                                (pr val))
-      (text-type typ)                       (pr (or val ""))
-                                            (pr val)))
+                                                (link val)
+                                                (pr (sanitize val)))
+      (in typ 'mdtext 'mdtext2)             (pr (or val ""))
+      (text-type typ)                       (pr (or (sanitize val) ""))
+                                            (pr (sanitize val))))
 
 (def text-type (typ) (in typ 'string 'string1 'url 'text 'mdtext 'mdtext2))
 
@@ -458,22 +459,18 @@
 ; remove the /rs in individual cases below.  Could do it in aform or
 ; even in the parsing of http requests, in the server.
 
-; Need the calls to striptags so that news users can't get html
-; into a title or comment by editing it.  If want a form that 
-; can take html, just create another typ for it.
-
 (def readvar (typ str (o fail nil))
   (case (carif typ)
-    string  (striptags str)
-    string1 (if (blank str) fail (striptags str))
-    url     (if (blank str) "" (valid-url str) (clean-url str) fail)
+    string  str
+    string1 (if (blank str) fail str)
+    url     (if (blank str) "" (valid-url str) str fail)
     num     (let n (saferead str) (if (number n) n fail))
     int     (let n (saferead str)
               (if (number n) (round n) fail))
     posint  (let n (saferead str)
               (if (and (number n) (> n 0)) (round n) fail))
-    text    (striptags str)
-    doc     (striptags str)
+    text    str
+    doc     str
     mdtext  (md-from-form str)
     mdtext2 (md-from-form str t)                      ; for md with no links
     sym     (or (sym:car:tokens str) fail)
@@ -562,7 +559,7 @@
         (iflet (newi spaces) (indented-code s i (if (is i 0) 2 0))
                (do (pr  "<p><pre><code>")
                  (let cb (code-block s (- newi spaces 1))
-                   (pr (eschtml cb))
+                   (presc cb)
                    (= i (+ (- newi spaces 1) (len cb))))
                  (pr "</code></pre>"))
                (iflet newi (parabreak s i (if (is i 0) 1 0))
@@ -591,12 +588,10 @@
                                (litmatch "https://" s i)))
                        (withs (n   (urlend s i)
                                url (cut s i n))
-                         (link (eschtml (if (no maxurl)
-                                            url
-                                            (ellipsize url maxurl)))
-                               (eschtml url))
+                         (link (if (no maxurl) url (ellipsize url maxurl))
+                               url)
                          (= i (- n 1)))
-                       (pr (eschtml-char (s i)))))))))
+                       (presc (s i))))))))
 
 (def indented-code (s i (o newlines 0) (o spaces 0))
   (let c (s i)

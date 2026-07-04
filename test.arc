@@ -1042,8 +1042,6 @@ c"
   (test? "&lt;a&gt;"            (eschtml "<a>"))
   (test? "&amp;"               (eschtml "&"))
   (test? "&quot;&#x27;&#x2F;"   (eschtml "\"'/"))
-  ; esc-tags only touches < > &
-  (test? "&lt;a&gt;&amp;\"'/"   (esc-tags "<a>&\"'/"))
   ; every char eschtml-char escapes round-trips back through uneschtml-char
   (each c '(#\< #\> #\& #\" #\' #\/)
     (let (back end) (uneschtml-char (eschtml-char c) 0)
