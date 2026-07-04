@@ -9,12 +9,12 @@
 
 (declare 'atstrings t)
 
-(= this-site*    "My Forum"
+(= this-site*    "HN Simulator"
    site-url*     "http://localhost:8080" ; no trailing slash
    site-email*   "hn@@ycombinator.lol"
    parent-url*   "/"
    favicon-url*  ""
-   site-desc*    "What this site is about." ; for rss feed
+   site-desc*    "Hacker News simulator" ; for rss feed
    site-color*   (color 170 170 230)
    border-color* (color 170 170 230))
 
