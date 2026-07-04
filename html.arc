@@ -36,8 +36,8 @@
         (name type title) opstring
         (class style src) opstring
         (onclick onfocus) opstring
-        (width height)    opnum
         (color bgcolor)   opcolor
+        (width height)    opnum
         tabindex          opnum
         aria-hidden       opbool
         spellcheck        opbool
