@@ -130,11 +130,11 @@
             (= (votes* u) (load-table it)))))
           
 (def init-user (u)
-  (= (votes* u) (table) 
-     (profs* u) (inst 'profile 'id u))
-  (save-votes u)
-  (save-prof u)
-  u)
+  (unless (file-exists (+ profdir* u))
+    (or= (votes* u) (table) 
+         (profs* u) (inst 'profile 'id u))
+    (save-votes u)
+    (save-prof u)))
 
 ; Need this because can create users on the server (for other apps)
 ; without setting up places to store their state as news users.
