@@ -7,8 +7,6 @@
 
 ; bug: somehow (+ votedir* nil) is getting evaluated.
 
-(declare 'atstrings t)
-
 (= this-site*    "HN Simulator"
    site-url*     "http://localhost:8080" ; no trailing slash
    site-email*   "hn@@ycombinator.lol"
