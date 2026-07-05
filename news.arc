@@ -1192,11 +1192,11 @@
             (when (in s!type 'story 'poll) (commentlink s))
             (when (apoll s) (addoptlink s))
             (unless i (flaglink s whence))
-            (unless (blank s!text) (linkslink s whence))
             (killlink s whence)
             (blastlink s whence)
             (blastlink s whence t)
             (deletelink s whence)
+            (unless (blank s!text) (linkslink s whence))
             (if (admin) (fromlink s)))))))
 
 (def fromlink (s)
