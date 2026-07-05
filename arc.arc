@@ -1371,6 +1371,12 @@
   (or (errsafe:load-table filename)
       (table)))
 
+(def dirs (path)
+  (aand (dir path)
+        ; can't use endmatch, strings.arc isn't loaded yet
+        ;(keep [endmatch "/" _] it)
+        (keep [is #\/ (_ (edge _))] it)))
+
 (def ensure-dir (path)
   (unless (dir-exists path)
     (system (string "mkdir -p " path))))
