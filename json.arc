@@ -46,6 +46,7 @@
   (if (in x nil 'null) (pr "null")
       (in x t 'true)   (pr "true")
       (is x 'false)    (pr "false")
+      (is x 'empty)    (pr "[]")
       (isa!int x)      (pr x)
       (isa!num x)      (pr x)
       (isa!string x)   (json-write-string x)
