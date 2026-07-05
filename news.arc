@@ -830,7 +830,7 @@
         (userlink user nil (me user))))))
 
 (def resetpw-link ()
-  (tostring (underlink "reset password" "resetpw")))
+  (tostring:underlink "reset password" "resetpw"))
 
 (def user-submissions-link ((t user me))
   (tostring:underlink "submissions" (submitted-url user)))
