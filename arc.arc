@@ -31,12 +31,12 @@
 (assign do (annotate 'mac
              (fn args `(%do ,@args))))
 
+(assign warnset (fn (var) nil))
+
 (assign safeset (annotate 'mac
                   (fn (var val)
                     `(do (if (bound ',var)
-                             (do (disp "*** redefining " (stderr))
-                                 (disp ',var (stderr))
-                                 (disp #\newline (stderr))))
+                             (warnset ',var))
                          (assign ,var ,val)))))
 
 (assign mac (annotate 'mac
@@ -1822,6 +1822,12 @@
                  (a `(list ',x
                            (fn () ,x)
                            (fn (,h) (assign ,x ,h)))))))))
+
+; re-enable redef warning
+
+(def warnset (var)
+  (w/stdout (stderr)
+    (prn "*** redefining " var)))
 
 ; any logical reason I can't say (push x (if foo y z)) ?
 ;   eval would have to always ret 2 things, the val and where it came from
