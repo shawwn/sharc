@@ -340,7 +340,7 @@
     (let rec (obj type 'comment dead nil flagged nil collapsed nil deleted nil)
       ; collapsed: class="athing comtr coll"
       (when (posmatch "comtr coll" row 0)
-        (= rec!collapsed t))
+        (set rec!collapsed))
       ; id="..."
       (aif (html-attr row 0 "id")
            (= rec!id (errsafe:int it)))
@@ -360,8 +360,8 @@
         (aif (between comhead "<span class=\"age\" title=\"" "\"" 0)
              (let toks (tokens (car it))
                (when toks (= rec!time (errsafe:int (last toks))))))
-        (when (posmatch "[flagged]" comhead) (= rec!flagged t))
-        (when (posmatch "[dead]"    comhead) (= rec!dead    t))
+        (when (posmatch "[flagged]" comhead) (set rec!flagged))
+        (when (posmatch "[dead]"    comhead) (set rec!dead))
         (aif (between comhead "class=\"togg clicky\"" "</a>" 0)
              (aif (html-attr (car it) 0 "n")
                   (= rec!descendants (or (errsafe:int it) 0)))))
@@ -406,11 +406,11 @@
   ; HN render order while preserving history).
   (with (new-ids (table) merged nil)
     (each c new-comments
-      (= (new-ids c!id) t)
+      (set (new-ids c!id))
       (push c merged))
     (each c old-comments
       (unless (new-ids c!id)
-        (= c!deleted t)
+        (set c!deleted)
         (push c merged)))
     (rev merged)))
 
