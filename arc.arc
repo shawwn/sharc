@@ -1005,17 +1005,11 @@
 (mac defmemo (name parms . body)
   `(safeset ,name (memo (fn ,parms ,@body))))
 
-(def <= args
-  (or (no args)
-      (no (cdr args))
-      (and (no (> (car args) (cadr args)))
-           (apply <= (cdr args)))))
+(def <= (x y . zs)
+  (and (no (> x y)) (if zs (apply <= y zs) t)))
 
-(def >= args
-  (or (no args)
-      (no (cdr args))
-      (and (no (< (car args) (cadr args)))
-           (apply >= (cdr args)))))
+(def >= (x y . zs)
+  (and (no (< x y)) (if zs (apply >= y zs) t)))
 
 (def whitec (c)
   (in c #\space #\newline #\tab #\return))
