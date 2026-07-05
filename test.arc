@@ -134,11 +134,11 @@
   (test? 4 (trunc 4.78)))
 
 (define-test med
-  (test? 2   (med '(3 1 2)))      ; odd: middle element
-  (test? 3   (med '(1 2 3 4 5)))  ; odd, longer
-  (test? 5/2 (med '(4 1 2 3)))    ; even: average of the two middles
-  (test? 15  (med '(10 20)))      ; even pair
-  (test? 7   (med '(7))))         ; single element
+  (test? 2   (med '(3 1 2))) ; odd: middle element
+  (test? 3   (med '(1 2 3 4 5))) ; odd, longer
+  (test? 5/2 (med '(4 1 2 3))) ; even: average of the two middles
+  (test? 15  (med '(10 20))) ; even pair
+  (test? 7   (med '(7)))) ; single element
 
 (define-test precedence
   (test? -3 (- (+ 1 2)))
@@ -326,8 +326,8 @@ c"
 
 (define-test adjoin
   ; default test is is
-  (test? '(1 2 3)   (adjoin 2 '(1 2 3)))   ; already present, no dup
-  (test? '(9 1 2 3) (adjoin 9 '(1 2 3)))   ; absent, prepend
+  (test? '(1 2 3)   (adjoin 2 '(1 2 3))) ; already present, no dup
+  (test? '(9 1 2 3) (adjoin 9 '(1 2 3))) ; absent, prepend
   ; with custom test: some elt > 2 already, so 2 is "present"
   (test? '(1 2 3)   (adjoin 2 '(1 2 3) >))
   ; none > 9, so 9 is added
@@ -339,7 +339,7 @@ c"
     (setmem t 9 s)
     (test? '(9 1 2 3) s))
   (with (s (list 1 2 3))
-    (setmem t 2 s)             ; already present, no dup
+    (setmem t 2 s) ; already present, no dup
     (test? '(1 2 3) s))
   ; nil test => rem
   (with (s (list 1 2 3 2))
@@ -347,7 +347,7 @@ c"
     (test? '(1 3) s))
   ; with cmp arg
   (with (s (list 1 2 3 4))
-    (setmem nil 2 s >)         ; remove elts > 2
+    (setmem nil 2 s >) ; remove elts > 2
     (test? '(1 2) s)))
 
 (define-test mem-place
@@ -360,15 +360,15 @@ c"
 
 (define-test pushnew
   (with (s (list 1 2 3))
-    (pushnew 2 s)              ; present, no change
+    (pushnew 2 s) ; present, no change
     (test? '(1 2 3) s)
-    (pushnew 9 s)              ; absent, prepend
+    (pushnew 9 s) ; absent, prepend
     (test? '(9 1 2 3) s))
   ; with test arg
   (with (s (list 1 2 3))
-    (pushnew 9 s >)            ; none > 9 => add
+    (pushnew 9 s >) ; none > 9 => add
     (test? '(9 1 2 3) s)
-    (pushnew 0 s >)            ; some > 0 => no add
+    (pushnew 0 s >) ; some > 0 => no add
     (test? '(9 1 2 3) s)))
 
 (define-test pull
@@ -377,20 +377,20 @@ c"
     (test? '(1 3) s))
   ; with test arg
   (with (s (list 1 2 3 4))
-    (pull 2 s >)               ; remove elts > 2
+    (pull 2 s >) ; remove elts > 2
     (test? '(1 2) s)))
 
 (define-test togglemem
   (with (s (list 1 2 3))
-    (togglemem 9 s)            ; absent => add
+    (togglemem 9 s) ; absent => add
     (test? '(9 1 2 3) s)
-    (togglemem 9 s)            ; present => remove
+    (togglemem 9 s) ; present => remove
     (test? '(1 2 3) s))
   ; with test arg
   (with (s (list 1 2 3))
-    (togglemem 9 s >)          ; none > 9 => add
+    (togglemem 9 s >) ; none > 9 => add
     (test? '(9 1 2 3) s)
-    (togglemem 0 s >)          ; some > 0 => remove elts > 0
+    (togglemem 0 s >) ; some > 0 => remove elts > 0
     (test? nil s)))
 
 (define-test fn-names
@@ -421,7 +421,7 @@ c"
     (test? 'vector (type v)))
   ; coerce round-trips list <-> byte vector (ints in [0..255])
   (test? '(1 2 255) (coerce (coerce '(1 2 255) 'vector) 'cons))
-  (test? 0          (len (coerce nil 'vector)))    ; empty list -> empty vec
+  (test? 0          (len (coerce nil 'vector))) ; empty list -> empty vec
   ; is compares byte vectors elementwise
   (test? t   (is (coerce '(1 2 3) 'vector) (coerce '(1 2 3) 'vector)))
   (test? nil (is (coerce '(1 2 3) 'vector) (coerce '(1 2 4) 'vector)))
@@ -449,16 +449,16 @@ c"
   (let h (table)
     (let k (obj a 1)
       (= (h k) 'same)
-      (test? 'same (h k)))            ; same object -> found
-    (test? nil (h (obj a 1)))         ; distinct equal table -> not found
+      (test? 'same (h k))) ; same object -> found
+    (test? nil (h (obj a 1))) ; distinct equal table -> not found
     (test? 1   (len h))))
 
 (define-test isotable
   ; table keys are compared structurally (deep), unlike a regular table
   (let h (isotable)
     (= (h (obj a 1 b 2)) 'foo)
-    (test? 'foo (h (obj a 1 b 2)))    ; distinct table, same content -> found
-    (test? nil  (h (obj a 1)))        ; different content -> not found
+    (test? 'foo (h (obj a 1 b 2))) ; distinct table, same content -> found
+    (test? nil  (h (obj a 1))) ; different content -> not found
     (test? 1    (len h)))
   ; vector and cons keys also match by content
   (let h (isotable)
@@ -507,17 +507,50 @@ c"
     (test? src (w/infile i f (drain (readb i))))
     (rmfile f)))
 
+; ----- strings.arc -----
+
+(define-test tokens
+  (test? '("a" "b" "c") (tokens "a b  c")) ; runs of sep collapse
+  (test? '("abc")       (tokens "abc"))
+  (test? nil            (tokens ""))
+  (test? nil            (tokens "  "))
+  (test? '("a" "b" "c") (tokens "a,b,,c" #\,))) ; custom separator
+
+(define-test halve
+  (test? '("key" ": value") (halve "key: value" #\:)) ; splits on first sep only
+  (test? '("a" " b c")      (halve "a b c"))
+  (test? '("novalue")       (halve "novalue"))) ; no sep -> single elt
+
+(define-test positions
+  (test? '(1 3 5) (positions #\a "banana"))
+  (test? '(0 2 4) (positions odd '(1 2 3 4 5))) ; predicate form
+  (test? nil      (positions #\z "banana")))
+
+(define-test lines
+  (test? '("a" "b" "c") (lines "a\nb\nc"))
+  (test? '("a" "b" "")  (lines "a\r\nb\r\n")) ; \r stripped, trailing ""
+  (test? '("")          (lines "")))
+
+(define-test slices
+  (test? '("a" "b" "c") (slices "a-b-c" #\-))
+  (test? '("abc")       (slices "abc" #\-)))
+
+(define-test unreserved
+  (test? true  (unreserved #\a))
+  (test? true  (unreserved #\-))
+  (test? false (unreserved #\/)))
+
 (define-test urlencode
   ; ascii unreserved passes through; space and reserved are %-escaped
   (test? "abc-._~"    (urlencode "abc-._~"))
   (test? "a%20b"      (urlencode "a b"))
-  (test? "a%2bb"      (urlencode "a+b"))        ; literal + -> %2b
+  (test? "a%2bb"      (urlencode "a+b")) ; literal + -> %2b
   ; non-ascii becomes its utf-8 bytes
   (test? "h%c3%a9llo" (urlencode "héllo"))
   (test? "x%ce%bbx"   (urlencode "xλx"))
   ; urldecode inverts; + and %XX both denote a byte
   (test? "héllo" (urldecode "h%c3%a9llo"))
-  (test? "xλx"   (urldecode "x%ce%bbx"))         ; the doc example
+  (test? "xλx"   (urldecode "x%ce%bbx")) ; the doc example
   (test? "a b"   (urldecode "a+b"))
   (test? "a b"   (urldecode "a%20b"))
   (test? "a+b"   (urldecode "a%2bb"))
@@ -525,6 +558,70 @@ c"
   (test? "日本語" (urldecode (urlencode "日本語")))
   (test? "" (urlencode ""))
   (test? "" (urldecode "")))
+
+(define-test litmatch
+  (test? true  (litmatch "ab" "abcdef"))
+  (test? true  (litmatch "cd" "abcdef" 2)) ; match at offset
+  (test? false (litmatch "cd" "abcdef"))
+  (test? false (litmatch "xyz" "ab"))) ; pattern longer than string
+
+(define-test endmatch
+  (test? true  (endmatch "def" "abcdef"))
+  (test? false (endmatch "abc" "abcdef")))
+
+(define-test posmatch
+  (test? 2   (posmatch "cd" "abcdef"))
+  (test? nil (posmatch "zz" "abcdef"))
+  (test? 2   (posmatch odd '(2 4 5 6)))) ; predicate form
+
+(define-test headmatch
+  (test? true  (headmatch "abc" "abcdef"))
+  (test? false (headmatch "bcd" "abcdef"))
+  (test? true  (headmatch "cd" "abcdef" 2)))
+
+(define-test begins
+  (test? true  (begins "abcdef" "abc"))
+  (test? false (begins "abcdef" "xyz"))
+  (test? true  (begins '(1 2 3 4) '(1 2)))) ; works on lists too
+
+(define-test findsubseq
+  (test? 2   (findsubseq "cd" "abcdef"))
+  (test? nil (findsubseq "zz" "abcdef")))
+
+(define-test subst
+  (test? "aXcXd"   (subst "X" "b" "abcbd"))
+  (test? "x--y--z" (subst "--" "ab" "xabyabz"))) ; multi-char old/new
+
+(define-test multisubst
+  (test? "121" (multisubst '(("a" "1") ("bb" "2")) "abba")))
+
+(define-test blank
+  (test? true   (blank "   "))
+  (test? true   (blank ""))
+  (test? false  (blank " a "))
+  (test? "  x " (nonblank "  x "))
+  (test? nil    (nonblank "   ")))
+
+(define-test trim
+  (test? "hi"   (trim "  hi  "))
+  (test? "hi  " (trim "  hi  " 'front))
+  (test? "  hi" (trim "  hi  " 'end))
+  (test? "hi"   (trim "xxhixx" 'both [is _ #\x]))) ; custom trim test
+
+(define-test num
+  (test? "3.14"      (num 3.14159))
+  (test? "3.1416"    (num 3.14159 4)) ; digits arg
+  (test? "1,234,567" (num 1234567)) ; thousands commas
+  (test? "1,000"     (num 1000 0))
+  (test? "-42"       (num -42))
+  (test? ".50"       (num 0.5 2 t))) ; trail-zeros
+
+(define-test pluralize
+  (test? "cat"    (pluralize 1 "cat"))
+  (test? "cats"   (pluralize 2 "cat"))
+  (test? "cats"   (pluralize 0 "cat"))
+  (test? "1 cat"  (plural 1 "cat"))
+  (test? "3 cats" (plural 3 "cat")))
 
 (define-test quasiquote
   (test? (quote a) (quasiquote a))
@@ -1141,7 +1238,7 @@ c"
 (test-is t-not-sym-t          false (is t (sym "t")))
 (test-is quote-t-not-sym-t    false (is 't (sym "t")))
 (test-is list-t-not-t         false (is (car '(t)) t))
-(test-is no-list-t            false (no (car '(t))))   ; a symbol, hence truthy
+(test-is no-list-t            false (no (car '(t)))) ; a symbol, hence truthy
 (test-is no-sym-t             false (no (sym "t")))
 (test-is type-sym-t-is-sym    true  (is (type (sym "t")) 'sym))
 
@@ -1151,13 +1248,13 @@ c"
 (test-is sym-t-self           true  (is (sym "t") (sym "t")))
 (test-is sym-lc-t-eq-sym-upcase-t  true  (is (sym "t") (sym "T")))
 (test-is list-t-eq-sym-upcase-t    true  (is (car '(t)) (sym "T")))
-(test-is t-not-sym-upcase-t   false (is t (sym "T")))   ; still the symbol, not truth
+(test-is t-not-sym-upcase-t   false (is t (sym "T"))) ; still the symbol, not truth
 (test-is write-sym-lc-t       "t"   (writes (sym "t")))
 (test-is write-sym-upcase-t   "t"   (writes (sym "T")))
 
 ; --- unquote injects the VALUE, flipping list-t from symbol to truth value ---
-(test-is qq-list-t-symbol     false (is (cadr `(a t)) t))       ; literal t: symbol
-(test-is qq-list-unquote-t    true  (is (cadr `(a ,t)) t))      ; ,t: the truth value
+(test-is qq-list-t-symbol     false (is (cadr `(a t)) t)) ; literal t: symbol
+(test-is qq-list-unquote-t    true  (is (cadr `(a ,t)) t)) ; ,t: the truth value
 (test-is qq-vs-quote-list-t   true  (is (cadr `(a t)) (cadr '(a t)))) ; qq == quote
 
 ; --- nil: one value everywhere (only (sym "nil") makes a distinct symbol) ---
@@ -1166,7 +1263,7 @@ c"
 (test-is nil-qq            true  (is nil `nil))
 (test-is nil-empty-list    true  (is nil '()))
 (test-is nil-paren         true  (is nil ()))
-(test-is nil-in-list       true  (is (car '(nil)) nil))   ; nil in data IS nil (unlike t)
+(test-is nil-in-list       true  (is (car '(nil)) nil)) ; nil in data IS nil (unlike t)
 (test-is nil-is-false      true  (is nil false))
 (test-is no-nil            true  (no nil))
 (test-is no-quote-nil      true  (no 'nil))
@@ -1174,12 +1271,12 @@ c"
 (test-is no-list-nil       true  (no (car '(nil))))
 (test-is type-nil-is-sym   true  (is (type nil) 'sym))
 (test-is write-nil         "nil" (writes nil))
-(test-is nil-eq-quote-upcase-nil true (is nil 'NIL))       ; case-insensitive
+(test-is nil-eq-quote-upcase-nil true (is nil 'NIL)) ; case-insensitive
 (test-is write-quote-upcase-nil  "nil" (writes 'NIL))
 ; (sym "nil") is a distinct bindable symbol, not the empty value
 (test-is nil-not-sym-nil       false (is nil (sym "nil")))
 (test-is quote-nil-not-sym-nil false (is 'nil (sym "nil")))
-(test-is no-sym-nil            false (no (sym "nil")))      ; a symbol, hence truthy
+(test-is no-sym-nil            false (no (sym "nil"))) ; a symbol, hence truthy
 (test-is nil-not-sym-upcase-nil false (is nil (sym "NIL")))
 (test-is sym-nil-eq-sym-upcase-nil true (is (sym "nil") (sym "NIL"))) ; case-insensitive
 
@@ -1225,7 +1322,7 @@ c"
 (test-is eval-quote-t-form     true (is (eval-quiet '(quote t)) t))
 
 ; a bindable t as the parameter binds and returns fine, however constructed
-(test-is eval-quote-let-t    5  (eval-quiet '(let t 5 t)))       ; list-t is bindable
+(test-is eval-quote-let-t    5  (eval-quiet '(let t 5 t))) ; list-t is bindable
 (test-is eval-qq-let-t       5  (eval-quiet `(let t 5 t)))
 (test-is eval-list-sym-let-t 5  (eval-quiet (list 'let (sym "t") 5 (sym "t"))))
 (test-is eval-with-t         5  (eval-quiet '(with (t 5) t)))
@@ -1240,7 +1337,7 @@ c"
 
 ; the truth value t in the body is that value, not the bound variable
 (test-is eval-qq-unquote-body  true (is (eval-quiet `(let t 5 ,'t)) t))
-(test-is eval-body-binds       5    (eval-quiet `(let t 5 t)))   ; contrast: bindable t
+(test-is eval-body-binds       5    (eval-quiet `(let t 5 t))) ; contrast: bindable t
 
 ; construction paths agree with each other and with direct evaluation
 (test-is eval-quote-eq-direct  true (is (let t 5 t) (eval-quiet '(let t 5 t))))

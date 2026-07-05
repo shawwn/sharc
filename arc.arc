@@ -476,7 +476,7 @@
            (isa!table ,gseq)
             (maptable (fn ,var ,@body)
                       ,gseq)
-            (for ,gv 0 (- (len ,gseq) 1)
+            (for ,gv 0 (edge ,gseq)
               (let ,var (,gseq ,gv) ,@body))))))
 
 ; (nthcdr x y) = (cut y x).
@@ -492,8 +492,8 @@
           s2)
         (firstn (- end start) (nthcdr start seq)))))
 
-
-(def edge (xs) (- (len xs) 1))
+(def edge (xs (o i 1) . n)
+  (apply - (len xs) i n))
 
 (def almost (xs) (cut xs 0 (edge xs)))
       
@@ -928,7 +928,7 @@
       s)))
 
 (mac forlen (var s . body)
-  `(for ,var 0 (- (len ,s) 1) ,@body))
+  `(for ,var 0 (edge ,s) ,@body))
 
 (mac on (var s . body)
   (if (is var 'index)
@@ -1423,7 +1423,7 @@
      fns)))
 
 (def atend (i s)
-  (> i (- (len s) 2)))
+  (>= i (edge s)))
 
 (def multiple (x y)
   (is 0 (mod x y)))

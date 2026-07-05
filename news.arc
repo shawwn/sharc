@@ -2707,7 +2707,7 @@
   (let nav (table)
     ((afn (sibs parent next-after root)
        (withs (vs   (keep cansee-descendant sibs) ; only the ones that render
-               last (- (len vs) 1))
+               last (edge vs))
          (apply + 0 ; total of this sibling group
            (map (fn (j)
                   (let c (vs j)

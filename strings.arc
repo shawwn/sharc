@@ -69,7 +69,7 @@
       (forlen i s
         (caselet c (s i)
           #\+ (a 32)                                ; space
-          #\% (do (when (> (- (len s) i) 2)
+          #\% (do (when (> (edge s i) 2)
                     (a (int (cut s (+ i 1) (+ i 3)) 16)))
                   (++ i 2))
               (a (int c)))))                         ; literal byte
@@ -111,7 +111,7 @@
        (unless (> ,(len pat) (len ,gstring))
          (and ,@(let acc nil
                   (forlen i pat
-                    (push `(is ,(pat (- (len pat) 1 i)) 
+                    (push `(is ,(pat (edge pat 1 i))
                                (,gstring (- ,glen 1 ,i)))
                            acc))
                   (rev acc)))))))
@@ -119,9 +119,9 @@
 (def posmatch (pat seq (o start 0))
   (catch
     (if (isa!fn pat)
-        (for i start (- (len seq) 1)
+        (for i start (edge seq)
           (when (pat (seq i)) (throw i)))
-        (for i start (- (len seq) (len pat))
+        (for i start (edge seq (len pat))
           (when (headmatch pat seq i) (throw i))))
     nil))
 
@@ -134,15 +134,15 @@
      0)))
 
 (def begins (seq pat (o start 0))
-  (unless (len> pat (- (len seq) start))
+  (unless (len> pat (edge seq start))
     (headmatch pat seq start)))
 
 (def subst (new old seq)
-  (let boundary (+ (- (len seq) (len old)) 1)
+  (let boundary (edge seq (len old) -1)
     (tostring 
       (forlen i seq
         (if (and (< i boundary) (headmatch old seq i))
-            (do (++ i (- (len old) 1))
+            (do (++ i (edge old))
                 (pr new))
             (pr (seq i)))))))
 
@@ -150,14 +150,14 @@
   (tostring 
     (forlen i seq
       (iflet (old new) (find [begins seq (car _) i] pairs)
-        (do (++ i (- (len old) 1))
+        (do (++ i (edge old))
             (pr new))
         (pr (seq i))))))
 
 ; not a good name
 
 (def findsubseq (pat seq (o start 0))
-  (if (< (- (len seq) start) (len pat))
+  (if (< (edge seq start) (len pat))
        nil
       (if (headmatch pat seq start)
           start
@@ -174,7 +174,7 @@
         (cut s 
              (if (in where 'front 'both) p1 0)
              (when (in where 'end 'both)
-               (let i (- (len s) 1)
+               (let i (edge s)
                  (while (and (> i p1) (f (s i)))
                    (-- i))
                  (+ i 1))))
