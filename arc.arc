@@ -491,6 +491,11 @@
             (= (s2 i) (seq (+ start i))))
           s2)
         (firstn (- end start) (nthcdr start seq)))))
+
+
+(def edge (xs) (- (len xs) 1))
+
+(def almost (xs) (cut xs 0 (edge xs)))
       
 (mac whilet (var test . body)
   (w/uniq (gf gp)
