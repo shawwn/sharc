@@ -1909,7 +1909,7 @@
            (no (and (or (blank url) (valid-url url))
                     (~blank title)))
             (flink {submit-page url title text retry*})
-           (len> title title-limit*)
+           (unless (admin) (len> title title-limit*))
             (flink {submit-page url title text toolong*})
            ; could also match (recent-spam:sitename url)
            (big-spamsites*:sitename url)
@@ -2454,7 +2454,7 @@
       (hook 'edit i))))
 
 (def ignore-edit (i name val)
-  (case name title (len> val title-limit*)
+  (case name title (unless (admin) (len> val title-limit*))
              dead  (and (mem 'nokill i!keys) (~admin))))
 
  
