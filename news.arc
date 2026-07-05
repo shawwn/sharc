@@ -801,7 +801,7 @@
       (yesno   ignore      ,(p 'ignore)                             ,e  ,e)
       (num     weight      ,(p 'weight)                             ,a  ,a)
       (mdtext2 about       ,(p 'about)                               t  ,u)
-      (raw     nil         ,"<tr style=\"height:5px\"></tr>"        ,u  nil)
+      (raw     nil         ,(tostring:spacerow 5)                   ,u  nil)
       (string  nil         ,email-msg*                              ,u  nil)
       (string  email       ,(p 'email)                              ,u  ,u)
       (yesno   showdead    ,(p 'showdead)                           ,u  ,u)
