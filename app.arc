@@ -449,9 +449,13 @@
       (is typ 'url)                         (if (and liveurls (valid-url val))
                                                 (link val)
                                                 (pr (sanitize val)))
-      (in typ 'mdtext 'mdtext2)             (pr (or val ""))
+      (skip-sanitize typ id)                (pr (or val ""))
       (text-type typ)                       (pr (or (sanitize val) ""))
                                             (pr (sanitize val))))
+
+(def skip-sanitize (typ id)
+  (or (in typ 'mdtext 'mdtext2)
+      (and (is typ 'string) (is id nil))))
 
 (def text-type (typ) (in typ 'string 'string1 'url 'text 'mdtext 'mdtext2))
 
