@@ -98,12 +98,6 @@
   (noisy-each 100 id (dir profdir*)
     (load-user id)))
 
-; For some reason vote files occasionally get written out in a 
-; broken way.  The nature of the errors (random missing or extra
-; chars) suggests the bug is lower-level than anything in Arc.
-; Which unfortunately means all lists written to disk are probably
-; vulnerable to it, since that's all save-table does.
-
 (def load-user (u)
   (= (votes* u) (load-table (+ votedir* u))
      (profs* u) (temload 'profile (+ profdir* u)))
