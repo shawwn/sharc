@@ -154,6 +154,7 @@
 ; at expansion time, so (t u me) would bake in (the me)'s value
 ; at compile time -- nil -- in every call site. The quoted form
 ; keeps (me) in the expansion to be evaluated at each runtime call.
+
 (mac karma   ((o u '(me))) `(uvar ,u karma))
 (mac ignored ((o u '(me))) `(uvar ,u ignore))
 
