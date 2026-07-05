@@ -971,17 +971,17 @@
 (mac insort (test elt seq)
   `(zap [insert-sorted ,test ,elt _] ,seq))
 
-(def reinsert-sorted (test elt seq (o cmp id))
+(def reinsert-sorted (test elt seq (o same id))
   (if (no seq) 
        (list elt) 
-      (cmp elt (car seq))
-       (reinsert-sorted test elt (cdr seq) cmp)
+      (same elt (car seq))
+       (reinsert-sorted test elt (cdr seq) same)
       (test elt (car seq)) 
        (cons elt (rem elt seq))
-      (cons (car seq) (reinsert-sorted test elt (cdr seq) cmp))))
+      (cons (car seq) (reinsert-sorted test elt (cdr seq) same))))
 
-(mac insortnew (test elt seq . cmp)
-  `(zap [reinsert-sorted ,test ,elt _ ,@cmp] ,seq))
+(mac insortnew (test elt seq . same)
+  `(zap [reinsert-sorted ,test ,elt _ ,@same] ,seq))
 
 ; Could make this look at the sig of f and return a fn that took the 
 ; right no of args and didn't have to call apply (or list if 1 arg).
