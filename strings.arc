@@ -64,19 +64,18 @@
 ; > (urldecode "x%ce%bbx") => "xλx"
 
 (def urldecode (s)
-  (utf8-decode:coerce
+  (bytes->utf8
     (accum a
       (forlen i s
         (caselet c (s i)
-          #\+ (a 32)                                ; space
+          #\+ (a 32)                             ; space
           #\% (do (when (> (edge s i) 2)
                     (a (int (cut s (+ i 1) (+ i 3)) 16)))
                   (++ i 2))
-              (a (int c)))))                         ; literal byte
-    'vector))
+          (a (int c)))))))                       ; literal byte
 
-(def unreserved (c)
-  (or (alphadig c) (in c #\- #\. #\_ #\~)))
+(def bytes->utf8 (cs)
+  (utf8-decode (coerce cs 'vector)))
 
 (def urlencode (s)
   (tostring
@@ -87,6 +86,9 @@
             (do (writec #\%)
                 (if (< b 16) (writec #\0))
                 (pr (coerce b 'string 16))))))))
+
+(def unreserved (c)
+  (or (alphadig c) (in c #\- #\. #\_ #\~)))
 
 (mac litmatch (pat string (o start 0))
   (w/uniq (gstring gstart)
