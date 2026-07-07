@@ -8,7 +8,7 @@
 ;"\u0085"
 
 (def chars (s)
-  (assert (isa!string s))
+  (assert (in (type s) 'string 'vector))
   (coerce s 'cons))
 
 (def tokens (s (o sep whitec))
@@ -18,7 +18,7 @@
                    (test (car cs)) (self (cdr cs) (consif tok toks) nil)
                                    (self (cdr cs) toks (cons (car cs) tok))))
       (rev (map [coerce _ 'string]
-                (map rev (rec (coerce s 'cons) nil nil)))))))
+                (map rev (rec (chars s) nil nil)))))))
 
 ; names of cut, split, halve not optimal
 
@@ -29,7 +29,7 @@
                    (test (car cs)) (list cs (rev tok))
                                    (self (cdr cs) (cons (car cs) tok))))
       (rev (map [coerce _ 'string]
-                (rec (coerce s 'cons) nil))))))
+                (rec (chars s) nil))))))
 
 ; maybe promote to arc.arc, but if so include a list clause
 
@@ -83,7 +83,7 @@
 
 (def urlencode (s)
   (tostring
-    (each b (coerce (utf8-encode s) 'cons)
+    (each b (chars:utf8-encode s)
       (let c (coerce b 'char)
         (if (and (< b 128) (unreserved c))
             (writec c)
@@ -194,7 +194,7 @@
                 (tostring
                   (map [apply pr (rev _)]
                        (rev (intersperse '(#\,)
-                                         (tuples (rev (coerce (string i) 'cons))
+                                         (tuples (rev (chars:string i))
                                                  3)))))))
           abrep
           (let a (abs n)
