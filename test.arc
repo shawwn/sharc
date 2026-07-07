@@ -623,6 +623,31 @@ c"
   (test? "1 cat"  (plural 1 "cat"))
   (test? "3 cats" (plural 3 "cat")))
 
+(define-test natsort
+  ; digit runs compare by value, not lexically
+  (test? '("a1" "a2" "a10")            (natsort '("a10" "a2" "a1")))
+  (test? '("img1" "img2" "img10" "img12")
+         (natsort '("img12" "img10" "img2" "img1")))
+  (test? '("1" "2" "3" "10" "20")      (natsort '("1" "10" "2" "20" "3")))
+  ; a prefix (no trailing number) sorts before the numbered variants
+  (test? '("file" "file1" "file2" "file10")
+         (natsort '("file" "file10" "file2" "file1")))
+  ; multiple number fields (version-like)
+  (test? '("v1.1" "v1.2" "v1.10" "v2.0")
+         (natsort '("v1.2" "v1.10" "v1.1" "v2.0")))
+  ; text compares case-insensitively, with a raw-string tiebreak
+  (test? '("A" "a" "B" "b")            (natsort '("b" "B" "a" "A")))
+  ; equal numeric value, differing zero-padding: deterministic tiebreak
+  (test? '("x08" "x8" "x9" "x10")      (natsort '("x10" "x8" "x9" "x08")))
+  ; edge cases
+  (test? nil       (natsort '()))
+  (test? '("only") (natsort '("only")))
+  ; the underlying key and comparator
+  (test? '("img" 10 "a") (nat-key "Img10a"))
+  (test? nil             (nat-key ""))
+  (test? true            (nat< "a2" "a10"))
+  (test? false           (nat< "a10" "a2")))
+
 (define-test quasiquote
   (test? (quote a) (quasiquote a))
   (test? 'a `a)

@@ -7,6 +7,10 @@
 ;> (get-output-string ss)
 ;"\u0085"
 
+(def chars (s)
+  (assert (isa!string s))
+  (coerce s 'cons))
+
 (def tokens (s (o sep whitec))
   (let test (testify sep)
     (let rec (afn (cs toks tok)
@@ -218,7 +222,53 @@
     (if (and (< n 0) (find [and (digit _) (isnt _ #\0)] abrep))
         (+ "-" abrep)
         abrep)))
-        
+
+; Natural sort: order strings so that embedded numbers compare by value
+; rather than by digit, e.g. "img2" before "img10".  The key splits a
+; string into alternating chunks -- maximal digit runs become ints (compared
+; numerically), everything else becomes a downcased string (so text compares
+; case-insensitively).  E.g. "Img10a" -> ("img" 10 "a").
+
+(def nat-chunks (cs)
+  (when cs
+    (let d (digit (car cs))
+      (withs (n     (or (pos [isnt d (digit _)] cs) (len cs))
+              chunk (coerce (cut cs 0 n) 'string)
+              rest  (cut cs n))
+        (cons (if d (int chunk) (downcase chunk))
+              (nat-chunks rest))))))
+
+(def nat-key (s) (nat-chunks:chars s))
+
+; Compare two chunks.  Two ints compare numerically, two strings
+; lexicographically; a number sorts before text when the types differ.
+
+(def nat-chunk (cmp x y)
+  (if (and (isa!int x) (isa!int y)) (cmp x y)
+      (isa!int x)                   t
+      (isa!int y)                   nil
+                                    (cmp x y)))
+
+(def natlist (cmp a b)
+  (if (no a)  (if b t nil)          ; shorter key sorts first when otherwise equal
+      (no b)  nil
+      (nat-chunk cmp (car a) (car b)) t
+      (nat-chunk cmp (car b) (car a)) nil
+                                      (natlist cmp (cdr a) (cdr b))))
+
+; Total order: fall back to a plain string compare so keys that are equal
+; ignoring case (e.g. "A" and "a") still order deterministically.
+
+(def nat (cmp a b)
+  (if (natlist cmp (nat-key a) (nat-key b)) t
+      (natlist cmp (nat-key b) (nat-key a)) nil
+                                            (cmp a b)))
+
+(def nat< (a b) (nat < a b))
+(def nat> (a b) (nat > a b))
+
+(def natsort  (xs) (sort nat< xs))
+(def natsort> (xs) (sort nat> xs))
 
 ; English
 
