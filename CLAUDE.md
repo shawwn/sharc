@@ -33,3 +33,6 @@ You can't use ! after a closing paren, like `((newstories maxend*) 2)!id`.
 
 A `(t var)` param defaults to a thread-local: `(t var)` => `(o var (the var))`, and `(t local var)` => `(o local (the var))`.
 E.g. `(def ip ((t req)) req!ip)` makes `(ip)` use `(the req)` while `(ip some-req)` uses the arg. See `examples/the.arc`.
+
+`is` is isomorphic, e.g. `(is (list 'a) (list 'a))` returns `t`. `iso` exists for backwards compatibility.
+If you need to compare object identity, use `id` (short for identical), e.g. `(id (list 'a) (list 'a))` returns `nil`.
