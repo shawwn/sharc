@@ -228,12 +228,14 @@
     (coerce n 'char)))
 
 (def json-hex-digit (c)
-  (if (no c) 0
-      (<= (coerce c 'int) (coerce #\9 'int))
-        (- (coerce c 'int) (coerce #\0 'int))
-      (<= (coerce c 'int) (coerce #\F 'int))
-        (+ 10 (- (coerce c 'int) (coerce #\A 'int)))
-      (+ 10 (- (coerce c 'int) (coerce #\a 'int)))))
+  (let i (only&int c)
+    (if (no i)
+         0
+        (<= i (int #\9))
+         (- i (int #\0))
+        (<= i (int #\F))
+         (+ 10 (- i (int #\A)))
+         (+ 10 (- i (int #\a))))))
 
 (def json-parse-number (st)
   (let start st!pos

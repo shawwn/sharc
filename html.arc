@@ -2,18 +2,14 @@
 
 
 (def color (r g b)
-  (with (c (table) 
-         f (fn (x) (if (< x 0) 0 (> x 255) 255 x)))
-    (= (c 'r) (f r) (c 'g) (f g) (c 'b) (f b))
-    c))
-
-(def dehex (str) (errsafe (coerce str 'int 16)))
+  (let (r g b) (map [clamp _ 0 255] (list r g b))
+    (obj r r g g b b)))
 
 (defmemo hex>color (str)
   (and (is (len str) 6)
-       (with (r (dehex (cut str 0 2))
-              g (dehex (cut str 2 4))
-              b (dehex (cut str 4 6)))
+       (with (r (errsafe:dehex (cut str 0 2))
+              g (errsafe:dehex (cut str 2 4))
+              b (errsafe:dehex (cut str 4 6)))
          (and r g b
               (color r g b)))))
 
@@ -51,7 +47,7 @@
 (or= hexreps (table))
 
 (for i 0 255 (= (hexreps i)
-                (let s (coerce i 'string 16)
+                (let s (hex i)
                   (if (is (len s) 1) (+ "0" s) s))))
 
 (defmemo hexrep (col)

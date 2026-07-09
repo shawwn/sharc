@@ -11,6 +11,14 @@
   (assert (in (type s) 'string 'vector))
   (coerce s 'cons))
 
+(def hex (s)
+  (assert (isa!int s))
+  (as!string s 16))
+
+(def dehex (s)
+  (assert (isa!string s))
+  (as!int s 16))
+
 (def tokens (s (o sep whitec))
   (let test (testify sep)
     (let rec (afn (cs toks tok)
