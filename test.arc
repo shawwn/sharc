@@ -311,6 +311,56 @@ c"
   (test? '(orf  a:b c)    (ssexpand 'a:b|c))   ; (a:b) OR c
   (test? '(compose a b c) (ssexpand 'a:b:c)))
 
+; Keywords: read from a leading OR trailing colon -- foo: and :foo are the
+; SAME keyword -- case-insensitive.  A keyword is its own type (key), NOT a
+; sym.  Gotcha: a colon *between* names (foo:bar) is compose ssyntax, not a
+; keyword.
+(define-test keyword
+  (test? 'key  (type 'foo:))
+  (test? 'key  (type ':foo))
+  (test? true  (isa 'foo: 'key))
+  (test? false (isa 'foo: 'sym))            ; a keyword is not a sym
+  ; leading and trailing colon read to the same keyword; case-insensitive
+  (test? true  (is 'foo: ':foo))
+  (test? true  (is 'foo: 'FOO:))
+  ; coerce both directions; names fold to lowercase as strings/syms
+  (test? "foo" (coerce 'foo: 'string))
+  (test? 'foo  (coerce 'foo: 'sym))
+  (test? true  (is 'foo: (coerce "foo" 'key)))
+  (test? true  (is 'foo: (coerce 'foo 'key)))
+  (test? true  (is (coerce "FOO" 'key) (coerce "foo" 'key)))
+  ; prints as :foo (lowercase, leading colon) and round-trips through read
+  (test? ":foo"      (tostring:write 'foo:))
+  (test? ":foo"      (tostring:disp 'foo:))
+  (test? "(:a :b c)" (tostring:write '(a: b: c)))   ; a plain sym has no colon
+  (test? true  (is 'foo: (readstring1 (tostring:write 'foo:))))
+  ; a colon *between* names is compose ssyntax, not a keyword
+  (test? 'sym               (type 'foo:bar))
+  (test? '(compose foo bar) (ssexpand 'foo:bar))
+  ; coerce is permissive on names but strict on the target type: the type
+  ; you ask for is the type you get, colons and all.  A ':' in the string
+  ; never silently promotes a sym to a keyword (you can build odd names --
+  ; e.g. for ssyntax -- and they stay whatever type you requested).
+  (test? true (isa (coerce ":foo" 'sym) 'sym))    ; NOT a keyword
+  (test? true (isa (sym ":foo")        'sym))
+  (test? true (isa (coerce ":foo" 'key) 'key))
+  (test? true (isa (coerce "foo"  'sym) 'sym))
+  (test? true (isa (coerce "foo"  'key) 'key)))
+
+; Syms: case-insensitive, folded to lowercase (the opposite internal case
+; from keywords).  t and nil are syms.
+(define-test sym
+  (test? 'sym  (type 'foo))
+  (test? 'sym  (type nil))
+  (test? 'sym  (type t))
+  (test? true  (isa 'foo 'sym))
+  (test? true  (is 'FOO 'foo))              ; case-insensitive
+  (test? 'foo  (sym "FOO"))                 ; folded to lowercase
+  (test? "foo" (coerce 'foo 'string))
+  (test? 'foo  (coerce "foo" 'sym))
+  ; (sym "t") is the bindable symbol named t, not the truth value
+  (test? 'sym  (type (sym "t"))))
+
 (define-test iso
   ; iso is kept as an alias for is (which is a deep compare here)
   (test? t   (iso '(1 2 (3)) '(1 2 (3))))

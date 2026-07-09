@@ -343,6 +343,7 @@ the truth value t.  See the identity tests in test.arc."
   (cond
     ((arc-tagged-p x) (arc-tagged-type x))
     ((consp x)        (arc-sym "cons"))
+    ((keywordp x)     (arc-sym "key"))
     ((null x)         (arc-sym "sym"))
     ((symbolp x)      (arc-sym "sym"))
     ((functionp x)    (arc-sym "fn"))
@@ -442,6 +443,8 @@ the truth value t.  See the identity tests in test.arc."
     ((stringp x)    (write-string x port))
     ((characterp x) (write-char x port))
     ((null x)       nil)
+    ((keywordp x)   (write-char #\: port)
+                    (write-string (string-downcase (symbol-name x)) port))
     ((symbolp x)    (write-string (symbol-name x) port))
     ((typep x 'double-float) (format port "~F" x))
     ((consp x)
@@ -467,6 +470,8 @@ the truth value t.  See the identity tests in test.arc."
     ((characterp x) (write x :stream port))
     ((null x)       (write-string "nil" port))
     ((eq x t)       (write-string "t" port))
+    ((keywordp x)   (write-char #\: port)
+                    (write-string (string-downcase (symbol-name x)) port))
     ((symbolp x)    (write-string (symbol-name x) port))
     ((consp x)
      (write-char #\( port)
@@ -515,6 +520,12 @@ the truth value t.  See the identity tests in test.arc."
     (cond
       ((arc-tagged-p x) (error "Can't coerce annotated object"))
       ((string= tname (string-downcase (symbol-name (arc-type x)))) x)
+      ((keywordp x)
+       ;; keyword names are upcased by the reader; fold back to lowercase
+       ;; so key->string/sym round-trips with how it was written.
+       (cond ((string= tname "string") (string-downcase (symbol-name x)))
+             ((string= tname "sym")    (arc-str->sym (symbol-name x)))
+             (t (error "Can't coerce keyword ~S to ~S" x type))))
       ((characterp x)
        (cond ((string= tname "int")    (char-code x))
              ((string= tname "string") (string x))
@@ -535,6 +546,7 @@ the truth value t.  See the identity tests in test.arc."
              (t (error "Can't coerce num ~S to ~S" x type))))
       ((stringp x)
        (cond ((string= tname "sym")    (arc-str->sym x))
+             ((string= tname "key")    (intern (string-upcase x) :keyword))
              ((string= tname "cons")   (coerce x 'list))
              ((string= tname "char")
               (if (= (length x) 1)
@@ -568,6 +580,7 @@ the truth value t.  See the identity tests in test.arc."
              (t (error "Can't coerce nil to ~S" type))))
       ((symbolp x)
        (cond ((string= tname "string") (symbol-name x))
+             ((string= tname "key")    (intern (string-upcase (symbol-name x)) :keyword))
              (t (error "Can't coerce sym ~S to ~S" x type))))
       ;; a non-string vector (e.g. a byte vector) -> its elements as a
       ;; list; for a byte vector that's a list of ints in [0..255]

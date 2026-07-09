@@ -415,7 +415,7 @@ Connection: close"))
 (def valid-scopeval (x)
   (if (isa!table x)
       (isnt x (the req))
-      (in (type x) 'string 'vector 'sym 'cons 'int 'num 'char 'table)))
+      (in (type x) 'string 'vector 'sym 'key 'cons 'int 'num 'char 'table)))
 
 (def scrub-scopeval (x)
   (case (type x)

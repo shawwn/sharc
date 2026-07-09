@@ -1636,10 +1636,10 @@
                      (coerce (+ n 32) 'char)
                      c)))
     (case (type x)
-      string (map downc x)
-      char   (downc x)
-      sym    (sym (map downc (coerce x 'string)))
-             (err "Can't downcase" x))))
+      string    (map downc x)
+      char      (downc x)
+      (sym key) x ; symbols and keywords are always lowercase
+                (err "Can't downcase" x))))
 
 (def upcase (x)
   (let upc (fn (c)
@@ -1648,10 +1648,10 @@
                    (coerce (- n 32) 'char)
                    c)))
     (case (type x)
-      string (map upc x)
-      char   (upc x)
-      sym    (sym (map upc (coerce x 'string)))
-             (err "Can't upcase" x))))
+      string    (map upc x)
+      char      (upc x)
+      (sym key) x ; symbols and keywords are always lowercase
+                (err "Can't upcase" x))))
 
 (def inc (x (o n 1))
   (coerce (+ (coerce x 'int) n) (type x)))
