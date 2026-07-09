@@ -657,8 +657,9 @@
 
 (def nad-fields ()
   `((num      caching         ,caching*                       t t)
-    (num      perpage         ,perpage*                       t t)
-    (num      threads-perpage ,threads-perpage*               t t)
+    (posint   perpage         ,perpage*                       t t)
+    (posint   threads-perpage ,threads-perpage*               t t)
+    (yesno    autoreload      ,autoreload*                    t t)
     (bigtoks  comment-kill    ,comment-kill*                  t t)
     (bigtoks  comment-ignore  ,comment-ignore*                t t)
     (bigtoks  lightweights    ,(sort < (keys lightweights*))  t t)))
@@ -668,17 +669,19 @@
 
 (def newsadmin-page ()
   (shortpage nil nil "newsadmin" "newsadmin"
+    (tag u (ulink "manage spam sites" (spamsites-page)))
+    (br2)
     (vars-form (nad-fields)
                (fn (name val)
                  (case name
                    caching            (= caching* val)
-                   perpage            (= perpage* (max 1 val))
-                   threads-perpage    (= threads-perpage* (max 1 val))
+                   perpage            (= perpage* val)
+                   threads-perpage    (= threads-perpage* val)
+                   autoreload         (= autoreload* val)
                    comment-kill       (todisk comment-kill* val)
                    comment-ignore     (todisk comment-ignore* val)
                    lightweights       (todisk lightweights* (memtable val))))
                {do "newsadmin"})
-
     (br2)
     (urform (let subject arg!id
               (if (profile subject)
@@ -689,9 +692,7 @@
     (br2)
     (urform (do (set-ip-ban arg!ip t)
                 "newsadmin")
-      (single-input "" 'ip 20 "ban ip"))
-    (br2)
-    (tag u (ulink "manage spam sites" (spamsites-page)))))
+      (single-input "" 'ip 20 "ban ip"))))
 
 (def spamsites-page ()
   (minipage "Spam Sites"
