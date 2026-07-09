@@ -479,6 +479,11 @@
             (for ,gv 0 (edge ,gseq)
               (let ,var (,gseq ,gv) ,@body))))))
 
+(def clamp (n lo hi)
+  (if (< n lo) lo
+      (> n hi) hi
+      n))
+
 ; (nthcdr x y) = (cut y x).
 
 (def cut (seq start (o end))
