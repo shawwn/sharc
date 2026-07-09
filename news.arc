@@ -586,7 +586,7 @@
     (pr " | "))
   (if (me)
       (link "logout" (logout-url whence) "logout")
-      (link "login" (login-url whence) "login")))
+      (link "login"  (login-url  whence) "login")))
 
 (def logout-url (whence)
   (string "logout?goto=" (urlencode:safe-goto whence)
