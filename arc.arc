@@ -1102,8 +1102,8 @@
 
 (def listtab (al)
   (let h (table)
-    (map (fn ((k v)) (= (h k) v))
-         al)
+    (each (k v) al
+      (= (h k) v))
     h))
 
 (mac obj args
@@ -1142,8 +1142,8 @@
                        (= (new k) v))
                      new)
                    (err "Can't copy " x))
-    (map (fn ((k v)) (= (x2 k) v))
-         (pair args))
+    (each (k v) (pair args)
+      (= (x2 k) v))
     x2))
 
 (def abs (n)
