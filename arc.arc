@@ -1565,11 +1565,12 @@
   `(let ,var (table) ,@body ,var))
 
 (def ero args
-  (w/stdout (stderr) 
-    (each a args 
-      (write a)
-      (writec #\space))
-    (writec #\newline))
+  (atomic
+    (w/stdout (stderr) 
+      (each a args 
+        (write a)
+        (writec #\space))
+      (writec #\newline)))
   (car args))
 
 (def queue () (list nil nil 0))
