@@ -358,9 +358,6 @@ errors out clearly rather than polluting (often locked) CL packages."
 
 (defun ssyntax-p (x)
   (and (symbolp x)
-       (not (or (string= (symbol-name x) "+")
-                (string= (symbol-name x) "++")
-                (string= (symbol-name x) "_")))
        (let ((n (symbol-name x)))
          (has-ssyntax-char-p n (- (length n) 2)))))
 
