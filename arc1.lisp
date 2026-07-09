@@ -18,6 +18,9 @@
 ;;; CL's package: separator conflicts with Arc ssyntax (foo:bar = compose).
 ;;; We write our own tokenizer so : is just a constituent character.
 
+(xdef ssyntax  (x) (tnil (ssyntax-p x)))
+(xdef ssexpand (x) (if (ssyntax-p x) (expand-ssyntax x) x))
+
 (defun arc-whitespace-p (c)
   (member c '(#\space #\tab #\newline #\return #\page)))
 
@@ -45,22 +48,23 @@ Backslash escapes the next character."
 Handles |...| segments verbatim, allowing special chars in symbol names.
 Returns (values string had-vbar-p) so the caller can distinguish a real
 empty-name symbol (`||`) from no token at all."
-  (let ((had-vbar nil))
+  (let ((had-vbar (char= #\| (peek-char nil stream nil nil)))
+        (once t))
     (values
      (with-output-to-string (buf)
        (loop
          (let ((c (peek-char nil stream nil nil)))
            (cond
              ((null c) (return))
-             ((char= c #\|)
-              (setf had-vbar t)
+             ((and once had-vbar)
+              (setf once nil)
               (arc-read-vbar-segment stream buf))
              ((arc-delimiter-p c) (return))
              (t (write-char (read-char stream) buf))))))
      had-vbar)))
 
 (defun ssyntax-char-p (c)
-  (member c '(#\: #\~ #\& #\. #\!)))
+  (member c '(#\: #\~ #\& #\| #\. #\!)))
 
 (defun cl-package-qualified-p (str)
   "True if STR has the form pkg::name with non-empty pkg and name.
@@ -363,7 +367,7 @@ errors out clearly rather than polluting (often locked) CL packages."
 
 (defun has-ssyntax-char-p (str i)
   (and (>= i 0)
-       (or (member (char str i) '(#\: #\~ #\& #\. #\!))
+       (or (ssyntax-char-p (char str i))
            (has-ssyntax-char-p str (- i 1)))))
 
 (defun arc-sym-intern (chars pkg)
@@ -430,9 +434,28 @@ errors out clearly rather than polluting (often locked) CL packages."
   (let ((n (symbol-name sym)))
     (cond
       ((find #\& n) (expand-and sym))
+      ((find #\| n) (expand-or sym))
       ((or (find-outside-cl-marker #\: n) (find #\~ n)) (expand-compose sym))
       ((or (find #\. n) (find #\! n)) (expand-sexpr sym))
       (t (error "Unknown ssyntax: ~S" sym)))))
+
+(defun expand-and (sym)
+  (let ((pkg (sym-pkg sym)))
+    (let ((elts (mapcar #'chars->value
+                        (arc-tokens (lambda (c) (eql c #\&))
+                                    (sym->chars sym) nil nil nil))))
+      (if (null (cdr elts))
+          (car elts)
+          (cons (intern "andf" pkg) elts)))))
+
+(defun expand-or (sym)
+  (let ((pkg (sym-pkg sym)))
+    (let ((elts (mapcar #'chars->value
+                        (arc-tokens (lambda (c) (eql c #\|))
+                                    (sym->chars sym) nil nil nil))))
+      (if (null (cdr elts))
+          (car elts)
+          (cons (intern "orf" pkg) elts)))))
 
 (defun expand-compose (sym)
   (let ((pkg (sym-pkg sym)))
@@ -447,15 +470,6 @@ errors out clearly rather than polluting (often locked) CL packages."
       (if (null (cdr elts))
           (car elts)
           (cons (intern "compose" pkg) elts)))))
-
-(defun expand-and (sym)
-  (let ((pkg (sym-pkg sym)))
-    (let ((elts (mapcar #'chars->value
-                        (arc-tokens (lambda (c) (eql c #\&))
-                                    (sym->chars sym) nil nil nil))))
-      (if (null (cdr elts))
-          (car elts)
-          (cons (intern "andf" pkg) elts)))))
 
 (defun expand-sexpr (sym)
   (build-sexpr (reverse (arc-tokens (lambda (c) (or (eql c #\.) (eql c #\!)))
@@ -519,6 +533,7 @@ errors out clearly rather than polluting (often locked) CL packages."
      (ac `(,(intern "no" (sym-pkg (caar s)))
            (,(cadar s) ,@(cdr s)))))
     ((arc-sym= (arc-caar? s) "andf") (ac-andf s))
+    ((arc-sym= (arc-caar? s) "orf") (ac-orf s))
     ;; uncomment this next line to see which expression is causing a
     ;; crash due to a function call on non-function (e.g. nil/num/sym)
     ;((consp s) (ac-safe-call (car s) (cdr s)))
@@ -1042,11 +1057,20 @@ isn't shadowed by a lexical binding."
     ((null (cdr fns)) (cons (car fns) args))
     (t (list (car fns) (decompose (cdr fns) args)))))
 
-(defun ac-andf (s)
-  (let ((gs (mapcar (lambda (x) (declare (ignore x)) (gensym)) (cdr s))))
+(defun ac-gensym (x)
+  (declare (ignore x))
+  (gensym))
+
+(defun ac-infix (s op)
+  (let ((gs (mapcar #'ac-gensym (cdr s))))
     (ac `((fn ,gs
-            (and ,@(mapcar (lambda (f) `(,f ,@gs)) (cdar s))))
+            (,op ,@(mapcar (lambda (f) `(,f ,@gs)) (cdar s))))
           ,@(cdr s)))))
+
+(defun ac-andf (s) (ac-infix s 'and))
+
+(defun ac-orf (s) (ac-infix s 'or))
+
 
 ;;;; ============================================================
 ;;;; Gensym

@@ -265,6 +265,52 @@ c"
   (test? t   ((testify 5 >) 6))
   (test? nil ((testify 5 >) 4)))
 
+; ssyntax: syntax embedded in a symbol's name, expanded by the compiler.
+; Operators, loosest to tightest binding: &  |  (: ~)  (. !)
+; ssexpand does one level; inner operators (e.g. ~bar) stay as symbols.
+(define-test ssyntax
+  ; compose (:), complement (~)
+  (test? '(compose car cdr) (ssexpand 'car:cdr))
+  (test? '(complement odd)  (ssexpand '~odd))
+  (test? 3     (car:cdr:cdr '(1 2 3 4)))
+  (test? true  (~odd 4))
+  (test? false (~odd 3))
+  ; sexpr: a.b calls, a!b passes a quoted arg
+  (test? '(a b)         (ssexpand 'a.b))
+  (test? '(a (quote b)) (ssexpand 'a!b))
+  ; andf (&) and orf (|); ssyntax resolves lexical predicates too
+  (test? '(andf a b) (ssexpand 'a&b))
+  (test? '(orf  a b) (ssexpand 'a|b))
+  (withs (small [< _ 10] big [> _ 100])
+    (test? true  (small&odd 7))
+    (test? false (small&odd 4))    ; even
+    (test? false (small&odd 13))   ; not small
+    (test? true  (small|big 5))
+    (test? false (small|big 50))   ; neither
+    (test? true  (small|big 200)))
+  ; priority: ~ binds tighter than &, so foo&~bar = (andf foo (complement bar))
+  (test? '(andf foo ~bar) (ssexpand 'foo&~bar))
+  (test? '(andf ~bar foo) (ssexpand '~bar&foo))
+  (test? true  (odd&~even 3))
+  (test? false (odd&~even 4))      ; ~ applies to even, not the whole andf
+  (test? true  (~even&odd 3))
+  ; composition mixed with andf: ~atom & (odd . len)
+  (test? '(andf ~atom odd:len) (ssexpand '~atom&odd:len))
+  (test? true  (~atom&odd:len '(1 2 3)))   ; non-atom of odd length
+  (test? false (~atom&odd:len '(1 2)))     ; even length
+  (test? false (~atom&odd:len 5))          ; atom
+  ; OR with a negated operand, e.g. admin|~editor
+  (test? '(orf admin ~editor) (ssexpand 'admin|~editor))
+  (withs (admin [is _ 'a] editor [is _ 'e])
+    (test? true  (admin|~editor 'a))
+    (test? false (admin|~editor 'e))
+    (test? true  (admin|~editor 'x)))
+  ; precedence between operators: & is outermost, then |, then :
+  (test? '(andf a b|c)    (ssexpand 'a&b|c))   ; a AND (b|c)
+  (test? '(andf a|b c)    (ssexpand 'a|b&c))   ; (a|b) AND c
+  (test? '(orf  a:b c)    (ssexpand 'a:b|c))   ; (a:b) OR c
+  (test? '(compose a b c) (ssexpand 'a:b:c)))
+
 (define-test iso
   ; iso is kept as an alias for is (which is a deep compare here)
   (test? t   (iso '(1 2 (3)) '(1 2 (3))))

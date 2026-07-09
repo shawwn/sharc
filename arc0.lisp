@@ -1389,9 +1389,6 @@ the truth value t.  See the identity tests in test.arc."
 (xdef flushout (&optional (s *standard-output*))
   (force-output s) t)
 
-(xdef ssyntax  (x) (tnil (ssyntax-p x)))
-(xdef ssexpand (x) (if (ssyntax-p x) (expand-ssyntax x) x))
-
 (xdef quit () (sb-ext:exit))
 
 (xdef memory () (sb-kernel:dynamic-usage))
