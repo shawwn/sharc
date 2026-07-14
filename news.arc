@@ -82,7 +82,7 @@
 
 (= initload-users* nil)
 
-(def nsv ((o port 8080))
+(def nsv ((o port (readenv "PORT" 8080)))
   (load-news)
   (asv port))
 

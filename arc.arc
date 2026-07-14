@@ -1756,6 +1756,11 @@
 (mac assert (expr (o msg "Assertion failed"))
   `(or ,expr (err (string ,msg ": " (tostring:pr ',expr)))))
 
+(def readenv (name (o default))
+  (aif (saferead:getenv name)
+       (unless (is it 0) it)
+       default))
+
 ; ---- Thread-local variables ---------------------------------------
 ;
 ; A per-thread key-value store, with two ergonomic affordances:

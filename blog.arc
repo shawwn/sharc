@@ -93,10 +93,10 @@
         (display-post it)
         (br 3)))))
 
-(def bsv ()
+(def bsv ((o port (readenv "PORT" 8080)))
   (ensure-dir postdir*)
   (load-posts)
-  (asv))
+  (asv port))
 
 (when (main)
   (bsv)
