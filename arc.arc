@@ -1415,7 +1415,7 @@
 
 (def datestring ((o s (seconds)))
   (let (y m d) (date s)
-    (string y "-" (if (< m 10) "0") m "-" (if (< d 10) "0") d)))
+    (string y "-" (zeropad m) "-" (zeropad d))))
 
 (def count (test x)
   (with (n 0 testf (testify test))
