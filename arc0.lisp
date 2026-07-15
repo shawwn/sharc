@@ -1199,6 +1199,20 @@ the truth value t.  See the identity tests in test.arc."
 ;;;; System calls
 ;;;; ============================================================
 
+(defun arc-grab-line (&optional (stream *standard-input*) (eof nil))
+  (multiple-value-bind (line missing-newline-p) (read-line stream nil :arc/eof)
+    (if (eq line :arc/eof) eof (list line missing-newline-p))))
+
+(defun arc-put-line (pair &optional (stream *standard-output*) (flush (not *arc-explicit-flush*)))
+  (when pair
+    (let ((line (car pair))
+          (missing-newline-p (cadr pair)))
+      (if missing-newline-p
+          (write-string line stream)
+          (write-line line stream))
+      (when flush
+        (force-output stream)))))
+
 (xdef system (cmd)
   ;; give the child arc's current stdin, so e.g.
   ;;   (fromstring "foo" (system "cat"))  prints "foo".
@@ -1210,8 +1224,10 @@ the truth value t.  See the identity tests in test.arc."
                                    :input *standard-input*
                                    :output :stream :wait nil))
          (out  (sb-ext:process-output proc)))
-    (loop for c = (read-char out nil nil)
-          while c do (write-char c *standard-output*))
+    ; (loop for c = (read-char out nil nil)
+    ;       while c do (write-char c *standard-output*))
+    (loop for c = (arc-grab-line out)
+          while c do (arc-put-line c))
     (sb-ext:process-wait proc))
   nil)
 
