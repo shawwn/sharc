@@ -1231,7 +1231,7 @@ the truth value t.  See the identity tests in test.arc."
     (sb-ext:process-wait proc))
   nil)
 
-(xdef pipe-from (cmd)
+(xdef pipe-from (cmd &optional (wait nil) (format :latin-1))
   ;; :external-format :latin-1 so each byte from the subprocess becomes
   ;; one Arc char.  Matches the file I/O defaults (see infile/outfile)
   ;; and keeps UTF-8 subprocess output round-trippable through Latin-1
@@ -1245,8 +1245,8 @@ the truth value t.  See the identity tests in test.arc."
   (sb-ext:process-output
    (sb-ext:run-program "/bin/sh" (list "-c" cmd)
                        :input *standard-input*
-                       :output :stream :wait nil
-                       :external-format :latin-1)))
+                       :output :stream :wait wait
+                       :external-format format)))
 
 (xdef getenv (name &optional default)
   ;; treat both "unset" and "set-but-empty" as missing, matching
