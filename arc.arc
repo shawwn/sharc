@@ -902,19 +902,27 @@
 (def filebytes (name)
   (w/infile s name (allbytes s)))
 
-(def writefile (val file)
+(def tmpname (file)
   ; unique tmp per write so concurrent writes to the same file don't
   ; clobber each other's tmp -- a shared "file.tmp" let one writer's
   ; rename consume the tmp out from under another's (mvfile -> ENOENT).
   ; the after clause removes the tmp if the write or rename throws.
-  (let tmpfile (+ file "." (rand-string 16) ".tmp")
+  (+ file "." (rand-string 16) ".tmp"))
+
+(def writefile (val file (o write write))
+  (let tmpfile (tmpname file)
     (after (do (w/outfile o tmpfile (write val o))
                (mvfile tmpfile file))
       (when (file-exists tmpfile)
         (rmfile tmpfile))))
   val)
 
-(def sym (x) (coerce x 'sym))
+(def copyfile (old new)
+  (let tmpfile (tmpname new)
+    (cpfile old tmpfile)
+    (mvfile tmpfile new)))
+
+(def sym (x) (as!sym x))
 
 (def int (x (o b 10)) (coerce x 'int b))
 
