@@ -86,7 +86,7 @@
 
 (def handle-request-1 (s)
   (let (i o ip) (socket-accept s)
-    (if (and (or (ignore-ips* ip) (abusive-ip ip))
+    (if (and (ignore-ips*|abusive-ip ip)
              (++ (spurned* ip 0)))
         (force-close i o)
         (do (++ requests*)
@@ -145,7 +145,7 @@
                            (respond-err o "Unknown request: " (car lines)))
                     (log-request type op args cooks ip t0 t1)
                     (set responded)))
-                (do (push (string (rev line)) lines)
+                (do (push (string:rev line) lines)
                     (wipe line)))
             (unless (is c #\return)
               (push c line)
@@ -178,7 +178,7 @@
           (-- n)
           (push c line)) 
         (if srv-noisy* (pr "\n\n"))
-        (respond o op (+ (parseargs (string (rev line))) args) cooks ip))))
+        (respond o op (+ (parseargs (string:rev line)) args) cooks ip))))
 
 (or= type-header* (table))
 
@@ -320,7 +320,7 @@ Connection: close"))
         loc)))
 
 (def static-filetype (sym)
-  (let fname (coerce sym 'string)
+  (let fname (as!string sym)
     (and (~find #\/ fname)
          (case (downcase (last (check (tokens fname #\.) ~single)))
            "gif"  'gif
@@ -363,7 +363,7 @@ Connection: close"))
           (and (is type 'post)
                (some (fn (s)
                        (and (begins s "Content-Length:")
-                            (errsafe:coerce (cadr (tokens s)) 'int)))
+                            (errsafe (as!int:cadr:tokens s))))
                      (cdr lines)))
           (some (fn (s)
                   (and (begins s "Cookie:")
@@ -406,7 +406,7 @@ Connection: close"))
   (aif req!args
        (apply string "?" (intersperse '&
                                       (map (fn ((k v))
-                                             (with (k (urlencode (string k))
+                                             (with (k (urlencode:string k)
                                                     v (urlencode v))
                                                (string k '= v)))
                                            it)))
