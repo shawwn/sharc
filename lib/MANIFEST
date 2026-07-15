@@ -1,0 +1,8 @@
+# vendored 2026-07-15T20:51:07Z by shawn
+# name	url	ref	commit
+ironclad	https://github.com/sharplispers/ironclad	v0.61	d4fe172e4a44b2ac5ab73cf97372314f98e8b8a7
+bordeaux-threads	https://github.com/sionescu/bordeaux-threads	master	92da6b9d4f2d92273290ab53416028c67a17b1d7
+alexandria	https://gitlab.common-lisp.net/alexandria/alexandria.git	master	f283e25efbe9f4323419a138b22ad2fc027f6641
+global-vars	https://github.com/lmj/global-vars	master	c749f32c9b606a1457daa47d59630708ac0c266e
+trivial-features	https://github.com/trivial-features/trivial-features	master	18a5cfafa5ca2565f4297d1d986409facff68f00
+trivial-garbage	https://github.com/trivial-garbage/trivial-garbage	master	3474f6414b73d4e3aa2d5c53080f4247a34f6380

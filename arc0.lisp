@@ -1,5 +1,11 @@
 ;;; arc0.lisp -- Arc runtime for Common Lisp (SBCL)
 
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (load (merge-pathnames "setup.lisp"
+                         (or *compile-file-truename*
+                             *load-truename*
+                             *default-pathname-defaults*))))
+
 (defpackage :arc
   (:use :common-lisp))
 
@@ -1281,18 +1287,15 @@ the truth value t.  See the identity tests in test.arc."
 ;;;; Misc primitives
 ;;;; ============================================================
 
-(xdef rand (&optional n)
-  (if n (random n)
-      (random 1.0d0)))
+(xdef rand (&optional (n 1.0d0))
+  (random n))
 
-(let ((urandom-stream nil))
-  (xdef randb ()
-    (unless urandom-stream
-      (setf urandom-stream
-            (open "/dev/urandom"
-                  :element-type '(unsigned-byte 8)
-                  :direction :input)))
-    (read-byte urandom-stream)))
+(xdef srand (&optional (n 1.0d0))
+  (crypto:strong-random n))
+
+(xdef randb () (crypto:random-bits 8))
+
+(xdef rand64 () (crypto:random-bits 64))
 
 (defun arc-dir (name)
   (let* ((base (if (or (zerop (length name))
