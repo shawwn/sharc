@@ -7,4 +7,5 @@
             "json.arc"
             "recaptcha.arc"
             "email.arc"
-            "prompt.arc"))
+            "prompt.arc"
+            "memorable.arc"))
