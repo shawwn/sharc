@@ -26,7 +26,7 @@
                  " for " (writes '(test? ,a ,b)))))))
 
 (mac define-test (name . body)
-  (let label (coerce (string "test-" name) 'sym)
+  (let label (sym:string "test-" name)
     `(do (def ,label ()
            (point return ,@body))
          (= (tests* ',name) ,label))))
@@ -178,8 +178,8 @@
   (test? 3 (len "\"a\""))
   ;(test? 'a "a")
   (test? #\a ("bar" 1))
-  ;(test? #\a (coerce "a" 'char))
-  (test? '(#\a #\b #\c) (coerce "abc" 'cons))
+  (test? #\a (as!char "a"))
+  (test? '(#\a #\b #\c) (chars "abc"))
   (let s "a
 b"
     (test? 3 (len s)))
@@ -510,18 +510,18 @@ c"
 
 (define-test byte-vectors
   ; ar-apply indexes a vector, len/type understand it
-  (let v (coerce '(104 105 106) 'vector)
+  (let v (as!vector '(104 105 106))
     (test? 104 (v 0))
     (test? 106 (v 2))
     (test? 3   (len v))
     (test? 'vector (type v)))
   ; coerce round-trips list <-> byte vector (ints in [0..255])
-  (test? '(1 2 255) (coerce (coerce '(1 2 255) 'vector) 'cons))
-  (test? 0          (len (coerce nil 'vector))) ; empty list -> empty vec
+  (test? '(1 2 255) (as!cons:as!vector '(1 2 255)))
+  (test? 0 (len (as!vector nil))) ; empty list -> empty vec
   ; is compares byte vectors elementwise
-  (test? t   (is (coerce '(1 2 3) 'vector) (coerce '(1 2 3) 'vector)))
-  (test? nil (is (coerce '(1 2 3) 'vector) (coerce '(1 2 4) 'vector)))
-  (test? nil (is (coerce '(1 2)   'vector) (coerce '(1 2 3) 'vector))))
+  (test? t   (is (as!vector '(1 2 3)) (as!vector '(1 2 3))))
+  (test? nil (is (as!vector '(1 2 3)) (as!vector '(1 2 4))))
+  (test? nil (is (as!vector '(1 2))   (as!vector '(1 2 3)))))
 
 (define-test table
   ; flat keys (string/symbol/int), absent key, and default for absent
@@ -558,11 +558,11 @@ c"
     (test? 1    (len h)))
   ; vector and cons keys also match by content
   (let h (isotable)
-    (= (h (coerce '(1 2 3) 'vector)) 'vec
-       (h '(9 8))                     'lst)
-    (test? 'vec (h (coerce '(1 2 3) 'vector)))
+    (= (h (as!vector '(1 2 3))) 'vec
+       (h '(9 8))               'lst)
+    (test? 'vec (h (as!vector '(1 2 3))))
     (test? 'lst (h (list 9 8)))
-    (test? nil  (h (coerce '(1 2) 'vector)))
+    (test? nil  (h (as!vector '(1 2))))
     (test? 2    (len h)))
   ; equality stays case-sensitive (arc-is2 is the test; psxhash, which is
   ; case-insensitive, only shares a bucket -- it doesn't merge the keys)
@@ -574,20 +574,20 @@ c"
 
 (define-test utf8
   ; string <-> utf-8 bytes (λ = U+03BB = ce bb, é = c3 a9)
-  (test? '(206 187)     (coerce (utf8-encode "λ") 'cons))
-  (test? "λ"            (utf8-decode (coerce '(206 187) 'vector)))
-  (test? '(104 195 169) (coerce (utf8-encode "hé") 'cons))
+  (test? '(206 187)     (as!cons (utf8-encode "λ")))
+  (test? "λ"            (utf8-decode (as!vector '(206 187))))
+  (test? '(104 195 169) (as!cons (utf8-encode "hé")))
   (test? "héllo"        (utf8-decode (utf8-encode "héllo")))
   ; string->bytes / bytes->string default to utf-8 and take a format
-  (test? '(206 187) (coerce (string->bytes "λ") 'cons))
-  (test? "λ"        (bytes->string (coerce '(206 187) 'vector)))
-  (test? '(233)     (coerce (string->bytes "é" :latin-1) 'cons)))
+  (test? '(206 187) (as!cons (string->bytes "λ")))
+  (test? "λ"        (bytes->string (as!vector '(206 187))))
+  (test? '(233)     (as!cons (string->bytes "é" :latin-1))))
 
 (define-test utf8-file
   ; writefile/readfile1 (the profile save path) must round-trip codepoints
   ; >255 now that outfile/infile are utf-8.  U+2019 (the curly ' that
   ; crashed profiles) is utf-8 e2 80 99; also test lambda and a CJK char.
-  (let s (+ "I" (utf8-decode (coerce '(226 128 153) 'vector)) "m happy λ 日")
+  (let s (+ "I" (utf8-decode (as!vector '(226 128 153))) "m happy λ 日")
     (let f "test-utf8-roundtrip.tmp"
       (writefile s f)
       (test? s (readfile1 f))
@@ -1188,7 +1188,7 @@ c"
   (test? "\"a\\\\b\""           (tostring (to-json "a\\b")))
   (test? "\"a\\nb\""            (tostring (to-json "a\nb")))
   (test? "\"a\\tb\""            (tostring (to-json "a\tb")))
-  (test? "\"\\u0001\""          (tostring (to-json (string (coerce 1 'char))))))
+  (test? "\"\\u0001\""          (tostring (to-json (string (as!char 1))))))
 
 (define-test json-encode-array
   ; nil encodes as JSON null, not [] (Arc conflates nil + empty list)
