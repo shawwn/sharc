@@ -272,6 +272,12 @@ Connection: close"))
        ,@body
        nil))
 
+(mac w/args (args . body)
+  `(w/the req (inst 'request 'args (map (fn ((k v))
+                                          (list (string k) v))
+                                        (pair ,args)))
+     ,@body))
+
 (def respond (str op args cooks ip)
   (w/stdout str
     (iflet f (srvops* op)
