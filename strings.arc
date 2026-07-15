@@ -280,13 +280,13 @@
 
 ; English
 
-(def pluralize (n str)
+(def pluralize (n str (o end "s"))
   (if (or (is n 1) (single n))
       str
-      (string str "s")))
+      (string str end)))
 
-(def plural (n x)
-  (string n #\  (pluralize n x)))
+(def plural (n x (o end "s"))
+  (string n " " (pluralize n x end)))
 
 
 ; http://www.eki.ee/letter/chardata.cgi?HTML4=1
