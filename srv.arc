@@ -402,9 +402,8 @@ Connection: close"))
 ;   (arg "id")   ; explicit string
 ;   (arg 'id)    ; symbol --- arc sugar:
 ;   arg!id       ; equivalent to (arg 'id)
-(def arg (key)
-  (let req (the req)
-    (alref req!args (if (isa!sym key) (string key) key))))
+(def arg (key (t req))
+  (alref req!args (if (isa!sym key) (as!string key) key)))
 
 ; reassemble-args urlencodes each key and value for safety
 
