@@ -924,7 +924,7 @@
 
 (def sym (x) (as!sym x))
 
-(def int (x (o b 10)) (coerce x 'int b))
+(def int (x (o b 10)) (as!int x b))
 
 (mac rand-choice exprs
   `(case (rand ,(len exprs))
