@@ -192,6 +192,29 @@ c"
   ;(test? "x3" (cat "x" (+ 1 2)))
   )
 
+; (+ "" x ...) and (string x ...) agree on atoms but diverge on lists:
+; string-coercing a list concatenates the coerced *elements*, while +
+; (dispatching on the leading string) uses the list's printed form.
+(define-test string-coerce
+  ; atoms: identical
+  (test? "123"  (+ "" 123))       (test? "123"  (string 123))
+  (test? "sym"  (+ "" 'sym))      (test? "sym"  (string 'sym))
+  (test? "a"    (+ "" #\a))       (test? "a"    (string #\a))
+  (test? ""     (+ "" nil))       (test? ""     (string nil))
+  (test? "xy"   (+ "" "x" "y"))   (test? "xy"   (string "x" "y"))
+  ; lists diverge: + prints the whole list, string concatenates elements
+  (test? "(a b c)" (+ "" '(a b c)))
+  (test? "abc"     (string '(a b c)))
+  ; a list of chars is the case string is meant for
+  (test? "(a b)" (+ "" '(#\a #\b)))
+  (test? "ab"    (string '(#\a #\b)))
+  ; nested lists: + keeps structure; string keeps only the inner list's parens
+  (test? "(1 2 (3 4))" (+ "" '(1 2 (3 4))))
+  (test? "12(3 4)"     (string '(1 2 (3 4))))
+  ; the reported example (note: (+ "" ...) keeps the trailing 123 too)
+  (test? "(a b c)123" (+ "" '(a b c) 123))
+  (test? "abc123"     (string '(a b c) 123)))
+
 (define-test atstrings
   (let a 'foo
     (test? "barfoo" "bar@a")
