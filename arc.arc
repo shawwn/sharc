@@ -76,6 +76,9 @@
 
 (def only (x . args) x) ; (only&pr maybe-nil)
 
+(def as (kind)
+  (fn (x . args) (apply coerce x kind args)))
+
 ; Maybe later make this internal.  Useful to let xs be a fn?
 
 (def map1 (f xs)
