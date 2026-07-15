@@ -894,7 +894,7 @@
   (let bs nil
     (whiler b (readb str nil) no
       (push b bs))
-    (coerce (rev bs) 'vector)))
+    (as!vector (rev bs))))
 
 (def filechars (name)
   (w/infile s name (allchars s)))
