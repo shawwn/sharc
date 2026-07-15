@@ -1671,8 +1671,15 @@
       (sym key) x ; symbols and keywords are always lowercase
                 (err "Can't upcase" x))))
 
+(def asnum (x)
+  (case (type x)
+    (num int) x
+    string    (coerce x 'num)
+    char      (coerce x 'int)
+    (err "Can't convert @x to number")))
+
 (def inc (x (o n 1))
-  (coerce (+ (coerce x 'int) n) (type x)))
+  (coerce (+ (asnum x) n) (type x)))
 
 (def range (start end)
   (if (> start end)
