@@ -1356,6 +1356,21 @@ the truth value t.  See the identity tests in test.arc."
     (rename-file old new-abs))
   nil)
 
+(xdef cpfile (old new)
+  ; copy old's contents to new.  Go through (unsigned-byte 8) so the
+  ; copy is byte-exact regardless of encoding, and use :supersede /
+  ; :create to mirror outfile's overwrite semantics.
+  (with-open-file (in old :direction :input :element-type '(unsigned-byte 8))
+    (with-open-file (out new :direction :output
+                             :element-type '(unsigned-byte 8)
+                             :if-exists :supersede
+                             :if-does-not-exist :create)
+      (let ((buf (make-array 65536 :element-type '(unsigned-byte 8))))
+        (loop for n = (read-sequence buf in)
+              while (plusp n)
+              do (write-sequence buf out :end n)))))
+  nil)
+
 (xdef bound (x) (tnil (arc-bound-p x)))
 
 (xdef newstring (size &optional (c #\space))
