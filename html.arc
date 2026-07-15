@@ -46,9 +46,7 @@
 
 (or= hexreps (table))
 
-(for i 0 255 (= (hexreps i)
-                (let s (hex i)
-                  (if (is (len s) 1) (+ "0" s) s))))
+(for i 0 255 (= (hexreps i) (zeropad:hex i)))
 
 (defmemo hexrep (col)
   (+ (hexreps (col 'r)) (hexreps (col 'g)) (hexreps (col 'b))))
