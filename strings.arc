@@ -1,6 +1,6 @@
 ; Matching.  Spun off 29 Jul 06.
 
-; arc> (tostring (writec (coerce 133 'char)))
+; arc> (tostring (writec (as!char 133)))
 ;
 ;> (define ss (open-output-string))
 ;> (write-char (integer->char 133) ss)
@@ -9,15 +9,11 @@
 
 (def chars (s)
   (assert (in (type s) 'string 'vector))
-  (coerce s 'cons))
+  (as!cons s))
 
-(def hex (s)
-  (assert (isa!int s))
-  (coerce s 'string 16))
+(def hex (s)   (assert (isa!int s)) (as!string s 16))
 
-(def dehex (s)
-  (assert (isa!string s))
-  (coerce s 'int 16))
+(def dehex (s) (assert (isa!string s)) (as!int s 16))
 
 (def tokens (s (o sep whitec))
   (let test (testify sep)
@@ -25,8 +21,7 @@
                (if (no cs)         (consif tok toks)
                    (test (car cs)) (self (cdr cs) (consif tok toks) nil)
                                    (self (cdr cs) toks (cons (car cs) tok))))
-      (rev (map [coerce _ 'string]
-                (map rev (rec (chars s) nil nil)))))))
+      (rev (map as!string:rev (rec (chars s) nil nil))))))
 
 ; names of cut, split, halve not optimal
 
@@ -36,8 +31,7 @@
                (if (no cs)         (list (rev tok))
                    (test (car cs)) (list cs (rev tok))
                                    (self (cdr cs) (cons (car cs) tok))))
-      (rev (map [coerce _ 'string]
-                (rec (chars s) nil))))))
+      (rev (map as!string (rec (chars s) nil))))))
 
 ; maybe promote to arc.arc, but if so include a list clause
 
@@ -87,17 +81,16 @@
           (a (int c)))))))                       ; literal byte
 
 (def bytes->utf8 (cs)
-  (utf8-decode (coerce cs 'vector)))
+  (utf8-decode (as!vector cs)))
 
 (def urlencode (s)
   (tostring
     (each b (chars:utf8-encode s)
-      (let c (coerce b 'char)
+      (let c (as!char b)
         (if (and (< b 128) (unreserved c))
             (writec c)
             (do (writec #\%)
-                (if (< b 16) (writec #\0))
-                (pr (coerce b 'string 16))))))))
+                (pr:zeropad (as!string b 16))))))))
 
 (def unreserved (c)
   (or (alphadig c) (in c #\- #\. #\_ #\~)))
@@ -216,15 +209,13 @@
                          m (/ (roundup (* a d)) d)
                          i (trunc m)
                          r (abs (trunc (- (* m d) (* i d)))))
-                   (+ (if (is i 0) 
-                          (if (or init-zero (is r 0)) "0" "") 
+                   (+ (if (is i 0)
+                          (if (or init-zero (is r 0)) "0" "")
                           (comma i))
-                      (withs (rest   (string r)
-                              padded (+ (newstring (- digits (len rest)) #\0)
-                                        rest)
+                      (withs (padded (zeropad r digits)
                               final  (if trail-zeros
                                          padded
-                                         (trim padded 'end [is _ #\0])))
+                                         (trim padded 'end #\0)))
                         (string (unless (empty final) ".")
                                 final)))))))
     (if (and (< n 0) (find [and (digit _) (isnt _ #\0)] abrep))
@@ -241,7 +232,7 @@
   (when cs
     (let d (digit (car cs))
       (withs (n     (or (pos [isnt d (digit _)] cs) (len cs))
-              chunk (coerce (cut cs 0 n) 'string)
+              chunk (as!string (cut cs 0 n))
               rest  (cut cs n))
         (cons (if d (int chunk) (downcase chunk))
               (nat-chunks rest))))))
