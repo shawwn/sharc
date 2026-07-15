@@ -1288,14 +1288,9 @@ the truth value t.  See the identity tests in test.arc."
 ;;;; ============================================================
 
 (xdef rand (&optional (n 1.0d0))
-  (random n))
-
-(xdef srand (&optional (n 1.0d0))
   (crypto:strong-random n))
 
-(xdef randb () (crypto:random-bits 8))
-
-(xdef rand64 () (crypto:random-bits 64))
+(xdef rand-bits #'crypto:random-bits)
 
 (defun arc-dir (name)
   (let* ((base (if (or (zerop (length name))

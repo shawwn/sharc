@@ -930,17 +930,21 @@
        (repeat ,n (push ,expr ,ga))
        (rev ,ga))))
 
-; rejects bytes >= 248 lest digits be overrepresented
+; will freeze unless expr can generate n unique values
+
+(mac n-dedup (n expr)
+  (w/uniq seen
+    `(let ,seen (table)
+       (n-of ,n (awhen (evtil ,expr (complement ,seen))
+                  (set (,seen it))
+                  it)))))
+
+(def rand-elt (seq) 
+  (seq (rand (len seq))))
 
 (def rand-string (n)
   (let c "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
-    (with (nc 62 s (newstring n) i 0)
-      (while (< i n)
-        (let x (randb)
-          (unless (> x 247)
-            (= (s i) (c (mod x nc)))
-            (++ i))))
-      s)))
+    (as!string (n-of n (rand-elt c)))))
 
 (mac forlen (var s . body)
   `(for ,var 0 (edge ,s) ,@body))
@@ -1412,9 +1416,6 @@
   (if (<= (len str) limit)
       str
       (+ (cut str 0 limit) "...")))
-
-(def rand-elt (seq) 
-  (seq (rand (len seq))))
 
 (mac until (test . body)
   `(while (no ,test) ,@body))
