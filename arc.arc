@@ -762,6 +762,13 @@
     `(withs (,var nil ,gf (testify ,endval))
        (while (no (,gf (= ,var ,expr)))
          ,@body))))
+
+(mac evtil (expr test)
+  (w/uniq gv
+    `(let ,gv ,expr
+       (while (no (,test ,gv))
+         (= ,gv ,expr))
+       ,gv)))
   
 ;(def macex (e)
 ;  (if (atom e)
@@ -1734,13 +1741,6 @@
   `((savers* ',var) 
     ,(if (is var expr) var `(= ,var ,expr))))
 
-
-(mac evtil (expr test)
-  (w/uniq gv
-    `(let ,gv ,expr
-       (while (no (,test ,gv))
-         (= ,gv ,expr))
-       ,gv)))
 
 (def rand-key (h)
   (if (empty h)
