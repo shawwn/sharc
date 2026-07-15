@@ -1407,6 +1407,12 @@
 (def date ((o s (seconds)))
   (rev (nthcdr 3 (timedate s))))
 
+(def zeropad (i (o n 2))
+  (let s (string i)
+    (while (< (len s) n)
+      (= s (+ "0" s)))
+    s))
+
 (def datestring ((o s (seconds)))
   (let (y m d) (date s)
     (string y "-" (if (< m 10) "0") m "-" (if (< d 10) "0") d)))
