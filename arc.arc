@@ -1047,7 +1047,7 @@
 
 (def digit (c) (<= #\0 c #\9))
 
-(def alphadig (c) (or (letter c) (digit c)))
+(def alphadig (c) (letter|digit c))
 
 (def punc (c)
   (in c #\. #\, #\; #\: #\! #\?))
