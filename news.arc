@@ -244,6 +244,9 @@
 (def safe-item (id)
   (aif (safe-id id) (item it)))
 
+(def arg->item ((o key 'id))
+  (safe-item:saferead (arg key)))
+
 (def safe-id     (id) (ok-id:saferead id))
 (def safe-int    (id) (ok-int:saferead id))
 (def safe-whole  (id) (ok-whole:saferead id))
@@ -253,9 +256,6 @@
 (def ok-int    (id) (and (exact id) id))
 (def ok-whole  (id) (and (exact id) (>= id 0) id))
 (def ok-posint (id) (and (exact id) (> id 0) id))
-
-(def arg->item (key)
-  (safe-item:saferead (arg key)))
 
 (def live (i) (nor i!dead i!deleted))
 
