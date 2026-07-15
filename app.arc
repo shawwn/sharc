@@ -355,11 +355,13 @@
         choose another."
        nil))
 
+(def goodchar (c)
+  (or (alphadig c) (in c #\- #\_)))
+
 (def goodname (str (o min 1) (o max nil))
   (and (isa!string str)
        (>= (len str) min)
-       (~find (fn (c) (no (or (alphadig c) (in c #\- #\_))))
-              str)
+       (~find ~goodchar str)
        (isnt (str 0) #\-)
        (or (no max) (<= (len str) max))
        str))
