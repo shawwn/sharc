@@ -525,7 +525,7 @@
                (f (car s))  (self (cdr s))
                             (cons (car s) (self (cdr s)))))
           seq)
-        (coerce (rem test (coerce seq 'cons) cmp) 'string))))
+        (coerce (rem test (as!cons seq) cmp) (type seq)))))
 
 ; Seems like keep doesn't need to testify-- would be better to
 ; be able to use tables as fns.  But rem does need to, because
