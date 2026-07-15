@@ -1649,9 +1649,9 @@
 
 (def downcase (x)
   (let downc (fn (c)
-               (let n (coerce c 'int)
+               (let n (as!int c)
                  (if (or (< 64 n 91) (< 191 n 215) (< 215 n 223))
-                     (coerce (+ n 32) 'char)
+                     (as!char (+ n 32))
                      c)))
     (case (type x)
       string    (map downc x)
@@ -1661,9 +1661,9 @@
 
 (def upcase (x)
   (let upc (fn (c)
-             (let n (coerce c 'int)
+             (let n (as!int c)
                (if (or (< 96 n 123) (< 223 n 247) (< 247 n 255))
-                   (coerce (- n 32) 'char)
+                   (as!char (- n 32))
                    c)))
     (case (type x)
       string    (map upc x)
