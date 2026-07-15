@@ -1212,7 +1212,7 @@
 (def sort (test seq)
   (if (alist seq)
       (mergesort test (copy seq))
-      (coerce (mergesort test (coerce seq 'cons)) (type seq))))
+      (coerce (mergesort test (as!cons seq)) (type seq))))
 
 ; Destructive stable merge-sort, adapted from slib and improved 
 ; by Eli Barzilay for MzLib; re-written in Arc.
