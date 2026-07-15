@@ -13,11 +13,11 @@
 
 (def hex (s)
   (assert (isa!int s))
-  (as!string s 16))
+  (coerce s 'string 16))
 
 (def dehex (s)
   (assert (isa!string s))
-  (as!int s 16))
+  (coerce s 'int 16))
 
 (def tokens (s (o sep whitec))
   (let test (testify sep)
