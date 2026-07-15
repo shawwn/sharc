@@ -1515,20 +1515,16 @@
 
   (def parse-format (str)
     (accum a
-      (with (chars nil  i -1)
+      (withs (chars nil  i -1
+              flush {do (a (as!string:rev chars))
+                        (wipe chars)})
         (w/instring s str
           (whilet c (readc s)
             (case c 
-              #\# (do (a (coerce (rev chars) 'string))
-                      (wipe chars)
-                      (a (read s)))
-              #\~ (do (a (coerce (rev chars) 'string))
-                      (wipe chars)
-                      (readc s)
-                      (a (list argsym (++ i))))
+              #\# (do (flush) (a:read s))
+              #\~ (do (flush) (a:list argsym (++ i)))
                   (push c chars))))
-         (when chars
-           (a (coerce (rev chars) 'string))))))
+         (if chars (flush)))))
   
   (mac prf (str . args)
     `(let ,argsym (list ,@args)
