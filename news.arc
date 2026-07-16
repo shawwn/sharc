@@ -879,11 +879,11 @@
 
 (or= caching* 1 perpage* 30 threads-perpage* 10)
 
-(= maxend* 210)
+(= maxend* 210 cache-busters* '(perf p n next))
 
 (mac newscache (name args time . body)
   (w/uniq gc
-    `(let ,gc (cache {unless (or arg!perf arg!p arg!n arg!next)
+    `(let ,gc (cache {unless (some arg cache-busters*)
                        (* caching* ,time)}
                      (fn ,args
                        (tostring (w/me nil ,@body))))
