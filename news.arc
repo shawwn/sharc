@@ -1121,10 +1121,10 @@
                          (unless comments (+ (cur-n) perpage*))]))))
 
 (def fave-url (id (o auth arg!auth) (o un (in arg!un "t" "T")))
-  (let auth (or auth (auth-for (or (me) "") id))
-    (string "fave?id=" (urlencode:string id)
-            (if un "&un=t")
-            (if auth (string "&auth=" (urlencode auth))))))
+  (or= auth (auth-for (or (me) "") id))
+  (string "fave?id=" (urlencode:string id)
+          (if un "&un=t")
+          (if auth (string "&auth=" (urlencode auth)))))
 
 ; The (good-auth "" id auth) branch lets a favorite survive logging in:
 ; the logged-out "favorite" link carries an auth token bound to "" (no
@@ -1139,7 +1139,7 @@
     (if (~me)
          (string "login?goto=" (urlencode (fave-url id auth)))
         (and i (or (good-auth (me) id auth)
-                   (good-auth "" id auth))) ; "" = fave on login (see above)
+                   (good-auth  ""  id auth))) ; "" = fave on login (see above)
          (do (set-favorite (me) id)
              (favorites-url (me) (acomment i)))
          (favorites-url (me)))))
