@@ -1801,8 +1801,6 @@
       (save-prof)
       (push (cons i!id vote) recent-votes*))))
 
-; redefined later
-
 ; Inverse of vote-for: undo the current user's vote on i.  Mirrors the
 ; recorded effects (score, karma, the vote records); hn.js sends how=un.
 
@@ -1823,6 +1821,8 @@
       (save-votes)
       (save-prof)
       (wipe (comment-cache* i!id)))))
+
+; redefined later
 
 (def biased-voter (i vote) nil)
 
