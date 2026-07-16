@@ -321,7 +321,7 @@ Connection: close"))
   ; reload /y itself; send it home instead
   (when loc
     (if (or (empty loc)
-            (is (pos #\? loc) 0))
+            (headmatch "?" loc))
         (string "/" loc)
         loc)))
 
