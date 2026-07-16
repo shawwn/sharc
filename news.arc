@@ -1453,14 +1453,14 @@
   ; newest is cursor-based, so it refills on any page.  The front page is
   ; page-based, so only its first page (exact "news"/"") can be refilled;
   ; deeper pages match nothing and safely no-op.
-  (if (is (and onop (car (tokens onop #\?))) "newest")
+  (if (is (only&car:tokens onop #\?) "newest")
        (w/the op "newest"
          (whenlet n (safe-id next)
            (whenlet tail (keep [<= _!id n] (newstories maxend*))
              (list (tostring (display-item 1 (car tail) onop t))
                    (aand (cadr tail) it!id)))))
       (in onop "news" "")
-       (w/the op (or onop "")
+       (w/the op onop
          (whenlet s ((topstories maxend*) (- perpage* 1))
            (list (tostring (display-item 1 s onop t)) nil)))))
 
