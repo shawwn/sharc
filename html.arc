@@ -310,7 +310,7 @@
 (def vspace (n)    (gentag img src (blank-url) height n width 0))
 (def vhspace (h w) (gentag img src (blank-url) height h width w))
 
-(mac new-hspace (n)    
+(mac new-hspace (n)
   (if (number n)
       `(pr ,(string "<span style=\"padding-left:" n "px\" />"))
       `(pr "<span style=\"padding-left:" ,n "px\" />")))
