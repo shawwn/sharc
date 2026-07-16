@@ -1189,7 +1189,7 @@
     (pr "More")))
 
 (def display-story (i s whence)
-  (when (or (cansee s) (s 'kids))
+  (when (cansee|!kids s)
     (tag (tr class "athing submission" id s!id)
       (display-item-number i)
       (tag (td valign 'top class 'votelinks) (votelinks s whence))
