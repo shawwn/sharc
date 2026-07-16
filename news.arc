@@ -1551,7 +1551,7 @@
             (pr "discuss"))))))
 
 (def visible-family (i (t user me))
-  (+ (if (cansee i user) 1 0)
+  (+ (if i!deleted 0 (cansee i user) 1 0)
      (sum [visible-family (item _) user] i!kids)))
 
 (def threadavg (i)
