@@ -2376,7 +2376,7 @@
     (if (and i
              (cansee i)
              (editable-type i)
-             (or (news-type i) (admin) (author i)))
+             (or (admin) (news-type|author i)))
         (edit-page i)
         (pr "No such item."))))
 
