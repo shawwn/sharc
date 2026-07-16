@@ -15,11 +15,28 @@
   (load-userinfo)
   (serve port))
 
+(def safe-load-admins ()
+  (map string (errsafe (readfile adminfile*))))
+
+(def save-admins ()
+  (aand (tostring:map prn admins*)
+        (writefile (trim it) adminfile* disp)))
+
+; always reload admins. It's cheap, safe, and if the user modifies the
+; admin file and a source file, shows up on next page reload.
+;
+; Ultimately have some way to reload non-arc files.
+
+(= admins* (safe-load-admins))
+
 (def load-userinfo ()
   (= hpasswords*   (safe-load-table hpwfile*)
      openids*      (safe-load-table oidfile*)
-     admins*       (map string (errsafe (readfile adminfile*)))
-     cookie->user* (safe-load-table cookfile*))
+     admins*       (safe-load-admins))
+  (safe-load-cookies))
+
+(def safe-load-cookies ()
+  (= cookie->user* (safe-load-table cookfile*))
   (maptable (fn (k v) (= (user->cookie* v) k))
             cookie->user*))
 
