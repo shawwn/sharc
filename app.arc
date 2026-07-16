@@ -240,7 +240,7 @@
 
 
 (defop login
-  (login-page 'both nil (list {hook 'login} (safe-goto arg!goto))))
+  (login-page 'both nil (list {} (safe-goto arg!goto))))
 
 ; switch is one of: register, login, both
 
@@ -299,6 +299,7 @@
   (prcookie cookie)
   (= (logins* user) ip
      (the me) user)
+  (hook 'login)
   (if (acons afterward)
       (let (f url) afterward
         (f)
