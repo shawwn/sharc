@@ -114,7 +114,7 @@
 
 (def admin ((t u me)) (and u (mem u admins*)))
 
-(def user-exists (u) (and u (hpasswords* u) u))
+(def acct-exists ((t u me)) (and u (hpasswords* u) u))
 
 (def admin-page msg
   (let user (me)
@@ -130,7 +130,7 @@
       (urform (with (u arg!acct p arg!pw)
                 (if (or (no u) (no p) (is u "") (is p ""))
                      (flink {pr "Bad data."})
-                    (user-exists u)
+                    (acct-exists u)
                      (flink {admin-page "User already exists: " u})
                      (do (create-acct u p)
                          "admin")))
@@ -348,9 +348,6 @@
 
 (or= dc-usernames* (table))
 
-(def username-taken (user)
-  (hpasswords* user))
-
 (def username-conflicts (user)
   (when (empty dc-usernames*)
     (each (k v) hpasswords*
@@ -365,7 +362,7 @@
        "Usernames can only contain letters, digits, dashes and 
         underscores, and should be between 2 and 15 characters long.  
         Please choose another."
-      (username-taken user)
+      (acct-exists user)
        "That username is taken. Please choose another."
       (username-conflicts user)
        "That username conflicts with an existing one.  Names are
