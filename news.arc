@@ -3200,7 +3200,7 @@ brackets&gt; and it should work.<br><br>")
                   (w/rlink (do (set-ip-ban ip (no banned))
                                "badips")
                     (fontcolor (if banned darkred) (pr ip)))))
-            (tdr (when (or (goods ip) (bads ip))
+            (tdr (when (goods|bads ip)
                    (pr (round (days-since 
                                 (max (aif (car (goods ip)) it!time 0) 
                                      (aif (car (bads  ip)) it!time 0)))))))
