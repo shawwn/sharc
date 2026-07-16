@@ -2828,7 +2828,7 @@
       (and (~live c) (~author c))
        "cdd"
        (withs (g ((comment-color c) 'r)
-               x (coerce g 'string 16))
+               x (as!string g 16))
          (string "c" (if (len< x 2) "0") x))))
 
 ; Threads
