@@ -162,6 +162,9 @@
   
 (def set-pw (user pw)
   (= (hpasswords* user) (and pw (bhash pw)))
+  (save-pws))
+
+(def save-pws ()
   (save-table hpasswords* hpwfile*))
 
 (def hello-page ()
