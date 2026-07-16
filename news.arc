@@ -816,6 +816,7 @@
       (posint  minaway     ,(p 'minaway)                            ,u  ,u)
       (sexpr   keys        ,(p 'keys)                               ,a  ,a)
       (hexcol  topcolor    ,(or (p 'topcolor) (hexrep site-color*)) ,k  ,k)
+      ,@(topcolor-default p u)
       (int     delay       ,(p 'delay)                              ,u  ,u)
       (string  nil         ,(resetpw-link)                          ,w   nil)
       (string  nil         ,(user-submissions-link user)             t   nil)
@@ -824,6 +825,10 @@
       (string  nil         ,(upvoted-links user)                    ,u   nil)
       (string  nil         ,(favorited-links u user)                 t   nil)
       )))
+
+(def topcolor-default (p u)
+  (when (p 'topcolor)
+    `((string  default     ,(hexrep site-color*)                    ,u  nil))))
 
 (def user-field (user)
   (tostring
