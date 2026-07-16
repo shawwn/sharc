@@ -29,6 +29,11 @@
 
 (= admins* (safe-load-admins))
 
+(or= hpasswords*   (table)
+     openids*      (table)
+     cookie->user* (table)
+     user->cookie* (table))
+
 (def load-userinfo ()
   (= hpasswords*   (safe-load-table hpwfile*)
      openids*      (safe-load-table oidfile*)
