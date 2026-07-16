@@ -1034,7 +1034,7 @@
   (bestn n (compare > realscore) (visible comments*)))
 
 
-(newsop lists () 
+(newsop lists ()
   (longpage (msec) nil "lists" "Lists" "lists"
     (sptab
       (row (link "best")         "Highest voted recent links")
@@ -1046,11 +1046,13 @@
       (row (link "topcolors")    (topcolors-label))
       (when (editor)
         (spacerow 10)
-        (map row:link '(flagged killed)))
+        (row (prbold "Editor links"))
+        (map [row:link _] '(flagged killed)))
       (when (admin)
         (spacerow 10)
-        (map row:link '(optimes editors topips spurned badlogins
-                                goodlogins badguys badsites badips)))
+        (row (prbold "Admin links"))
+        (map [row:link _] '(optimes editors topips spurned badlogins
+                            goodlogins badguys badsites badips)))
       (hook 'listspage))))
 
 (def topcolors-label ()
