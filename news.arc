@@ -875,6 +875,8 @@
 
 ; remember to set caching to 0 when testing non-logged-in 
 
+; these are configurable via /newsadmin
+
 (or= caching* 1 perpage* 30 threads-perpage* 10)
 
 (= maxend* 210)
