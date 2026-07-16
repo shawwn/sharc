@@ -618,8 +618,7 @@
 (mac opexpand (definer name parms . body)
   `(,definer ,name
      (with (user (me) ip (ip))
-       (with ,(and parms (mappend [list _ (list 'arg (list 'quote _))]
-                                  parms))
+       (with ,(mappend [list _ `(arg ',_)] parms)
          (newslog ',name ,@parms)
          ,@body))))
 
