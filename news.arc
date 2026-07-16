@@ -1531,7 +1531,7 @@
        (fontcolor darkred (pr user))
       (and (admin) (admin user))
        (fontcolor darkblue (pr user))
-      (and (or (admin) (member)) (member user) (~me user))
+      (and (admin|member) (member&~me user))
        (fontcolor orange (pr user))
       (and show-noob (me) (noob user))
        (fontcolor noob-color* (pr user))
