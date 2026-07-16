@@ -2361,8 +2361,7 @@
   (aif i!parent (superparent:item it) i))
 
 (def display-item-text (s)
-  (when (and (cansee s)
-             (in s!type 'story 'poll)
+  (when (and (metastory&cansee s)
              (~blank s!text))
     (spacerow 2)
     (row "" s!text)))
