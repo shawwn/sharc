@@ -11,7 +11,7 @@
    adminfile*  (string arcdir* "admins")
    cookfile*   (string arcdir* "cooks"))
 
-(def asv ((o port 8080))
+(def asv ((o port (readenv "PORT" 8080)))
   (load-userinfo)
   (serve port))
 
