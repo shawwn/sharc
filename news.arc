@@ -3294,11 +3294,14 @@ brackets&gt; and it should work.<br><br>")
               (tdr:prt n)
               (tdr:prt (and n (num (/ (* n ms) 1000) 3 t t)))))))))
 
-(defop topcolors
+(defop topcolors 
   (minipage "Custom Colors"
     (tab 
-      (each c (dedup (map downcase (trues [uvar _ topcolor] (users))))
-        (tr (td c) (tdcolor (hex>color c) (hspace 30)))))))
+      (each c (topcolors)
+        (tr (td (pr "#" c)) (tdcolor (hex>color c) (hspace 30)))))))
+
+(defcache topcolors 90
+  (dedup (map downcase (trues [uvar _ topcolor] (users)))))
 
 ; Forgot page
 
