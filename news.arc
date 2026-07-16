@@ -631,6 +631,10 @@
   `(do (pushnew ',(car body) newsop-names*)
        (opexpand defop ,@body)))
 
+(mac newsopg body
+  `(do (pushnew ',(car body) newsop-names*)
+       (opexpand defopg ,@body)))
+
 (mac adop (name parms . body)
   (w/uniq g
     `(opexpand defopa ,name ,parms
@@ -1405,21 +1409,19 @@
                 (hide-item i user))
             (safe-goto goto)))))
 
-(newsop hidden (id)
-  (let subject (if (and id (~blank id) (goodname id)) id (me))
-    (if (no (me))
-         (pr "You have to be logged in to see hidden submissions.")
-        (and (~me subject) (~admin))
-         (pr "Can't see another user's hidden submissions.")
-         (listpage (msec)
-                   (hidden-items subject)
-                   "hidden" "Hidden submissions"
-                   (nexturl (hidden-url subject)) t
-                   [nexturl (hidden-url subject) _
-                            (+ (cur-n) perpage*)]))))
+(newsopg hidden (id)
+  (let subject (check id ~blank&goodname)
+    (if (and subject (~me subject) (~admin))
+        (pr "Can't display that.")
+        (listpage (msec)
+                  (only&hidden-items subject)
+                  "hidden" "Hidden submissions"
+                  (nexturl (hidden-url subject)) t
+                  [nexturl (hidden-url subject) _
+                           (+ (cur-n) perpage*)]))))
 
 (def hidden-url ((t user me))
-  (string "hidden?id=" user))
+  (string "hidden" (if user "?id=") user))
 
 (def hidden-items ((t user me))
   (rem no (map item (uvar user hidden))))
