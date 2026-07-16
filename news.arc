@@ -1503,12 +1503,13 @@
   (awhen (and show-avg* (admin) show-avg (uvar user avg))
     (pr " (@(num it 1 t t))")))
 
+(def text-time (secs)
+  (let (Y M D h m s) (map zeropad (rev:timedate secs))
+    (+ "" Y "-" M "-" D "T" h ":" m ":" s " " secs)))
+
 (def agelink (i)
-  (let (s m h D M Y) (map [+ (if (< _ 10) "0" "") _]
-                          (timedate i!time))
-    (let title (+ "" Y "-" M "-" D "T" h ":" m ":" s " " i!time)
-      (tag (span class "age" title title)
-        (link (text-age:item-age i) (item-url i!id))))))
+  (tag (span class "age" title (text-time i!time))
+    (link (text-age:item-age i) (item-url i!id))))
 
 (def unvotelink (i (o whence))
   ; hn.js injects the "unvote" link here after a live vote; render it
