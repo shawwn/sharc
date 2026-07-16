@@ -172,6 +172,14 @@
 (def save-pws ()
   (save-table hpasswords* hpwfile*))
 
+(def copy-account (old new)
+  (assert (acct-exists old))
+  (assert (~acct-exists new))
+  (logout-user old)
+  (logout-user new)
+  (= (hpasswords* new) (hpasswords* old))
+  (save-pws))
+
 (def hello-page ()
   (whitepage (prs "hello" (me) "at" (ip))))
 
