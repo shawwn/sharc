@@ -164,7 +164,9 @@
 (def check-key (k (t u me))
   (and u (mem k (uvar u keys))))
 
-(def author (i (t u me)) (is u i!by))
+(def by (i) i!by)
+
+(def author (i (t u me)) (is u (by i)))
 
 
 (or= stories* nil comments* nil 
@@ -390,7 +392,7 @@
   (def delayed (i)
     (and (no (mature i!id))
          (acomment i)
-         (or (< (item-age i) (min max-delay* (uvar i!by delay)))
+         (or (< (item-age i) (min max-delay* (uvar (by i) delay)))
              (do (set (mature i!id))
                  nil)))))
 
@@ -983,7 +985,7 @@
   (retrieve n [cansee&bynoob _] source))
 
 (def bynoob (i)
-  (< (- (user-age i!by) (item-age i)) (* 60 24 noob-days*)))
+  (< (- (user-age (by i)) (item-age i)) (* 60 24 noob-days*)))
 
 (newsop from (site kind next)
   (w/the listpage-body
@@ -1467,7 +1469,7 @@
 
 (def cansee-score (i)
   (or (isnt i!type 'comment)
-      (me i!by)
+      (me (by i))
       (admin)))
 
 (def itemline (i (o whence))
@@ -1487,7 +1489,7 @@
 ; redefined later
 
 (def byline (i (o whence))
-  (userlink i!by)
+  (userlink (by i))
   (pr " ")
   (agelink i)
   (pr " ")
@@ -1556,7 +1558,7 @@
 
 (def threadavg (i)
   (only&avg (map [or (uvar _ avg) 1] 
-                 (rem admin (dedup (map !by (keep live (family i))))))))
+                 (rem admin (dedup (map by (keep live (family i))))))))
 
 (= user-changetime* 120 editor-changetime* 1440)
 
@@ -1603,7 +1605,7 @@
 
 (def flaglink (i whence)
   (when (and (me)
-             (or (admin) (~me i!by))
+             (or (admin) (~me (by i)))
              (or (admin) (> (karma) flag-threshold*)))
     (pr bar*)
     (w/rlink (do (if (admin)
@@ -1614,7 +1616,7 @@
                             (~mem 'nokill i!keys)
                             (len> i!flags flag-kill-threshold*)
                             (< (realscore i) 10)
-                            (~find admin:!2 i!vote))
+                            (~find admin:by:!2 i!vote))
                    (pushnew 'flagged i!keys)
                    (kill i 'flags))
                  whence)
@@ -1664,21 +1666,21 @@
     (pr bar*)
     (w/rlink (do (toggle-blast i nuke)
                  whence)
-      (prt (if (ignored i!by) "un-") (if nuke "nuke" "blast")))))
+      (prt (if (ignored (by i)) "un-") (if nuke "nuke" "blast")))))
 
 (def toggle-blast (i (o nuke))
   (atomic
-    (if (ignored i!by)
-        (do (wipe i!dead (ignored i!by))
+    (if (ignored (by i))
+        (do (wipe i!dead (ignored (by i)))
             (awhen (and nuke (sitename i!url))
               (set-site-ban it nil)))
         (do (set i!dead)
-            (ignore i!by (if nuke 'nuke 'blast))
+            (ignore (by i) (if nuke 'nuke 'blast))
             (awhen (and nuke (sitename i!url))
               (set-site-ban it 'ignore))))
     (if i!dead (log-kill i))
     (save-item i)
-    (save-prof i!by)))
+    (save-prof (by i))))
 
 (def candelete (i (t user me))
   (or (admin user) (own-changeable-item i user)))
@@ -1763,19 +1765,19 @@
 
 (def vote-for (i (o dir 'up))
   (unless (or ((votes) i!id) 
-              (and (~live i) (~me i!by)))
+              (and (~live i) (~me (by i))))
     (withs (ip   (logins* (me))
             vote (list (seconds) ip (me) dir i!score))
       (unless (or (and (or (ignored) check-key!novote)
-                       (~me i!by))
+                       (~me (by i)))
                   (and (is dir 'down)
                        (~editor)
                        (or check-key!nodowns
                            (> (downvote-ratio) downvote-ratio-limit*)
                            ; prevention of karma-bombing
-                           (just-downvoted i!by)))
+                           (just-downvoted (by i))))
                   (and (~legit-user)
-                       (~me i!by)
+                       (~me (by i))
                        (find [is (cadr _) ip] i!votes))
                   (and (isnt i!type 'pollopt)
                        (biased-voter i vote)))
@@ -1787,8 +1789,8 @@
         (unless (or (author i)
                     (and (is ip i!ip) (~editor))
                     (is i!type 'pollopt))
-          (++ (karma i!by) (case dir up 1 down -1))
-          (save-prof i!by))
+          (++ (karma (by i)) (case dir up 1 down -1))
+          (save-prof (by i)))
         (wipe (comment-cache* i!id)))
       (if (admin) (pushnew 'nokill i!keys))
       (push vote i!votes)
@@ -1812,8 +1814,8 @@
       (unless (or (author i)
                   (and (is (logins* (me)) i!ip) (~editor))
                   (is i!type 'pollopt))
-        (-- (karma i!by) (case dir up 1 down -1))
-        (save-prof i!by))
+        (-- (karma (by i)) (case dir up 1 down -1))
+        (save-prof (by i)))
       (pull [is _!2 (me)] i!votes)
       (save-item i)
       (wipe ((votes* (me)) i!id))
@@ -1830,7 +1832,7 @@
 
 (def downvote-ratio ((o sample 20))
   (ratio [is _!1!3 'down]
-         (keep [let by ((item (car _)) 'by)
+         (keep [let by (by (item (car _)))
                  (nor (me by) (ignored by))]
                (bestn sample (compare > car:cadr) (tablist (votes))))))
 
@@ -2116,10 +2118,10 @@
 ; dealing with trolls rather than spammers.
 
 (def maybe-ban-ip (s)
-  (when (and s!dead (ignored s!by))
+  (when (and s!dead (ignored (by s)))
     (let bads (loaded-items [and _!dead (astory _) (is _!ip s!ip)])
       (when (and (len> bads ip-ban-threshold*)
-                 (some [and (ignored _!by) (isnt _!by s!by)] bads))
+                 (some [and (ignored (by _)) (isnt (by _) (by s))] bads))
         (set-ip-ban s!ip t nil nil)))))
 
 (def killallby (user) 
@@ -2263,7 +2265,7 @@
     (whenlet i (safe-item id)
       (let del i!deleted
         (when (news-type i)
-          (obj by          (unless del i!by)
+          (obj by          (unless del (by i))
                dead        (unless del (~live i))
                deleted     i!deleted
                descendants (unless del
@@ -2526,7 +2528,7 @@
   (catch
     (each k parent!kids
       (whenlet i (item k)
-        (when (and (me i!by) (cansee i) (is (unmarkdown i!text) text))
+        (when (and (me (by i)) (cansee i) (is (unmarkdown i!text) text))
           (throw i))))))
 
 (def bad-user ((t u me))
@@ -2880,7 +2882,7 @@
   (map item (retrieve limit acomment:item (uvar user submitted))))
   
 (def subcomment (c)
-  (some [and (acomment _) (is _!by c!by) (no _!deleted)]
+  (some [and (acomment _) (is (by _) (by c)) (no _!deleted)]
         (ancestors c)))
 
 (def ancestors (i)
@@ -3162,7 +3164,7 @@ brackets&gt; and it should work.<br><br>")
                   (fontcolor (case ban kill darkred gray!220) (pr "x"))))
             (td (w/rlink (do (set-site-ban site 'ignore) "badsites")
                   (fontcolor (case ban ignore darkred gray!220) (pr "x"))))
-            (td (each u (dedup (map !by deads))
+            (td (each u (dedup (map by deads))
                   (userlink u nil)
                   (pr " "))))))))
 
@@ -3227,7 +3229,7 @@ brackets&gt; and it should work.<br><br>")
                 (+ ips (rem [mem _ ips] (keys banned-ips*))))
           subs (table 
                  [each ip ips
-                   (= (_ ip) (dedup (map !by (+ (bads ip) (goods ip)))))]))
+                   (= (_ ip) (dedup (map by (+ (bads ip) (goods ip)))))]))
     (list subs
           (sort (compare > (memo [badness (subs _) (bads _) (goods _)]))
                 ips))))
