@@ -1905,7 +1905,7 @@
            (item-url it!id))
        (if (no (me))
             (flink {submit-login-warning url title text})
-           (no (and (or (blank url) (valid-url url))
+           (no (and (blank|valid-url url)
                     (~blank title)))
             (flink {submit-page url title text retry*})
            (unless (admin) (len> title title-limit*))
