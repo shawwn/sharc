@@ -230,6 +230,7 @@
   (if (no options)
       '()
       (let ((opt val) . rest) options
+        (if (isa opt 'key) (zap sym opt))
         (iflet meth (opmeth spec opt)
           (if val
               (cons (if (precomputable-tagopt val)
