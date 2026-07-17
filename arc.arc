@@ -44,6 +44,8 @@
                 `(do (sref sig ',parms ',name)
                      (safeset ,name (annotate 'mac (fn ,parms ,@body)))))))
 
+(mac com (e) (eval e))
+
 (mac def (name x . body)
   (if (is body nil)
       `(safeset ,name ,x)
