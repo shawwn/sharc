@@ -809,6 +809,21 @@
          start)
         (recstring [if (f (seq _)) _] seq start))))
 
+(def positions (test seq (o start 0))
+  (let f (testify test)
+    (accum a
+      (if (alist seq)
+          ((afn (seq (o n start))
+             (when seq
+               (if (f (car seq)) (a n))
+               (self (cdr seq) (+ n 1))))
+           (nthcdr start seq))
+          (for i start (edge seq)
+            (if (f (seq i)) (a i)))))))
+
+(def lastpos (test seq (o start 0))
+  (last:positions test seq start))
+
 (def even (n) (is (mod n 2) 0))
 
 (def odd (n) (no (even n)))

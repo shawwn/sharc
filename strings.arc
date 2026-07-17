@@ -33,14 +33,6 @@
                                    (self (cdr cs) (cons (car cs) tok))))
       (rev (map as!string (rec (chars s) nil))))))
 
-; maybe promote to arc.arc, but if so include a list clause
-
-(def positions (test seq)
-  (accum a
-    (let f (testify test)
-      (forlen i seq
-        (if (f (seq i)) (a i))))))
-
 (def lines (s)
   (accum a
     ((afn ((p . ps))
