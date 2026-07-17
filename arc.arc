@@ -222,9 +222,6 @@
       x
       [cmp _ x]))
 
-; Like keep, seems like some shouldn't testify.  But find should,
-; and all probably should.
-
 (def some (test seq (o cmp is))
   (let f (testify test cmp)
     (if (alist seq)
