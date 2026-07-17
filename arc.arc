@@ -988,13 +988,16 @@
 ;   (w/uniq (a b)
 ;     `(with (,a ,x ,b ,y) (if (> ,a ,b) ,a ,b))))
 
-(def most (f seq) 
+(def most (f seq (o cmp >))
   (unless (no seq)
     (withs (wins (car seq) topscore (f wins))
       (each elt (cdr seq)
         (let score (f elt)
-          (if (> score topscore) (= wins elt topscore score))))
+          (if (cmp score topscore) (= wins elt topscore score))))
       wins)))
+
+(def least (f seq)
+  (most f seq <))
 
 ; Insert so that list remains sorted.  Don't really want to expose
 ; these but seem to have to because can't include a fn obj in a 
