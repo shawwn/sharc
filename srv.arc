@@ -544,7 +544,7 @@ Connection: close"))
   (map getter (sortable fnids* < car)))
 
 (def dead-fnids ((o max-hours fnid-hours-max*))
-  (accum a
+  (accumulate a
     (each (id (created lasts user)) timed-fnids*
       (when (> (since created) lasts)
         (a id)))
