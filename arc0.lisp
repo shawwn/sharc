@@ -116,6 +116,11 @@ the truth value t.  See the identity tests in test.arc."
 ;;;; Funcall helpers
 ;;;; ============================================================
 
+(defun arc-apply (fn &rest args)
+  (ar-apply fn (ar-apply-args args)))
+
+(xdef apply #'arc-apply)
+
 (defun ar-apply-args (args)
   (cond
     ((null args) nil)
@@ -135,10 +140,7 @@ the truth value t.  See the identity tests in test.arc."
     ((vectorp fn)    (aref fn (car args)))
     (t (error "Function call on non-function: ~S" fn))))
 
-(defun arc-apply (fn &rest args)
-  (ar-apply fn (ar-apply-args args)))
 
-(xdef apply #'arc-apply)
 
 (defun arc-call0 (fn)
   (if (functionp fn) (funcall fn) (ar-apply fn nil)))
