@@ -929,6 +929,8 @@
 
 (def int (x (o b 10)) (as!int x b))
 
+(def keysym (x) (if (isa!key x) (sym x) x))
+
 (mac rand-choice exprs
   `(case (rand ,(len exprs))
      ,@(let key -1 
@@ -1137,7 +1139,7 @@
 
 (mac obj args
   `(listtab (list ,@(map (fn ((k v))
-                           `(list ',k ,v))
+                           `(list ',(keysym k) ,v))
                          (pair args)))))
 
 (def load-table (file (o eof))
