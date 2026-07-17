@@ -805,7 +805,7 @@
                (f (car seq)) 
                 n
                (self (cdr seq) (+ n 1))))
-         (nthcdr start seq) 
+         (nthcdr start seq)
          start)
         (recstring [if (f (seq _)) _] seq start))))
 
