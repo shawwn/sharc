@@ -218,7 +218,7 @@
    start))
 
 (def testify (x (o cmp is))
-  (if (isa!fn x) x [cmp _ x]))
+  (if (isa!fn|isa!table x) x [cmp _ x]))
 
 ; Like keep, seems like some shouldn't testify.  But find should,
 ; and all probably should.
