@@ -784,7 +784,9 @@
 (def consif (x y) (if x (cons x y) y))
 
 (def string args
-  (apply + "" (map [coerce _ 'string] args)))
+  (if (~cdr args)
+      (as!string (car args))
+      (apply + "" (map as!string args))))
 
 (def flat x
   ((afn (x acc)
