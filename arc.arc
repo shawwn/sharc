@@ -951,7 +951,9 @@
                   it)))))
 
 (def rand-elt (seq) 
-  (seq (rand (len seq))))
+  (let n (len seq)
+    (when (> n 0)
+      (seq (rand n)))))
 
 (def rand-string (n)
   (let c "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
