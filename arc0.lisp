@@ -1303,8 +1303,12 @@ the truth value t.  See the identity tests in test.arc."
 ;;;; Misc primitives
 ;;;; ============================================================
 
-(xdef rand (&optional (n 1.0d0))
-  (crypto:strong-random n))
+(defun arc-rand (&optional (n 1.0d0))
+  (cond ((= n 0) 0)
+        ((< n 0) (- (arc-rand (- n))))
+        (t (crypto:strong-random n))))
+
+(xdef rand #'arc-rand)
 
 (xdef rand-bits #'crypto:random-bits)
 
