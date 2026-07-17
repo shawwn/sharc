@@ -185,7 +185,7 @@
 ; Could be smarter about preloading by keeping track of popular pages.
 
 (def load-items ()
-  (system (+ "rm -f " storydir* "*.tmp"))
+  (system:list "rm" "-f" (string storydir* "*/*.tmp"))
   (pr "load items: ") 
   (with (items (table)
          ids   (sort > (map int (dir storydir*))))

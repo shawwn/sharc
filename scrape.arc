@@ -85,8 +85,7 @@
 (def load-scrape-config ()
   (unless (file-exists scrape-config*)
     (when (file-exists scrape-example*)
-      (system (+ "cp " (shellquote scrape-example*) " "
-                       (shellquote scrape-config*)))))
+      (copyfile scrape-example* scrape-config*)))
   (or (and (file-exists scrape-config*) (load-json scrape-config*))
       (obj username "hnscraper")))
 

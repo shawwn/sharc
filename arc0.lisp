@@ -1223,9 +1223,12 @@ the truth value t.  See the identity tests in test.arc."
   ;; tty and all) or an in-memory stream like a string-input-stream
   ;; (SBCL copies it to the child through a pipe in the background, so
   ;; reading the child's output below can't deadlock against the write).
-  (let* ((proc (sb-ext:run-program "/bin/sh" (list "-c" cmd)
+  (let* ((bin (if (listp cmd) (car cmd) "/bin/sh"))
+         (args (if (listp cmd) (cdr cmd) (list "-c" cmd)))
+         (proc (sb-ext:run-program bin args
                                    :input *standard-input*
-                                   :output :stream :wait nil))
+                                   :output :stream :wait nil
+                                   :search t))
          (out  (sb-ext:process-output proc)))
     ; (loop for c = (read-char out nil nil)
     ;       while c do (write-char c *standard-output*))
@@ -1245,11 +1248,14 @@ the truth value t.  See the identity tests in test.arc."
   ;; (e.g. fromstring's) is copied to the child in the background, which
   ;; works even though the caller reads our returned stream later -- SBCL
   ;; captured the stream here and feeds it independently of the binding.
-  (sb-ext:process-output
-   (sb-ext:run-program "/bin/sh" (list "-c" cmd)
-                       :input *standard-input*
-                       :output :stream :wait wait
-                       :external-format format)))
+  (let* ((bin (if (listp cmd) (car cmd) "/bin/sh"))
+         (args (if (listp cmd) (cdr cmd) (list "-c" cmd))))
+    (sb-ext:process-output
+     (sb-ext:run-program bin args
+                         :input *standard-input*
+                         :output :stream :wait wait
+                         :external-format format
+                         :search t))))
 
 (xdef getenv (name &optional default)
   ;; treat both "unset" and "set-but-empty" as missing, matching
