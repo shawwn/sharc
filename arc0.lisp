@@ -128,19 +128,18 @@ the truth value t.  See the identity tests in test.arc."
     (t (cons (car args) (ar-apply-args (cdr args))))))
 
 (defun ar-apply (fn args)
+  (if (functionp fn) (apply fn args)
+    (let ((x (apply #'arc-ref fn args)))
+      (if (eq x :arc/invalid)
+          (error "Function call on non-function: ~S" fn)
+          x))))
+
+(defun arc-ref (seq i &optional default)
   (cond
-    ((functionp fn)  (apply fn args))
-    ((consp fn)      (nth (car args) fn))
-    ((stringp fn)    (char fn (car args)))
-    ((hash-table-p fn)
-     (let ((v (gethash (car args) fn :arc/missing)))
-       (if (eq v :arc/missing)
-           (if (cdr args) (cadr args) nil)
-           v)))
-    ((vectorp fn)    (aref fn (car args)))
-    (t (error "Function call on non-function: ~S" fn))))
-
-
+    ((sequencep seq)    (elt seq i))
+    ((hash-table-p seq) (let ((v (gethash i seq :arc/missing)))
+                          (if (eq v :arc/missing) default v)))
+    (t :arc/invalid)))
 
 (defun arc-call0 (fn)
   (if (functionp fn) (funcall fn) (ar-apply fn nil)))
@@ -377,6 +376,9 @@ the truth value t.  See the identity tests in test.arc."
 
 (defun threadp (x)
   (typep x 'sb-thread:thread))
+
+(defun sequencep (x)
+  (typep x 'sequence))
 
 (defun arc-tag (type rep)
   (if (and (arc-tagged-p rep)
