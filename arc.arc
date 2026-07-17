@@ -1407,6 +1407,12 @@
         ;(keep [endmatch "/" _] it)
         (keep [is #\/ (_ (edge _))] it)))
 
+(def files (path)
+  (aand (dir path)
+        ; can't use endmatch, strings.arc isn't loaded yet
+        ;(rem [endmatch "/" _] it)
+        (rem [is #\/ (_ (edge _))] it)))
+
 (def ensure-dir (path)
   (unless (dir-exists path)
     (system (string "mkdir -p " path))))
