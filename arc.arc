@@ -666,7 +666,7 @@
 (mac w/defs body
   (let names nil
     (each f body
-      (if (and (acons f) (is (car f) 'def))
+      (if (caris f 'def)
           (push (cadr f) names)))
     `(with ,(mappend [list _ nil] (rev names))
        ,@body)))
