@@ -736,11 +736,14 @@
        (car args)
       `(let it ,(car args) (and it (aand ,@(cdr args))))))
 
-(mac accum (accfn . body)
+(mac accumulate (accfn . body)
   (w/uniq gacc
-    `(withs (,gacc nil ,accfn [push _ ,gacc])
+    `(withs (,gacc nil ,accfn [= ,gacc (cons _ ,gacc)])
        ,@body
-       (rev ,gacc))))
+       ,gacc)))
+
+(mac accum (accfn . body)
+  `(rev (accumulate ,accfn ,@body)))
 
 ; Repeatedly evaluates its body till it returns nil, then returns vals.
 
@@ -1114,15 +1117,15 @@
   table)
 
 (def keys (h) 
-  (accum a (each (k v) h (a k))))
+  (accumulate a (each (k v) h (a k))))
 
 (def vals (h) 
-  (accum a (each (k v) h (a v))))
+  (accumulate a (each (k v) h (a v))))
 
 ; These two should really be done by coerce.  Wrap coerce?
 
 (def tablist (h)
-  (accum a (maptable (fn args (a args)) h)))
+  (accumulate a (maptable (fn args (a args)) h)))
 
 (def listtab (al)
   (let h (table)
