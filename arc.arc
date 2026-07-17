@@ -1863,9 +1863,9 @@
 
 (def stop-thread (th)
   (when th
-    (unless (dead th)
+    (unless (dead-thread th)
       (kill-thread th))
-    (until (dead th) (sleep 0))
+    (until (dead-thread th) (sleep 0))
     (wipe (thread-locals* th))))
 
 ; Referencing the bare symbol `scope` (or `scope%`) compiles to

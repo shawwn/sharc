@@ -98,7 +98,7 @@
                          (stop-thread th2))))
               (= th2 (thread
                        (sleep threadlife*)
-                       (unless (dead th1)
+                       (unless (dead-thread th1)
                          (prn "srv thread took too long for " ip))
                        (force-close i o)
                        (stop-thread th1))))))))

@@ -1183,7 +1183,7 @@ the truth value t.  See the identity tests in test.arc."
 
 (xdef current-thread () sb-thread:*current-thread*)
 
-(xdef dead (th) (tnil (not (sb-thread:thread-alive-p th))))
+(xdef dead-thread (th) (tnil (not (sb-thread:thread-alive-p th))))
 
 (xdef sleep (n) (sleep n) nil)
 
