@@ -938,6 +938,9 @@
         (rmfile tmpfile))))
   val)
 
+(def dispfile (val file)
+  (writefile val file disp))
+
 (def copyfile (old new)
   (let tmpfile (tmpname new)
     (cpfile old tmpfile)
