@@ -447,7 +447,7 @@
   ; old (or nil) = previous saved record (decoded JSON; tables with symbol keys).
   (with (story    parsed!story
          comments parsed!comments
-         old-comments (and old (or old!comments nil)))
+         old-comments (and old old!comments))
     (= story!fetched_at (seconds))
     (let merged (merge-comments old-comments comments)
       (each c merged
@@ -462,7 +462,7 @@
 (or= scrape-users-to-fetch* (table))
 
 (def push-user-to-fetch (u)
-  (when u (= (scrape-users-to-fetch* u) t)))
+  (when u (set (scrape-users-to-fetch* u))))
 
 
 ; ----- User scrape -----
