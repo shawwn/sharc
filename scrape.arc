@@ -757,7 +757,9 @@
         ; set via the web UI later).  Skip entirely if dev-password
         ; is nil/empty.
         (when (and scrape-dev-password*
-                   (~empty scrape-dev-password*)
-                   (no (hpasswords* id)))
-          (= (hpasswords* id) (shash scrape-dev-password*)))
+                   (~empty scrape-dev-password*))
+          (or= (hpasswords* id) (scrape-dev-password-hash)))
         p))))
+
+(defmemo scrape-dev-password-hash ()
+  (bhash scrape-dev-password*))
