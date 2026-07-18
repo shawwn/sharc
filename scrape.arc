@@ -478,15 +478,10 @@
   (when (or force (no (recently-fetched? (sym (+ "u/" id)))))
     (let raw (curl-get-public (+ scrape-api-host* "/user/" id ".json"))
       (when (and raw (>= (len raw) 2))
-        (writefile-raw (inject-fetched-at raw (seconds))
-                       (+ scrape-user-dir* id ".json"))
+        (dispfile (inject-fetched-at raw (seconds))
+                  (+ scrape-user-dir* id ".json"))
         (= (scrape-last-fetch* (sym (+ "u/" id))) (seconds))
         t))))
-
-(def writefile-raw (s path)
-  (let tmp (+ path ".tmp")
-    (w/outfile o tmp (disp s o))
-    (mvfile tmp path)))
 
 (def inject-fetched-at (raw t)
   ; raw is a JSON object string (firebase response).  Insert
