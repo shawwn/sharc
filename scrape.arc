@@ -33,7 +33,7 @@
    scrape-fetchlog*  (string arcdir* "scrape/last-fetch.lisp")
    scrape-user-agent*
      "hnscraper (https://news.ycombinator.com/user?id=hnscraper; contact shawnpresser@@gmail.com)"
-   scrape-refetch-secs* 3600       ; skip items refetched within last hour
+   scrape-refetch-secs* (* 60 5)       ; skip items refetched within last five minutes
    ; robots.txt advertises Crawl-delay: 30 for generic bots.  The
    ; hnscraper account has explicit owner authorization to run faster;
    ; the About page invites contact if it's too aggressive.  Keep this
