@@ -676,7 +676,7 @@
       ; record the story under the author's submitted list (used by
       ; /submitted and /threads).
       (when s!by
-        (whenlet author (profs* s!by)
+        (whenlet author (profile s!by)
           (unless (mem id author!submitted)
             (= author!submitted (cons id author!submitted))
             (save-prof s!by))))
@@ -745,7 +745,7 @@
       ; when there's no on-disk file, and (nil id) -> "Function call
       ; on non-function: NIL".  Re-using news's init-user keeps that
       ; setup in one place.
-      (unless (profs* id) (init-user id))
+      (unless (profile id) (init-user id))
       (let p (profs* id)
         (when u!created (= p!created u!created))
         (when u!karma   (= p!karma   u!karma))
