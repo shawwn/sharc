@@ -217,26 +217,26 @@
               (self (+ i 1)))))
    start))
 
-(def testify (x (o cmp is))
-  (if (and (isa!fn|isa!table x) (is cmp is))
+(def testify (x (o same is))
+  (if (and (isa!fn|isa!table x) (is same is))
       x
-      [cmp _ x]))
+      [same _ x]))
 
-(def some (test seq (o cmp is))
-  (let f (testify test cmp)
+(def some (test seq (o same is))
+  (let f (testify test same)
     (if (alist seq)
         (reclist f:car seq)
         (recstring f:seq seq))))
 
-(def all (test seq (o cmp is))
-  (~some (complement (testify test cmp)) seq))
+(def all (test seq (o same is))
+  (~some (complement (testify test same)) seq))
        
-(def mem (test seq (o cmp is))
-  (let f (testify test cmp)
+(def mem (test seq (o same is))
+  (let f (testify test same)
     (reclist [if (f:car _) _] seq)))
 
-(def find (test seq (o cmp is))
-  (let f (testify test cmp)
+(def find (test seq (o same is))
+  (let f (testify test same)
     (if (alist seq)
         (reclist   [if (f:car _) (car _)] seq)
         (recstring [if (f:seq _) (seq _)] seq))))
@@ -518,23 +518,23 @@
       (last (cdr xs))
       (car xs)))
 
-(def rem (test seq (o cmp is))
-  (let f (testify test cmp)
+(def rem (test seq (o same is))
+  (let f (testify test same)
     (if (alist seq)
         ((afn (s)
            (if (no s)       nil
                (f (car s))  (self (cdr s))
                             (cons (car s) (self (cdr s)))))
           seq)
-        (coerce (rem test (as!cons seq) cmp) (type seq)))))
+        (coerce (rem test (as!cons seq) same) (type seq)))))
 
 ; Seems like keep doesn't need to testify-- would be better to
 ; be able to use tables as fns.  But rem does need to, because
 ; often want to rem a table from a list.  So maybe the right answer
 ; is to make keep the more primitive, not rem.
 
-(def keep (test seq (o cmp is))
-  (rem (complement (testify test cmp)) seq))
+(def keep (test seq (o same is))
+  (rem (complement (testify test same)) seq))
 
 ;(def trues (f seq) 
 ;  (rem nil (map f seq)))
