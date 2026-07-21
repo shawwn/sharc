@@ -159,18 +159,22 @@
 
 (def create-acct (user pw)
   (set (dc-usernames* (downcase user)))
-  (set-pw user pw))
+  (set-pw user pw)
+  user)
 
 (def disable-acct (user)
   (set-pw user (rand-string 20))
-  (logout-user user))
+  (logout-user user)
+  user)
   
 (def set-pw (user pw)
   (= (hpasswords* user) (and pw (bhash pw)))
-  (save-pws))
+  (save-pws)
+  user)
 
 (def save-pws ()
-  (save-table hpasswords* hpwfile*))
+  (save-table hpasswords* hpwfile*)
+  t)
 
 (def copy-account (old new)
   (assert (acct-exists old))
