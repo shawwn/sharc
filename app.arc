@@ -393,7 +393,6 @@
   (and (isa!string str)
        (>= (len str) min)
        (~find ~goodchar str)
-       (isnt (str 0) #\-)
        (or (no max) (<= (len str) max))
        str))
 
