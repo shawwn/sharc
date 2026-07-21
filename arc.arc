@@ -907,11 +907,11 @@
           (cons x (self i)))))
    (if (isa!string src) (instring src) src)))
 
-(def allchars (str)
+(def allchars ((o str (stdin)))
   (tostring (whiler c (readc str nil) no
               (writec c))))
 
-(def allbytes (str)
+(def allbytes ((o str (stdin)))
   (let bs nil
     (whiler b (readb str nil) no
       (push b bs))
