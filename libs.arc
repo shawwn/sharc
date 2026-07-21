@@ -1,4 +1,5 @@
 (map load '("strings.arc"
+            "parallel.arc"
             "pprint.arc"
             "code.arc"
             "html.arc"
