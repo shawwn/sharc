@@ -1040,7 +1040,7 @@
       (same elt (car seq))
        (reinsert-sorted test elt (cdr seq) same)
       (test elt (car seq)) 
-       (cons elt (rem elt seq))
+       (cons elt (rem elt seq same))
       (cons (car seq) (reinsert-sorted test elt (cdr seq) same))))
 
 (mac insortnew (test elt seq . same)
