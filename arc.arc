@@ -81,6 +81,11 @@
 (def as (kind)
   (fn (x . args) (apply coerce x kind args)))
 
+(def map0 (f xs)
+  (if (no xs)
+      nil
+      (do (f (car xs)) (map0 f (cdr xs)))))
+
 ; Maybe later make this internal.  Useful to let xs be a fn?
 
 (def map1 (f xs)
@@ -309,7 +314,7 @@
 
 (def warn (msg . args)
   (disp (+ "Warning: " msg ". "))
-  (map [do (write _) (disp " ")] args)
+  (map0 [do (write _) (disp " ")] args)
   (disp #\newline))
 
 (mac atomic body
@@ -694,11 +699,11 @@
 ; the rep of these.  That would also require hacking the reader.  
 
 (def pr args
-  (map1 disp args)
+  (map0 disp args)
   (car args))
 
 (def prt args
-  (map1 only&disp args)
+  (map0 only&disp args)
   (car args))
 
 (def prn args
@@ -1123,7 +1128,7 @@
 (def prall (elts (o init "") (o sep ", "))
   (when elts
     (pr init (car elts))
-    (map [pr sep _] (cdr elts))
+    (map0 [pr sep _] (cdr elts))
     elts))
              
 (def prs args     
