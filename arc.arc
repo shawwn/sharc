@@ -1829,6 +1829,16 @@
        (unless (in it 0 'false) it)
        default))
 
+; https://en.wikipedia.org/wiki/Fisher%E2%80%93Yates_shuffle#The_modern_algorithm
+
+(def shuffle! (xs)
+  (down i (edge xs) 1
+    (let j (rand (+ i 1))
+      (swap (xs j) (xs i))))
+  xs)
+
+(def shuffle (xs) (shuffle! (copy xs)))
+
 ; ---- Thread-local variables ---------------------------------------
 ;
 ; A per-thread key-value store, with two ergonomic affordances:
