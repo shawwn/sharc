@@ -1288,7 +1288,7 @@
                nil))
          n))))
 
-; Also by Eli.
+; Also by Eli. Merges two lists that are already sorted.
 
 (def merge (less? x y)
   (if (no x) y
