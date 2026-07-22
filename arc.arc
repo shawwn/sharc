@@ -1689,9 +1689,9 @@
   (when noisy (prn) (flushout)))
 
 (mac point (name . body)
-  (w/uniq (g p)
-    `(ccc (fn (,g)
-            (let ,name (fn ((o ,p)) (,g ,p))
+  (w/uniq (k val)
+    `(ccc (fn (,k)
+            (let ,name (fn ((o ,val)) (,k ,val))
               ,@body)))))
 
 (mac catch body
