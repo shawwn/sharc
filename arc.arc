@@ -580,7 +580,8 @@
   (w/uniq (g1 g2)
     (with ((binds1 val1 setter1) (setforms place1)
            (binds2 val2 setter2) (setforms place2))
-      `(atwiths ,(+ binds1 (list g1 val1) binds2 (list g2 val2))
+      `(atwiths ,(+ binds1 (list g1 val1)
+                    binds2 (list g2 val2))
          (,setter1 ,g2)
          (,setter2 ,g1)))))
 
