@@ -981,9 +981,12 @@
           (seq (rand-key seq))
           (seq (rand n))))))
 
+(def rand-elts (n seq)
+  (n-of n (rand-elt seq)))
+
 (def rand-string (n)
   (let c "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
-    (as!string (n-of n (rand-elt c)))))
+    (as!string (rand-elts n c))))
 
 (mac forlen (var s . body)
   `(for ,var 0 (edge ,s) ,@body))
