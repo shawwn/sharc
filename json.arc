@@ -1,5 +1,6 @@
 ; JSON encoder + decoder.
 ;
+;   (as-json x)             ; return x as a JSON string
 ;   (to-json x)             ; print x as JSON to current stdout
 ;   (to-json x nil stream)  ; print x as JSON to `stream`
 ;   (to-json x t stream)    ; pretty-print, indenting with two spaces
@@ -32,6 +33,9 @@
 
 (def to-json (x (o pretty) (o stream (stdout)))
   (w/stdout stream (json-write x (json-indent-step pretty) "")))
+
+(def as-json (x (o pretty))
+  (tostring (to-json x pretty)))
 
 (def json-indent-step (pretty)
   (if (no pretty)         nil
