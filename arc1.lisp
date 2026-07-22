@@ -1077,7 +1077,7 @@ isn't shadowed by a lexical binding."
 ;;;; ============================================================
 
 (defvar *arc-gensym-count* 0)
-(defun arc-gensym (&optional (x 's))
+(defun arc-gensym (&optional (x 'gs))
   (incf *arc-gensym-count*)
   (arc-sym (format nil "~A~D" x *arc-gensym-count*)))
 
