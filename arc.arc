@@ -405,7 +405,7 @@
                      (warn "Inverting what looks like a function call"
                            expr0 expr))
                    (w/uniq (g h)
-                     (let argsyms (map [uniq] (cdr expr))
+                     (let argsyms (map [uniq 'arg] (cdr expr))
                         (list (+ (list g (car expr))
                                  (mappend list argsyms (cdr expr)))
                               `(,g ,@argsyms)
