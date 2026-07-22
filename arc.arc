@@ -1826,7 +1826,7 @@
 
 (def readenv (name (o default))
   (aif (saferead:getenv name)
-       (unless (is it 0) it)
+       (unless (in it 0 'false) it)
        default))
 
 ; ---- Thread-local variables ---------------------------------------
