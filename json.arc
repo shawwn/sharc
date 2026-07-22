@@ -134,7 +134,7 @@
     (json-parse st)))
 
 (def load-json (file)
-  (errsafe (from-json (filechars file))))
+  (from-json (filechars file)))
 
 (def json-peek (st)
   (and (< st!pos st!n)
