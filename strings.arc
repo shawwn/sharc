@@ -75,6 +75,9 @@
 (def bytes->utf8 (cs)
   (utf8-decode (as!vector cs)))
 
+(def string->utf8 (s)
+  (bytes->string (string->bytes s :latin-1)))
+
 (def urlencode (s)
   (tostring
     (each b (chars:utf8-encode s)
