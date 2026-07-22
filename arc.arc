@@ -586,7 +586,7 @@
          (,setter2 ,g1)))))
 
 (mac rotate places
-  (with (vars (map [uniq] places)
+  (with (vars (map [uniq 'arg] places)
          forms (map setforms places))
     `(atwiths ,(mappend (fn (g (binds val setter))
                           (+ binds (list g val)))
