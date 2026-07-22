@@ -977,7 +977,9 @@
 (def rand-elt (seq) 
   (let n (len seq)
     (when (> n 0)
-      (seq (rand n)))))
+      (if (isa!table seq)
+          (seq (rand-key seq))
+          (seq (rand n))))))
 
 (def rand-string (n)
   (let c "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
