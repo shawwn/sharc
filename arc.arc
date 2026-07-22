@@ -1894,6 +1894,11 @@
     (until (dead-thread th) (sleep 0))
     (wipe (thread-locals* th))))
 
+(= main-thread* (current-thread))
+
+(def main-thread ((o th (current-thread)))
+  (is th main-thread*))
+
 ; Referencing the bare symbol `scope` (or `scope%`) compiles to
 ; (%scope env), where ac splices in its compile-time lexical environment.
 ; For each distinct lexical in scope, emit (name (fn () name) (fn (v) ...))
