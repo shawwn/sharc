@@ -1673,13 +1673,20 @@
   (w/uniq (gn gc)
     `(with (,gn ,n ,gc 0)
        (each ,var ,val
-         (when (multiple (++ ,gc) ,gn)
-           (pr ".") 
-           (flushout)
-           )
+         (noisy-report (++ ,gc) ,gn)
          ,@body)
-       (prn)
-       (flushout))))
+       (noisy-flush ,gn))))
+
+(def noisy-report (n noisy)
+  (atomic
+    (when noisy
+      (when (multiple n noisy)
+        (pr ".") (flushout))
+      (when (multiple n (* 10 noisy))
+        (pr " ") (flushout)))))
+
+(def noisy-flush (noisy)
+  (when noisy (prn) (flushout)))
 
 (mac point (name . body)
   (w/uniq (g p)
