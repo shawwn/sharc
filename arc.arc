@@ -140,7 +140,7 @@
 ; Composes in functional position are transformed away by ac.
 
 (mac compose args
-  (let g (uniq)
+  (let g (uniq 'g)
     `(fn ,g
        ,((afn (fs)
            (if (cdr fs)
@@ -151,7 +151,7 @@
 ; Ditto: complement in functional position optimized by ac.
 
 (mac complement (f)
-  (let g (uniq)
+  (let g (uniq 'g)
     `(fn ,g (no (apply ,f ,g)))))
 
 (def rev (xs) 
@@ -464,7 +464,7 @@
          ,@body))))
 
 (mac repeat (n . body)
-  `(for ,(uniq) 1 ,n ,@body))
+  `(for ,(uniq 'i) 1 ,n ,@body))
 
 ; could bind index instead of gensym
 
@@ -567,7 +567,7 @@
     `(let ,var ,expr ,(ex args))))
 
 (mac case (expr . args)
-  `(caselet ,(uniq) ,expr ,@args))
+  `(caselet ,(uniq 'x) ,expr ,@args))
 
 (mac push (x place)
   (w/uniq gx
@@ -654,8 +654,8 @@
 ; E.g. (++ x) equiv to (zap + x 1)
 
 (mac zap (op place . args)
-  (with (gop    (uniq)
-         gargs  (map [uniq] args)
+  (with (gop    (uniq 'op)
+         gargs  (map [uniq 'arg] args)
          mix    (afn seqs 
                   (if (some no seqs)
                       nil
@@ -1554,7 +1554,7 @@
       (when (> v n) (= winner k n v)))
     (list winner n)))
 
-(let argsym (uniq)
+(let argsym (uniq 'args)
 
   (def parse-format (str)
     (accum a
