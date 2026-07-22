@@ -140,7 +140,7 @@
   (and (< st!pos st!n)
        (st!src st!pos)))
 
-(def json-bump (st) (= st!pos (+ st!pos 1)))
+(def json-bump (st (o n 1)) (++ st!pos n))
 
 (def json-ws (st)
   (catch
@@ -149,15 +149,15 @@
 
 (def json-parse (st)
   (json-ws st)
-  (let c (json-peek st)
-    (if (no c)         nil
-        (is c #\{)     (json-parse-object st)
-        (is c #\[)     (json-parse-array st)
-        (is c #\")     (json-parse-string st)
-        (is c #\t)     (do (= st!pos (+ st!pos 4)) t)
-        (is c #\f)     (do (= st!pos (+ st!pos 5)) nil)
-        (is c #\n)     (do (= st!pos (+ st!pos 4)) nil)
-                       (json-parse-number st))))
+  (whenlet c (json-peek st)
+    (case c
+      #\{ (json-parse-object st)
+      #\[ (json-parse-array st)
+      #\" (json-parse-string st)
+      #\t (do (json-bump st 4) t)   ; true
+      #\f (do (json-bump st 5) nil) ; false
+      #\n (do (json-bump st 4) nil) ; null
+          (json-parse-number st))))
 
 (def json-parse-object (st)
   (json-bump st)                                  ; consume {
