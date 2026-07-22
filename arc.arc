@@ -1528,12 +1528,12 @@
       (f (car xs))           (cons (car xs) (retrieve (- n 1) f (cdr xs)))
                              (retrieve n f (cdr xs))))
 
-(def dedup (xs)
-  (with (h (table) acc nil)
+(def dedup (xs (o key idfn))
+  (with (h (isotable) acc nil)
     (each x xs
-      (unless (h x)
+      (unless (h:key x)
         (push x acc)
-        (set (h x))))
+        (set (h:key x))))
     (rev acc)))
 
 (def single (x) (and (acons x) (no (cdr x))))
