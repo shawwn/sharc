@@ -59,7 +59,7 @@
   (w/socket s port (handle-request s t)))
 
 (def ensure-srvdirs ()
-  (map ensure-dir (list arcdir* logdir* staticdir*)))
+  (map0 ensure-dir (list arcdir* logdir* staticdir*)))
 
 (or= srv-noisy* nil)
 
