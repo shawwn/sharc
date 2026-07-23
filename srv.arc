@@ -412,9 +412,9 @@ Connection: close"))
   (string (urlencode k) '= (urlencode v))) ; urlencodes key for safety
 
 (def valid-scopeval (x)
-  (if (isa!table x)
-      (isnt x (the req))
-      (in (type x) 'string 'vector 'sym 'key 'cons 'int 'num 'char 'table)))
+  (if (isa x 'table)
+      (~is x (the req))
+      (isa x 'string 'vector 'sym 'key 'cons 'int 'num 'char)))
 
 (def scrub-scopeval (x)
   (case (type x)
