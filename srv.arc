@@ -405,17 +405,13 @@ Connection: close"))
 (def arg (key (t req))
   (alref req!args (if (isa!sym key) (as!string key) key)))
 
-; reassemble-args urlencodes each key and value for safety
-
 (def reassemble-args ((t req))
   (aif req!args
-       (apply string "?" (intersperse '&
-                                      (map (fn ((k v))
-                                             (with (k (urlencode:string k)
-                                                    v (urlencode v))
-                                               (string k '= v)))
-                                           it)))
+       (apply string "?" (intersperse '& (map reassemble-kv it)))
        ""))
+
+(def reassemble-kv ((k v))
+  (string (urlencode k) '= (urlencode v))) ; urlencodes key for safety
 
 (def valid-scopeval (x)
   (if (isa!table x)
