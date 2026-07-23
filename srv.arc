@@ -765,6 +765,10 @@ Connection: close"))
     (stop-thread (bgthreads* id))
     (wipe (bgthreads* id))))
 
+(def restart-bgthreads ()
+  (stop-bgthreads)
+  (start-bgthreads))
+
 ; should be a macro for this?
 
 (mac defbg (id sec . body)
