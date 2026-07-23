@@ -274,12 +274,14 @@
   `(tr ,@(map [list 'td _] args)))
 
 (mac prrow args
-  (w/uniq g
+  (w/uniq (g x)
     `(tr ,@(map (fn (a) 
-                  `(let ,g ,a
-                     (if (number ,g)
-                         (tdr (pr ,g))
-                         (td (pr ,g)))))
+                  `(withs (,g nil ,x (tostring (= ,g ,a)))
+                     (if (~empty ,x)
+                          (td (pr ,x))
+                         (number ,g)
+                          (tdr (pr ,g))
+                          (td (pr ,g)))))
                  args))))
 
 (mac prbold body `(tag b (pr ,@body)))
