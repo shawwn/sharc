@@ -482,9 +482,8 @@ Connection: close"))
   (if key
       (let fnkey (fnid-key key)
         (or= (fnkey->fnid* fnkey)
-             (let id (gen-fnid)
-               (= (fnid->fnkey* id) fnkey)
-               id)))
+             (lets id (gen-fnid)
+               (= (fnid->fnkey* id) fnkey))))
       (gen-fnid)))
 
 (def fnid (f (o k))
@@ -745,10 +744,9 @@ Connection: close"))
 ; eventually promote to general util
 
 (def sortable (ht (o f >) (o key idfn))
-  (let res nil
+  (lets res nil
     (each kv ht
-      (insort (compare f key:cadr) kv res))
-    res))
+      (insort (compare f key:cadr) kv res))))
 
 
 ; Background Threads
