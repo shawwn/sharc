@@ -45,23 +45,33 @@ Backslash escapes the next character."
 
 (defun arc-read-token (stream)
   "Read a bare token (symbol or number) from stream.
-Handles |...| segments verbatim, allowing special chars in symbol names.
-Returns (values string had-vbar-p) so the caller can distinguish a real
-empty-name symbol (`||`) from no token at all."
-  (let ((had-vbar (char= #\| (peek-char nil stream nil nil)))
-        (once t))
+Handles a leading |...| segment and inline backslash escapes verbatim,
+allowing special chars in symbol names. A backslash escapes the following
+character even if it is a delimiter, so e.g. \\{ reads as the symbol named
+{ (matching the Racket/CL reader). Returns (values string escaped-p) so
+the caller can distinguish an escaped literal (the empty-name symbol ||,
+or an escaped : that should stay a symbol) from an ordinary token."
+  (let ((escaped nil))
     (values
      (with-output-to-string (buf)
+       ;; A leading |...| segment reads verbatim.
+       (when (eql #\| (peek-char nil stream nil nil))
+         (setf escaped t)
+         (arc-read-vbar-segment stream buf))
        (loop
          (let ((c (peek-char nil stream nil nil)))
            (cond
              ((null c) (return))
-             ((and once had-vbar)
-              (setf once nil)
-              (arc-read-vbar-segment stream buf))
+             ((char= c #\\)
+              (setf escaped t)
+              (read-char stream)  ; consume backslash
+              (let ((next (read-char stream nil nil)))
+                (if (null next)
+                    (error "Unexpected EOF after \\ in token")
+                    (write-char next buf))))
              ((arc-delimiter-p c) (return))
              (t (write-char (read-char stream) buf))))))
-     had-vbar)))
+     escaped)))
 
 (defun ssyntax-char-p (c)
   (member c '(#\: #\~ #\& #\| #\. #\!)))
