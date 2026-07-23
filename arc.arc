@@ -1720,8 +1720,8 @@
 (def asnum (x)
   (case (type x)
     (num int) x
-    string    (coerce x 'num)
-    char      (coerce x 'int)
+    string    (as!num x)
+    char      (as!int x)
     (err "Can't convert @x to number")))
 
 (def inc (x (o n 1))
