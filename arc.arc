@@ -680,6 +680,11 @@
       `(atwiths ,(+ binds (list gop op) (mix gargs args))
          (,setter (,gop ,val ,@gargs))))))
 
+(def zaptable (f h)
+  (each (k v) h
+    (= (h k) (f v)))
+  h)
+
 (mac w/defs body
   (let names nil
     (each f body
