@@ -18,44 +18,37 @@
 (def code-density (file)
   (/ (codetree file) (codelines file))) 
 
-(def tokcount (files)
-  (let counts (table)
+(def tokcount ((o files loaded-files*))
+  (lets counts (table)
     (each f files
       (each token (flat (readall (infile f)))
-        (++ (counts token 0))))
-    counts))
+        (++ (counts token 0))))))
 
-(def common-tokens (files)
+(def common-tokens ((o files loaded-files*))
   (let counts (tokcount files)
-    (let ranking nil
-      (maptable (fn (k v)
-                  (unless (nonop k)
-                    (insort (compare > cadr) (list k v) ranking)))
-                counts)
-      ranking)))
+    (sort (compare > cadr)
+          (accum a
+            (each (k v) counts
+              (unless (nonop k) (a (list k v))))))))
 
 (def nonop (x)
   (in x 'quote 'unquote 'quasiquote 'unquote-splicing))
 
-(def common-operators (files)
-  (keep [and (isa!sym (car _)) (bound (car _))] (common-tokens files)))
+(def common-operators ((o files loaded-files*))
+  (keep [isa!sym&bound (car _)] (common-tokens files)))
 
 (def top40 (xs)
   (map prn (firstn 40 xs))
   t)
 
-(def space-eaters (files)
+(def space-eaters ((o files loaded-files*))
   (let counts (tokcount files)
-    (let ranking nil
-      (maptable (fn (k v)
-                  (when (and (isa!sym k) (bound k))
-                    (insort (compare > [* (len (string (car _)))
-                                          (cadr _)])
-                            (list k v (* (len (string k)) v))
-                            ranking)))
-                counts)
-    ranking)))
+    (sort (compare > last)
+          (accum a
+            (each (k v) counts
+              (when (and (isa!sym k) (bound k))
+                (a (list k v (* (len (string k)) v)))))))))
 
-;(top40 (space-eaters allfiles*))
+;(top40:space-eaters)
 
 (mac flatlen args `(len (flat ',args)))
