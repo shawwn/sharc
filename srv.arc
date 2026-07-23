@@ -772,9 +772,13 @@ Connection: close"))
 ; should be a macro for this?
 
 (mac defbg (id sec . body)
-  `(do (pull [caris _ ',id] pending-bgthreads*)
-       (push (list ',id {do ,@body} ,sec) 
-             pending-bgthreads*)))
+  (let name (sym:string id "-bgthread")
+    `(do (def ,name () ,@body)
+         (insert-bgthread ',id {,name} ,sec))))
+
+(def insert-bgthread (id f sec)
+  (pull [caris _ id] pending-bgthreads*)
+  (push (list id f sec) pending-bgthreads*))
 
 
 
