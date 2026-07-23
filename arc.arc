@@ -1299,15 +1299,14 @@
 (def merge (less? x y)
   (if (no x) y
       (no y) x
-      (let lup nil
-        (assign lup
-                (fn (r x y r-x?) ; r-x? for optimization -- is r connected to x?
-                  (if (less? (car y) (car x))
-                    (do (if r-x? (scdr r y))
-                        (if (cdr y) (lup y x (cdr y) nil) (scdr y x)))
-                    ; (car x) <= (car y)
-                    (do (if (no r-x?) (scdr r x))
-                        (if (cdr x) (lup x (cdr x) y t) (scdr x y))))))
+      (w/defs
+        (def lup (r x y r-x?) ; r-x? for optimization -- is r connected to x?
+          (if (less? (car y) (car x))
+              (do (if r-x? (scdr r y))
+                  (if (cdr y) (lup y x (cdr y) nil) (scdr y x)))
+              ; (car x) <= (car y)
+              (do (if (no r-x?) (scdr r x))
+                  (if (cdr x) (lup x (cdr x) y t) (scdr x y)))))
         (if (less? (car y) (car x))
           (do (if (cdr y) (lup y x (cdr y) nil) (scdr y x))
               y)
