@@ -417,19 +417,11 @@ Connection: close"))
       (isa x 'string 'vector 'sym 'key 'cons 'int 'num 'char)))
 
 (def scrub-scopeval (x)
-  (case (type x)
-    cons  (map scrub-scopeval x)
-    fn    nil
-    table (aif (is x (the req))
-                nil
-               (x 'id)
-                (obj id it)
-                (let tbl (table)
-                  (each (k v) x
-                    (awhen (scrub-scopeval v)
-                      (= (tbl k) it)))
-                  tbl))
-    (if (valid-scopeval x) x)))
+  (when (valid-scopeval x)
+    (case (type x)
+      cons  (map scrub-scopeval x)
+      table (or x!id (zaptable scrub-scopeval (copy x)))
+            x)))
 
 (or= ignored-scopeids* (table))
 
