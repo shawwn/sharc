@@ -253,8 +253,10 @@
 
 (def isa (x . y)
   (if y
-      (is (type x) (car y)) ; (is x 'int)
-      [is (type _) x]))     ; (isa!int x)
+      (tnil:mem (type x) y)   ; e.g. (isa x 'int 'string)
+      [is       (type _) x])) ; e.g. (isa!int x)
+
+(def tnil (x) (if x t nil))
 
 ; Possible to write map without map1, but makes News 3x slower.
 
