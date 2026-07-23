@@ -524,12 +524,15 @@ the truth value t.  See the identity tests in test.arc."
         (let ((n (read-from-string s)))
           (if (numberp n) n nil))))))
 
+(defun arc-typename (type)
+  (string-downcase
+    (if (symbolp type) (symbol-name type) (string type))))
+
 (defun arc-coerce (x type &optional radix)
-  (let ((tname (string-downcase
-                (if (symbolp type) (symbol-name type) (string type)))))
+  (let ((tname (arc-typename type)))
     (cond
       ((arc-tagged-p x) (error "Can't coerce annotated object"))
-      ((string= tname (string-downcase (symbol-name (arc-type x)))) x)
+      ((string= tname (arc-typename (arc-type x))) x)
       ((keywordp x)
        ;; keyword names are upcased by the reader; fold back to lowercase
        ;; so key->string/sym round-trips with how it was written.
