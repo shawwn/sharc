@@ -1702,28 +1702,18 @@
   `(point throw ,@body))
 
 (def downcase (x)
-  (let downc (fn (c)
-               (let n (as!int c)
-                 (if (or (< 64 n 91) (< 191 n 215) (< 215 n 223))
-                     (as!char (+ n 32))
-                     c)))
-    (case (type x)
-      string    (map downc x)
-      char      (downc x)
-      (sym key) x ; symbols and keywords are always lowercase
-                (err "Can't downcase" x))))
+  (case (type x)
+    string    (#'string-downcase x)
+    char      (#'char-downcase x)
+    (sym key) x ; symbols and keywords are always lowercase
+              (err "Can't downcase" x)))
 
 (def upcase (x)
-  (let upc (fn (c)
-             (let n (as!int c)
-               (if (or (< 96 n 123) (< 223 n 247) (< 247 n 255))
-                   (as!char (- n 32))
-                   c)))
-    (case (type x)
-      string    (map upc x)
-      char      (upc x)
-      (sym key) x ; symbols and keywords are always lowercase
-                (err "Can't upcase" x))))
+  (case (type x)
+    string    (#'string-upcase x)
+    char      (#'char-upcase x)
+    (sym key) x ; symbols and keywords are always lowercase
+              (err "Can't upcase" x)))
 
 (def asnum (x)
   (case (type x)
