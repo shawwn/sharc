@@ -741,6 +741,10 @@
 (mac whenlet (var expr . body)
   `(iflet ,var ,expr (do ,@body)))
 
+(mac whenlets (var expr . body)
+  `(lets ,var ,expr
+     (when ,var ,@body)))
+
 (mac aif (expr . args)
   `(let it ,expr
      (if it
