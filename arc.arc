@@ -1262,15 +1262,15 @@
 ; by Eli Barzilay for MzLib; re-written in Arc.
 
 (def mergesort (less? lst)
-  (with (n (len lst))
+  (let n (len lst)
     (if (<= n 1) lst
-        ; ; check if the list is already sorted
-        ; ; (which can be a common case, eg, directory lists).
-        ; (let loop ([last (car lst)] [next (cdr lst)])
-        ;   (or (null? next)
-        ;       (and (not (less? (car next) last))
-        ;            (loop (car next) (cdr next)))))
-        ; lst
+        ; check if the list is already sorted
+        ; (which can be a common case, eg, directory lists).
+        ((afn ((o last (car lst)) (o next (cdr lst)))
+           (or (no next)
+               (and (~less? (car next) last)
+                    (self (car next) (cdr next))))))
+        lst
         ((afn (n)
            (if (> n 2)
                 ; needs to evaluate L->R
