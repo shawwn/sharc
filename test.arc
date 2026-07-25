@@ -682,11 +682,50 @@ c"
   (test? true  (litmatch "ab" "abcdef"))
   (test? true  (litmatch "cd" "abcdef" 2)) ; match at offset
   (test? false (litmatch "cd" "abcdef"))
-  (test? false (litmatch "xyz" "ab"))) ; pattern longer than string
+  (test? false (litmatch "xyz" "ab"))      ; pattern longer than string
+  (test? true  (litmatch "abcdef" "abcdef")) ; whole string
+  (test? true  (litmatch "" "abc"))          ; empty pattern always matches
+  (test? true  (litmatch "" "abc" 3))        ; ... even at the end
+  (test? false (litmatch "a" "abc" 3))       ; start at end
+  (test? false (litmatch "a" "abc" 10)))     ; start past end, no error
+
+(define-test litmatch-runtime
+  ; a non-literal pattern can't be unrolled, so it goes to litmatch2
+  (let p "cd"
+    (test? true  (litmatch p "abcdef" 2))
+    (test? false (litmatch p "abcdef")))
+  (let p "xyz"
+    (test? false (litmatch p "ab")))
+  ; litmatch2 is not string-only: `is` compares sequences elementwise
+  (test? true  (litmatch '(a b) '(a b c)))
+  (test? true  (litmatch2 "" "abc" 3))
+  (test? false (litmatch2 "a" "abc" 10))
+  ; both paths agree
+  (test? (litmatch "cd" "abcdef" 2) (litmatch2 "cd" "abcdef" 2))
+  (test? (litmatch "cd" "abcdef")   (litmatch2 "cd" "abcdef")))
 
 (define-test endmatch
   (test? true  (endmatch "def" "abcdef"))
-  (test? false (endmatch "abc" "abcdef")))
+  (test? false (endmatch "abc" "abcdef"))
+  (test? true  (endmatch "abcdef" "abcdef"))  ; whole string
+  (test? true  (endmatch "" "abc"))           ; empty pattern always matches
+  (test? false (endmatch "abcdefg" "abcdef"))) ; pattern longer than string
+
+(define-test endmatch-runtime
+  ; the shape real callers use (srv.arc, scrape.arc): literal pattern,
+  ; variable string.  dispatches to endmatch2.
+  (let s "abc/"
+    (test? true  (endmatch "/" s)))
+  (let s "abc"
+    (test? false (endmatch "/" s)))
+  (let s "ab"
+    (test? false (endmatch "abcd" s)))       ; pattern longer than string
+  (test? true  (endmatch2 "" "abc"))
+  (test? true  (endmatch2 "abc" "abc"))
+  (test? false (endmatch2 "abcd" "ab"))
+  ; both paths agree
+  (test? (endmatch "def" "abcdef") (endmatch2 "def" "abcdef"))
+  (test? (endmatch "abc" "abcdef") (endmatch2 "abc" "abcdef")))
 
 (define-test posmatch
   (test? 2   (posmatch "cd" "abcdef"))

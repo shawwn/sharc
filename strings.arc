@@ -91,14 +91,21 @@
   (or (alphadig c) (in c #\- #\. #\_ #\~)))
 
 (mac litmatch (pat string (o start 0))
-  (w/uniq (gstring gstart)
-    `(with (,gstring ,string ,gstart ,start)
-       (unless (> (+ ,gstart ,(len pat)) (len ,gstring))
-         (and ,@(let acc nil
-                  (forlen i pat
-                    (push `(is ,(pat i) (,gstring (+ ,gstart ,i)))
-                           acc))
-                  (rev acc)))))))
+  (if (~isa!string pat)
+      `(litmatch2 ,pat ,string ,(or start 0))
+      (w/uniq (gstring gstart)
+        `(with (,gstring ,string ,gstart ,start)
+           (unless (> (+ ,gstart ,(len pat)) (len ,gstring))
+             (and ,@(let acc nil
+                      (forlen i pat
+                        (push `(is ,(pat i) (,gstring (+ ,gstart ,i)))
+                               acc))
+                      (rev acc))))))))
+
+(def litmatch2 (pat string (o start 0))
+  (let n (len pat)
+    (and (<= start (edge string n))
+         (is pat (cut string start (+ start n))))))
 
 ; litmatch would be cleaner if map worked for string and integer args:
 
@@ -108,15 +115,22 @@
 ;                    pat)
 
 (mac endmatch (pat string)
-  (w/uniq (gstring glen)
-    `(withs (,gstring ,string ,glen (len ,gstring))
-       (unless (> ,(len pat) (len ,gstring))
-         (and ,@(let acc nil
-                  (forlen i pat
-                    (push `(is ,(pat (edge pat 1 i))
-                               (,gstring (- ,glen 1 ,i)))
-                           acc))
-                  (rev acc)))))))
+  (if (~isa!string string)
+      `(endmatch2 ,pat ,string)
+      (w/uniq (gstring glen)
+        `(withs (,gstring ,string ,glen (len ,gstring))
+           (unless (> ,(len pat) (len ,gstring))
+             (and ,@(let acc nil
+                      (forlen i pat
+                        (push `(is ,(pat (edge pat 1 i))
+                                   (,gstring (- ,glen 1 ,i)))
+                               acc))
+                      (rev acc))))))))
+
+(def endmatch2 (pat string)
+  (let n (edge string (len pat))
+    (and (>= n 0)
+         (is pat (cut string n)))))
 
 (def posmatch (pat seq (o start 0))
   (catch
