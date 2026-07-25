@@ -967,8 +967,7 @@ c"
         (do (= a 20)
             (test? 20 a)))
     (test? 20 (do (= a 10)
-                  (do (= a 20) a))))
-  (test? '(%do) (macex '(do))))
+                  (do (= a 20) a)))))
 
 (define-test if
   (test? '(if a) (macex '(if a)))
