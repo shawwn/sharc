@@ -411,6 +411,9 @@ Connection: close"))
 (def reassemble-kv ((k v))
   (string (urlencode k) '= (urlencode v))) ; urlencodes key for safety
 
+(def reassemble-url ((t op))
+  (string op (reassemble-args)))
+
 (def valid-scopeval (x)
   (if (isa x 'table)
       (~is x (the req))
