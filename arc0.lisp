@@ -97,18 +97,14 @@ the truth value t.  See the identity tests in test.arc."
 ;;;; ============================================================
 
 (defvar *arc-atstrings*     t)
-(defvar *arc-direct-calls*  nil)
 (defvar *arc-explicit-flush* nil)
 
 (xdef sig *arc-fn-signatures*)
 
-(defun arc-declare (key val)
-  (let ((flag (not (null val)))
-        (k (string-downcase (symbol-name key))))
-    (cond ((string= k "atstrings")      (setf *arc-atstrings*      flag))
-          ((string= k "direct-calls")   (setf *arc-direct-calls*   flag))
-          ((string= k "explicit-flush") (setf *arc-explicit-flush* flag)))
-    val))
+(defun arc-declare (key &optional (val t))
+  (let ((flag (not (null val))))
+    (cond ((arc-sym= key "atstrings")      (setf *arc-atstrings*      flag))
+          ((arc-sym= key "explicit-flush") (setf *arc-explicit-flush* flag)))))
 
 (xdef declare #'arc-declare)
 
