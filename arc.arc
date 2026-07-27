@@ -698,12 +698,13 @@
       (if (acons place)
            ; compound place: use setforms to eval subforms only once
            (let (binds val setter) (setforms place)
-             `(atwiths ,binds (or ,val (,setter ,expr))))
+             `(withs ,binds (or ,val (,setter ,expr))))
           (lex place)
            ; lexical var: read/write directly
            `(or ,place (= ,place ,expr))
            ; plain global symbol: guard against unbound
-           `(or (and (bound ',place) ,place) (= ,place ,expr))))
+           `(or (and (bound ',place) ,place)
+                (= ,place ,expr))))
     `(do ,@(pair (map1 ssexpand args)
                  (fn (place expr) `(atomic ,(or1 place expr)))))))
 
