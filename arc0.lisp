@@ -718,6 +718,9 @@ the truth value t.  See the identity tests in test.arc."
 ;;;     opts is an optional table:
 ;;;       ssl      -- force SSL on any port
 ;;;       noverify -- skip certificate verification
+;;;       timeout  -- seconds a read may stall before erroring.
+;;;                   No default here, unlike http-fetch: this is a
+;;;                   general primitive and SMTP (email.arc) uses it.
 ;;;
 ;;;   (http-fetch url [opts])
 ;;;     HTTP request; returns the response body as a string.
@@ -727,7 +730,17 @@ the truth value t.  See the identity tests in test.arc."
 ;;;       headers  -- alist of ("Header-Name" "value") pairs
 ;;;       body     -- request body string
 ;;;       noverify -- skip certificate verification
+;;;       timeout  -- seconds a single read may stall (default
+;;;                   *http-timeout*, 60; 0 means block forever)
+;;;       maxtime  -- seconds for the whole request
 ;;;
+;;;   (http-response url [opts])
+;;;     Same request, but returns a table of status / headers / body and
+;;;     does NOT signal on non-2xx -- 3xx replies carry headers worth
+;;;     reading, e.g. the Set-Cookie on a login redirect.  headers is an
+;;;     alist of (name value) with duplicates kept.
+;;;
+
 ;;;   (flushout [stream])
 ;;;     Flush a stream (defaults to stdout).
 ;;;
@@ -848,9 +861,15 @@ the truth value t.  See the identity tests in test.arc."
       (sb-sys:with-pinned-objects (buf)
         (let ((n (ssl-read (ssl-stream-ssl s) (sb-sys:vector-sap buf) 8192)))
           (if (<= n 0)
-              (progn (setf (ssl-stream-read-buf s) ""
-                           (ssl-stream-read-pos s) 0)
-                     (return-from sb-gray:stream-read-char :eof))
+              (progn
+                ;; A -1 with SSL_ERROR_SYSCALL (5) is a failed read(2) --
+                ;; a fired SO_RCVTIMEO, if one was set.  Reporting that as
+                ;; :eof would truncate the stream silently, so say so.
+                (when (and (minusp n) (= (ssl-get-error (ssl-stream-ssl s) n) 5))
+                  (error "ssl read timed out"))
+                (setf (ssl-stream-read-buf s) ""
+                      (ssl-stream-read-pos s) 0)
+                (return-from sb-gray:stream-read-char :eof))
               (setf (ssl-stream-read-buf s)
                     (sb-ext:octets-to-string (subseq buf 0 n)
                                              :external-format :utf-8)
@@ -900,13 +919,85 @@ the truth value t.  See the identity tests in test.arc."
   (ssl-ctx-free (ssl-stream-ctx s))
   (sb-bsd-sockets:socket-close (ssl-stream-sock s)))
 
-(defun tcp-connect (host port)
-  "Open a TCP connection, return the raw socket."
+;;; ---- Socket read timeouts ----
+;;;
+;;; Without these, a peer that accepts a connection and then goes quiet
+;;; blocks the reading thread forever: there is no other timeout in this
+;;; path, and TCP keepalive is off by default.
+;;;
+;;; Two mechanisms, because neither covers both stream types:
+;;;
+;;;   SO_RCVTIMEO works for SSL, where ssl-read calls read(2) directly
+;;;   and we see the -1 ourselves.  It does NOT work for plain sockets:
+;;;   SBCL's fd-stream treats the resulting EAGAIN as "would block" and
+;;;   waits on the fd anyway, so read-byte still hangs indefinitely
+;;;   (measured).  sb-bsd-sockets doesn't expose the option, so it goes
+;;;   through setsockopt directly.
+;;;
+;;;   wait-until-fd-usable gates every read on both stream types and is
+;;;   what actually bounds the plain-socket path.
+
+(sb-alien:define-alien-routine ("setsockopt" %setsockopt) sb-alien:int
+  (fd sb-alien:int) (level sb-alien:int) (optname sb-alien:int)
+  (optval (* t)) (optlen sb-alien:int))
+
+(defconstant +sol-socket+  #+darwin #xffff #-darwin 1)
+(defconstant +so-rcvtimeo+ #+darwin #x1006 #-darwin 20)
+(defconstant +so-sndtimeo+ #+darwin #x1005 #-darwin 21)
+
+(defvar *http-timeout* 60
+  "Default timeout in seconds for socket-connect and http-fetch: how long
+   a single read may go without progress.  nil or 0 means block forever
+   (the old behavior).  Override per call with the `timeout' option.
+   Note this bounds reads, not connect(2), which is left to the OS's own
+   SYN-retry limit (~75s on darwin, ~2min on linux).")
+
+(defun set-socket-timeout (fd seconds)
+  "Set SO_RCVTIMEO / SO_SNDTIMEO on FD.  Silently does nothing when
+   SECONDS is nil or non-positive."
+  (when (and seconds (> seconds 0))
+    ;; struct timeval is 16 bytes on both platforms: tv_sec is 64-bit at
+    ;; offset 0, tv_usec is 32-bit (darwin) or 64-bit (linux) at offset
+    ;; 8.  Writing tv_usec as 32 bits and leaving 12-15 zero is correct
+    ;; for both, since both are little-endian.
+    (let ((buf (make-array 16 :element-type '(unsigned-byte 8)
+                              :initial-element 0)))
+      (multiple-value-bind (sec frac) (floor seconds)
+        (let ((usec (round (* frac 1000000))))
+          (dotimes (i 8) (setf (aref buf i)       (ldb (byte 8 (* 8 i)) sec)))
+          (dotimes (i 4) (setf (aref buf (+ 8 i)) (ldb (byte 8 (* 8 i)) usec)))))
+      (sb-sys:with-pinned-objects (buf)
+        (dolist (opt (list +so-rcvtimeo+ +so-sndtimeo+))
+          (%setsockopt fd +sol-socket+ opt
+                       (sb-alien:sap-alien (sb-sys:vector-sap buf) (* t))
+                       16))))))
+
+(defun stream-fd (stream)
+  "The file descriptor behind STREAM, for either stream type we hand out."
+  (cond ((typep stream 'arc-ssl-stream)
+         (sb-bsd-sockets:socket-file-descriptor (ssl-stream-sock stream)))
+        ((typep stream 'sb-sys:fd-stream)
+         (sb-sys:fd-stream-fd stream))))
+
+(defun wait-readable (stream timeout host-desc)
+  "Block until STREAM has data available.  Signals an error if TIMEOUT
+   seconds pass with nothing to read.  A nil/0 timeout waits forever."
+  (if (and timeout (> timeout 0))
+      (let ((fd (stream-fd stream)))
+        (or (null fd)                   ; unknown stream type: can't poll
+            (sb-sys:wait-until-fd-usable fd :input timeout nil)
+            (error "read from ~A timed out after ~A s" host-desc timeout)))
+      t))
+
+(defun tcp-connect (host port &optional timeout)
+  "Open a TCP connection, return the raw socket.  TIMEOUT bounds later
+   reads and writes; connect itself is bounded by the OS."
   (let* ((addr (sb-bsd-sockets:host-ent-address
                 (sb-bsd-sockets:get-host-by-name host)))
          (sock (make-instance 'sb-bsd-sockets:inet-socket
                               :type :stream :protocol :tcp)))
     (sb-bsd-sockets:socket-connect sock addr port)
+    (set-socket-timeout (sb-bsd-sockets:socket-file-descriptor sock) timeout)
     sock))
 
 (defun arc-opt (opts key)
@@ -919,10 +1010,17 @@ the truth value t.  See the identity tests in test.arc."
   "Connect to host:port, return a bidirectional stream.
    OPTS is an Arc table with optional keys:
      ssl      -- force SSL (default: auto for port 443)
-     noverify -- skip certificate verification"
+     noverify -- skip certificate verification
+     timeout  -- seconds a read may stall before erroring (0 = forever,
+                 default *http-timeout*)"
   (let* ((ssl-p (or (arc-opt opts "ssl") (= port 443)))
          (noverify (arc-opt opts "noverify"))
-         (sock (tcp-connect host port)))
+         ;; No default here: socket-connect is a general primitive (SMTP
+         ;; in email.arc uses it), and a socket-level timeout changes how
+         ;; those streams behave.  The default lives in http-fetch, which
+         ;; is where the unbounded reads were a problem.
+         (timeout (arc-opt opts "timeout"))
+         (sock (tcp-connect host port timeout)))
     (if ssl-p
         (progn
           (unless *ssl-available*
@@ -991,24 +1089,86 @@ the truth value t.  See the identity tests in test.arc."
 ;; boundary: the leading byte ends up followed by chunk framing (CRLF, a
 ;; hex size, CRLF) instead of its continuation bytes.
 
-(defun http-slurp-octets (stream)
+(defun http-response-end (out header-end need chunked)
+  "True when OUT already holds the whole response, so we can stop reading
+   instead of waiting for the peer to close.  NEED is the total length
+   implied by Content-Length; CHUNKED means look for the terminal chunk."
+  (cond ((null header-end) nil)
+        (need    (>= (length out) need))
+        (chunked (let ((n (length out)))
+                   ;; terminal chunk: CRLF "0" CRLF CRLF
+                   (and (>= n (+ header-end 4 7))
+                        (= (aref out (- n 7)) 13) (= (aref out (- n 6)) 10)
+                        (= (aref out (- n 5)) 48)
+                        (= (aref out (- n 4)) 13) (= (aref out (- n 3)) 10)
+                        (= (aref out (- n 2)) 13) (= (aref out (- n 1)) 10))))
+        (t nil)))
+
+(defun http-slurp-octets (stream &optional timeout deadline host-desc)
   "Read the entire response from STREAM into a fresh adjustable
-   (unsigned-byte 8) vector, with no character decoding."
+   (unsigned-byte 8) vector, with no character decoding.
+
+   Stops as soon as the response is complete per Content-Length or the
+   terminal chunk, rather than waiting for EOF: a server that ignores
+   our `Connection: close' would otherwise hang us forever holding a
+   response we had already fully received (measured).  Falls back to
+   reading until EOF when neither framing is present.
+
+   Signals an error if a single read stalls for TIMEOUT seconds, or if
+   the whole read exceeds DEADLINE (internal-real-time units)."
   (let ((out (make-array 8192 :element-type '(unsigned-byte 8)
-                              :adjustable t :fill-pointer 0)))
-    (if (typep stream 'arc-ssl-stream)
-        ;; Read raw bytes straight from SSL, bypassing the stream's
-        ;; per-buffer UTF-8 decoding.
-        (let ((buf (make-array 8192 :element-type '(unsigned-byte 8))))
-          (sb-sys:with-pinned-objects (buf)
-            (loop for n = (ssl-read (ssl-stream-ssl stream)
-                                    (sb-sys:vector-sap buf) 8192)
-                  while (> n 0)
-                  do (dotimes (i n) (vector-push-extend (aref buf i) out)))))
-        ;; Plain socket: bivalent stream (:element-type :default), so we
-        ;; can read raw bytes to EOF.
-        (loop for b = (read-byte stream nil nil)
-              while b do (vector-push-extend b out)))
+                              :adjustable t :fill-pointer 0))
+        (buf (make-array 8192 :element-type '(unsigned-byte 8)))
+        (ssl-p (typep stream 'arc-ssl-stream))
+        (header-end nil) (need nil) (chunked nil))
+    (loop
+      (when (and deadline (> (get-internal-real-time) deadline))
+        (error "read from ~A exceeded its overall time limit" host-desc))
+      (wait-readable stream timeout host-desc)
+      (let ((n (sb-sys:with-pinned-objects (buf)
+                 (if ssl-p
+                     ;; Read raw bytes straight from SSL, bypassing the
+                     ;; stream's per-buffer UTF-8 decoding.
+                     (ssl-read (ssl-stream-ssl stream)
+                               (sb-sys:vector-sap buf) 8192)
+                     ;; Plain socket: read(2) on the fd directly.  We
+                     ;; never read through the stream, so nothing is
+                     ;; buffered behind us -- and unlike read-sequence,
+                     ;; this returns what's available instead of blocking
+                     ;; until the buffer is full, which is what lets the
+                     ;; Content-Length check below fire.
+                     (multiple-value-bind (cnt errno)
+                         (sb-unix:unix-read (stream-fd stream)
+                                            (sb-sys:vector-sap buf) 8192)
+                       ;; nil is a failed read, not end of data; treating
+                       ;; it as EOF would truncate the body silently.
+                       (or cnt
+                           (error "read from ~A failed (errno ~D)"
+                                  host-desc errno)))))))
+        (when (<= n 0)
+          (when (and ssl-p (minusp n))
+            ;; SSL_ERROR_SYSCALL (5) with a -1 return is a failed read(2)
+            ;; -- with SO_RCVTIMEO set that means the timeout fired.  A 0
+            ;; return is a peer that closed without close_notify, which is
+            ;; common enough to treat as a clean EOF.
+            (let ((code (ssl-get-error (ssl-stream-ssl stream) n)))
+              (when (= code 5)
+                (error "read from ~A timed out" host-desc))))
+          (return))
+        (dotimes (i n) (vector-push-extend (aref buf i) out))
+        ;; Learn the framing once, then checking for completion is O(1).
+        (unless header-end
+          (setf header-end (octets-find-crlfx2 out))
+          (when header-end
+            (let* ((hdrs (parse-http-headers (octets->latin1 out 0 header-end)))
+                   (te (cdr (assoc "transfer-encoding" hdrs :test #'string=)))
+                   (cl (cdr (assoc "content-length" hdrs :test #'string=))))
+              (cond ((and te (search "chunked" (string-downcase te)))
+                     (setf chunked t))
+                    (cl (let ((k (parse-integer cl :junk-allowed t)))
+                          (when k (setf need (+ header-end 4 k)))))))))
+        (when (http-response-end out header-end need chunked)
+          (return))))
     out))
 
 (defun octets->latin1 (v start end)
@@ -1096,28 +1256,39 @@ the truth value t.  See the identity tests in test.arc."
                     (setf body (subseq body 0 n))))))
       (values status-code header-str body))))
 
-(defun arc-http-fetch (url &optional opts)
-  "Fetch URL via HTTP. Returns the response body as a string.
+(defun arc-http-request (url &optional opts)
+  "Perform an HTTP request.  Returns (values status-code headers body),
+   where HEADERS is an alist of (lowercased-name . value) and BODY is a
+   decoded string.  Does not signal on non-2xx -- that's the caller's
+   business, and 3xx replies carry headers worth reading (a login POST's
+   Set-Cookie, say).
    OPTS is an Arc table with optional keys:
      method   -- HTTP method (default \"GET\")
      headers  -- alist of (name value) string pairs
      body     -- request body string
-     noverify -- skip SSL certificate verification"
+     noverify -- skip SSL certificate verification
+     timeout  -- seconds a single read may stall (0 = forever)
+     maxtime  -- seconds for the whole request"
   (multiple-value-bind (host port path use-ssl) (parse-url url)
     (let* ((method  (or (arc-opt opts "method") "GET"))
            (hdrs    (arc-opt opts "headers"))
            (reqbody (arc-opt opts "body"))
-           (sock-opts (when (arc-opt opts "noverify")
-                        (let ((h (make-hash-table :test #'equal :synchronized t)))
-                          (setf (gethash (arc-sym "noverify") h) t)
-                          h)))
-           (stream  (arc-socket-connect host port
-                      (if use-ssl
-                          (or sock-opts
-                              (let ((h (make-hash-table :test #'equal :synchronized t)))
-                                (setf (gethash (arc-sym "ssl") h) t)
-                                h))
-                          sock-opts))))
+           (timeout (or (arc-opt opts "timeout") *http-timeout*))
+           (maxtime (arc-opt opts "maxtime"))
+           (deadline (when (and maxtime (> maxtime 0))
+                       (+ (get-internal-real-time)
+                          (* maxtime internal-time-units-per-second))))
+           ;; One options table with every key in it.  Building it as an
+           ;; either/or (noverify OR ssl) used to drop the ssl flag when
+           ;; noverify was passed, so https on a non-443 port silently
+           ;; connected in the clear.
+           (sock-opts (let ((h (make-hash-table :test #'equal :synchronized t)))
+                        (when use-ssl (setf (gethash (arc-sym "ssl") h) t))
+                        (when (arc-opt opts "noverify")
+                          (setf (gethash (arc-sym "noverify") h) t))
+                        (when timeout (setf (gethash (arc-sym "timeout") h) timeout))
+                        h))
+           (stream  (arc-socket-connect host port sock-opts)))
       (unwind-protect
            (progn
              ;; Request line
@@ -1151,18 +1322,42 @@ the truth value t.  See the identity tests in test.arc."
              (force-output stream)
              ;; Read response as raw octets; decode only after the transfer
              ;; framing is stripped (see http-slurp-octets / http-parse-response).
-             (let ((raw (http-slurp-octets stream)))
+             (let ((raw (http-slurp-octets stream timeout deadline url)))
                (multiple-value-bind (code headers body)
                    (http-parse-response raw)
-                 (declare (ignore headers))
-                 (unless (<= 200 code 299)
-                   (error "HTTP ~D from ~A" code url))
-                 (sb-ext:octets-to-string
-                  body :external-format '(:utf-8 :replacement #\?)))))
+                 (values code
+                         (parse-http-headers headers)
+                         (sb-ext:octets-to-string
+                          body :external-format '(:utf-8 :replacement #\?))))))
         (close stream)))))
+
+(defun arc-http-fetch (url &optional opts)
+  "Fetch URL via HTTP.  Returns the response body as a string, and
+   signals an error on non-2xx.  See arc-http-request for OPTS."
+  (multiple-value-bind (code headers body) (arc-http-request url opts)
+    (declare (ignore headers))
+    (unless (<= 200 code 299)
+      (error "HTTP ~D from ~A" code url))
+    body))
+
+(defun arc-http-response (url &optional opts)
+  "Like arc-http-fetch, but returns an Arc table of the whole response --
+   status, headers and body -- and never signals on the status.  Headers
+   are an alist of (name value) pairs, keeping duplicates: a response can
+   carry several Set-Cookie lines and they all matter."
+  (multiple-value-bind (code headers body) (arc-http-request url opts)
+    (let ((h (make-hash-table :test #'equal :synchronized t)))
+      (setf (gethash (arc-sym "status") h) code
+            (gethash (arc-sym "headers") h)
+              (mapcar (lambda (p) (list (car p) (cdr p))) headers)
+            (gethash (arc-sym "body") h) body)
+      h)))
 
 (xdef http-fetch (url &rest args)
   (arc-http-fetch url (car args)))
+
+(xdef http-response (url &rest args)
+  (arc-http-response url (car args)))
 
 ;;;; ============================================================
 ;;;; Threading  (sb-thread)
