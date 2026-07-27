@@ -726,10 +726,10 @@
        (writec #\newline)))
 
 (mac wipe args
-  `(do ,@(map (fn (a) `(= ,a nil)) args)))
+  `(do ,@(map [do `(= ,_ nil)] args)))
 
 (mac set args
-  `(do ,@(map (fn (a) `(= ,a t)) args)))
+  `(do ,@(map [do `(= ,_ t)] args)))
 
 ; Destructuring means ambiguity: are pat vars bound in else? (no)
 
