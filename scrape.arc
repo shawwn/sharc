@@ -21,8 +21,8 @@
 ; between HTML page fetches (no delay for Firebase user lookups, which
 ; hit a separate host that doesn't publish one).
 
-(load "json.arc")
-
+(when (main)
+  (load "news.arc"))
 
 ; ----- Config -----
 
@@ -33,20 +33,32 @@
    scrape-fetchlog*  (string arcdir* "scrape/last-fetch.lisp")
    scrape-user-agent*
      "hnscraper (https://news.ycombinator.com/user?id=hnscraper; contact shawnpresser@@gmail.com)"
-   scrape-refetch-secs* (* 60 5)       ; skip items refetched within last five minutes
+   scrape-item-refetch-secs* (* 60 5)   ; skip items refetched within last five minutes
+   scrape-user-refetch-secs* (* 60 60)  ; skip users refetched within last hour
    ; robots.txt advertises Crawl-delay: 30 for generic bots.  The
    ; hnscraper account has explicit owner authorization to run faster;
    ; the About page invites contact if it's too aggressive.  Keep this
    ; conservative; revert to 30 if HN ops asks.
-   scrape-crawl-delay*  3
+   scrape-crawl-delay*  0.5
    ; max parallel curl subprocesses for the user API.  Firebase has no
    ; advertised rate limit; 10 is comfortable.
    scrape-user-concurrency* 10
+   scrape-item-concurrency* 1
    scrape-hn-host*      "https://news.ycombinator.com"
    scrape-api-host*     "https://hacker-news.firebaseio.com/v0")
 
 (or= scrape-last-fetch* (table))     ; id -> unix seconds when last fetched
 
+(= scrape-verbose* t)
+
+(def scrape-verbose ()
+  (or scrape-verbose* (main-thread)))
+
+(def scrapelog args
+  (if (scrape-verbose) (atomic (apply prn args))))
+
+(def scrape-ero args
+  (if (scrape-verbose) (atomic (apply ero args))))
 
 ; Curl.
 
@@ -54,10 +66,13 @@
                         "-A" scrape-user-agent*))
 
 (def curl-get (url)
-  (apply shellsafe 'curl (+ (curl-args) (list "-b" scrape-cookies* url))))
+  (whenlet c (cookie-header (read-cookie-jar scrape-cookies*) url)
+    (http-fetch url (obj headers `(("Cookie" ,c))))))
+  ;(string->utf8 (apply shellsafe 'curl (+ (curl-args) (list "-b" scrape-cookies* url)))))
 
 (def curl-get-public (url)
-  (apply shellsafe 'curl (+ (curl-args) (list url))))
+  (http-fetch url))
+  ;(string->utf8 (apply shellsafe 'curl (+ (curl-args) (list url)))))
 
 (def curl-post-form (url fields)
   ; fields: alist of (key value) pairs.  POST as form-urlencoded.
@@ -138,8 +153,8 @@
   (let line (apply + (intersperse #\tab
               (list "#HttpOnly_news.ycombinator.com"
                     "FALSE" "/" "TRUE" "2147368447" "user" value)))
-    (writefile-raw (+ "# Netscape HTTP Cookie File\n" line "\n")
-                   scrape-cookies*)))
+    (dispfile (+ "# Netscape HTTP Cookie File\n" line "\n")
+              scrape-cookies*)))
 
 (def seed-cookie-from-config! (cfg)
   ; if env or cfg has a cookie value, install it into the jar.
@@ -170,14 +185,13 @@
                     (list (list "acct" u)
                           (list "pw"   p)
                           (list "goto" "news")))
-    (let ok (hn-logged-in? u)
+    (lets ok (hn-logged-in? u)
       (prn "  -> " (if ok "logged in" "FAILED"))
       ; only persist a prompted password if the login actually worked
       (when (and ok (is source 'prompt))
         (= cfg!password p)
         (save-scrape-config cfg)
-        (prn "  password saved to " scrape-config*))
-      ok)))
+        (prn "  password saved to " scrape-config*)))))
 
 (def ensure-login ()
   ; Order: (1) existing valid cookie jar, (2) cookie supplied via env
@@ -226,7 +240,7 @@
 ; parse-item-page) for the dead/flagged/collapsed comment markers that
 ; the API doesn't expose.
 
-(def fetch-top-stories ()
+(def fetch-topstories ()
   ; returns list of story ids in HN's current top-stories order, or nil
   (errsafe:from-json (curl-get-public (+ scrape-api-host* "/topstories.json"))))
 
@@ -247,19 +261,16 @@
 
 (def parse-subtext-row! (html start rec open-pat close-pat)
   (aif (between html open-pat close-pat start)
-       (withs (inner (car it)
-               m-score (between inner "<span class=\"score\"" "</span>" 0)
-               m-by    (between inner "<a href=\"user?id=" "\"" 0)
-               m-age   (between inner "<span class=\"age\" title=\"" "\"" 0))
-         (when m-score
+       (let inner (car it)
+         (whenlet m-score (between inner "<span class=\"score\"" "</span>" 0)
            (let txt (car m-score)
-             (aif (posmatch ">" txt)
-                  (= rec!score
-                     (errsafe:int (car (tokens (cut txt (+ it 1)))))))))
-         (when m-by   (= rec!by (car m-by)))
-         (when m-age
-           (let toks (tokens (car m-age))
-             (when toks (= rec!time (errsafe:int (last toks)))))))))
+             (awhen (posmatch ">" txt)
+               (= rec!score (errsafe:int:car:tokens (cut txt (+ it 1)))))))
+         (whenlet m-by (between inner "<a href=\"user?id=" "\"" 0)
+           (= rec!by (car m-by)))
+         (whenlet m-age (between inner "<span class=\"age\" title=\"" "\"" 0)
+           (whenlet toks (tokens (car m-age))
+             (= rec!time (errsafe:int (last toks))))))))
 
 
 ; ----- Item / comment page parsing -----
@@ -288,55 +299,55 @@
   ; Parses both the story (top fatitem) and the comment list.
   ; Returns (obj story comments) where story is a table and comments
   ; is a list of comment tables in DFS render order.
-  (withs (story    (parse-fatitem html)
-          comments (parse-comments html story!id))
-    (obj story story comments comments)))
+  (w/table item
+    (= item!story    (parse-fatitem html)
+       item!comments (parse-comments html item!story!id))))
 
 (def parse-fatitem (html)
   ; The story page's top item lives inside <table class="fatitem"> as a
   ; <tr class="athing submission" id="N"> row followed by a subtext row.
   ; Story text (for Ask HN / text submissions) lives in <div class="toptext">.
-  (let rec (obj type 'story dead nil deleted nil)
+  (lets rec (obj type 'story dead nil deleted nil)
     (whenlet ft (posmatch "<table class=\"fatitem\"" html 0)
       (whenlet p (posmatch "<tr class=\"athing" html ft)
         (aif (html-attr html p "id")
              (= rec!id (errsafe:int it)))
         (parse-titleline! html p rec)
         (parse-subtext-row! html p rec "<td class=\"subtext\">" "</tr>")
-        (aif (between html "<div class=\"toptext\">" "</div>" p)
-             (= rec!text (uneschtml (car it))))))
-    rec))
+        (aif (between html "<div class=\"toptext\"" "</div>" p)
+             (let text (car it)
+               (aif (pos #\> text)
+                    (= text (cut text (+ it 1))))
+               (= rec!text (uneschtml text))))))))
 
 (def parse-comments (html story-id)
   ; Split the html into per-comment chunks once, then parse each in
   ; isolation.  Without this, posmatch's O(N) scans on the full 2MB
   ; html turn parse-comments into N*M-quadratic.
-  (with (acc nil
-         positions nil
-         start 0
-         anchor "<tr class=\"athing comtr"
-         indent-stack (table))
-    (whilet p (posmatch anchor html start)
-      (push p positions)
-      (= start (+ p (len anchor))))
-    (let ps (rev positions)
-      (forlen i ps
-        (let p (ps i)
-          (let row (cut html p (or (ps (+ i 1)) (len html)))
-            (let c (parse-comment-row row story-id indent-stack)
-              (when c
-                (push c acc)
-                (let ind c!indent
-                  (= (indent-stack ind) c!id)
-                  (each k (keys indent-stack)
-                    (if (> k ind) (wipe (indent-stack k)))))))))))
-    (rev acc)))
+  (accum a
+    (with (positions nil
+           start 0
+           anchor "<tr class=\"athing comtr"
+           indent-stack (table))
+      (whilet p (posmatch anchor html start)
+        (push p positions)
+        (= start (+ p (len anchor))))
+      (let ps (rev positions)
+        (forlen i ps
+          (withs (p (ps i)
+                  end (or (errsafe:ps (+ i 1)) (len html))
+                  row (cut html p end))
+            (whenlet c (parse-comment-row row story-id indent-stack)
+              (a c)
+              (= (indent-stack c!indent) c!id)
+              (each k (keys indent-stack [> _ c!indent])
+                (wipe (indent-stack k))))))))))
 
 (def parse-comment-row (row story-id indent-stack)
   ; `row` is the substring starting at `<tr class="athing comtr` for one
   ; comment, up to (but not including) the next comment row's start.
   (catch
-    (let rec (obj type 'comment dead nil flagged nil collapsed nil deleted nil)
+    (lets rec (obj type 'comment)
       ; collapsed: class="athing comtr coll"
       (when (posmatch "comtr coll" row 0)
         (set rec!collapsed))
@@ -345,9 +356,9 @@
            (= rec!id (errsafe:int it)))
       (unless rec!id (throw nil))
       ; indent
-      (aif (between row "<td class=\"ind\" indent=\"" "\"" 0)
-           (= rec!indent (or (errsafe:int (car it)) 0))
-           (= rec!indent 0))
+      (= rec!indent (or (aif (between row "<td class=\"ind\" indent=\"" "\"" 0)
+                             (errsafe:int (car it)))
+                         0))
       ; parent: most recent comment at indent-1, else story
       (= rec!parent (or (indent-stack (- rec!indent 1)) story-id))
       ; comhead -- look for inline flags, user, age, descendants.
@@ -357,45 +368,55 @@
         (aif (between comhead "<a href=\"user?id=" "\"" 0)
              (= rec!by (car it)))
         (aif (between comhead "<span class=\"age\" title=\"" "\"" 0)
-             (let toks (tokens (car it))
-               (when toks (= rec!time (errsafe:int (last toks))))))
-        (when (posmatch "[flagged]" comhead) (set rec!flagged))
-        (when (posmatch "[dead]"    comhead) (set rec!dead))
-        (aif (between comhead "class=\"togg clicky\"" "</a>" 0)
-             (aif (html-attr (car it) 0 "n")
-                  (= rec!descendants (or (errsafe:int it) 0)))))
+             (whenlet toks (tokens (car it))
+               (= rec!time (errsafe:int (last toks)))))
+        (if (posmatch "[flagged]" comhead) (set rec!flagged))
+        (if (posmatch "[dead]"    comhead) (set rec!dead))
+        (aand (between comhead "class=\"togg clicky\"" "</a>" 0)
+              (html-attr (car it) 0 "n")
+              (= rec!descendants (or (errsafe:int it) 0))))
       ; body text
       (aif (between row "<div class=\"commtext " "</div>" 0)
            (let inner (car it)
+             (aif (posmatch "\"" inner)
+                  (= rec!color (cut inner 0 it)))
              ; strip the "c00\">" prefix
              (aif (posmatch ">" inner)
-                  (= rec!text (uneschtml (trim (cut inner (+ it 1)) 'end))))))
-      rec)))
+                  (= rec!text (uneschtml (trim (cut inner (+ it 1)) 'end)))))))))
 
 
 ; ----- HN Firebase API (users only) -----
 
 (def fetch-user (id)
   ; returns parsed user table, or nil
-  (aand (curl-get-public (+ scrape-api-host* "/user/" id ".json"))
+  (aand (curl-get-public (fetch-user-url id))
         (from-json it)
-        (and (isa!table it) it)))
+        (check it isa!table)))
 
+(def fetch-user-url (id)
+  (+ scrape-api-host* "/user/" id ".json"))
 
 
 ; ----- Refetch policy & deletion-aware merge -----
 
 (def load-fetchlog ()
   (= scrape-last-fetch*
-     (or (and (file-exists scrape-fetchlog*) (errsafe:load-table scrape-fetchlog*))
+     (or (and (file-exists scrape-fetchlog*)
+              (errsafe:load-table scrape-fetchlog*))
          (table))))
 
 (def save-fetchlog ()
   (save-table scrape-last-fetch* scrape-fetchlog*))
 
-(def recently-fetched? (id)
+(def recently-fetched? (id secs)
   (let t-last (scrape-last-fetch* id)
-    (and t-last (< (- (seconds) t-last) scrape-refetch-secs*))))
+    (and t-last (< (- (seconds) t-last) secs))))
+
+(def recently-fetched-item? (id)
+  (recently-fetched? id scrape-item-refetch-secs*))
+
+(def recently-fetched-user? (id)
+  (recently-fetched? (sym (+ "u/" id)) scrape-user-refetch-secs*))
 
 (def merge-comments (old-comments new-comments)
   ; old-comments and new-comments are lists of tables; key by id.
@@ -416,31 +437,66 @@
 
 ; ----- Item scrape orchestration -----
 
+(or= last-fetch-time* (now))
+
+(def scrape-delay! ()
+  (atomic
+    (let delay (- scrape-crawl-delay* (- (now) last-fetch-time*))
+      (= last-fetch-time* (now))
+      (when (> delay 0)
+        (sleep delay)))))
+
+(def fetch-hn-item (id)
+  (atomic
+    (scrape-delay!)
+    (curl-get (+ scrape-hn-host* "/item?id=" id))))
+
 (def scrape-item! (id (o force))
-  (let result
-       (if (and (no force) (recently-fetched? id))
-           (do (prn "  skip " id " (fetched recently)")
-               (load-json (+ scrape-item-dir* id ".json")))
-           (do
-             (prn "  item " id)
-             (sleep scrape-crawl-delay*)
-             (let html (curl-get (+ scrape-hn-host* "/item?id=" id))
-               (if (no html)
-                   (do (prn "  FAILED to fetch " id) nil)
-                   (withs (parsed (parse-item-page html)
-                           path   (+ scrape-item-dir* id ".json")
-                           old    (and (file-exists path) (load-json path))
-                           merged (build-item-json parsed old))
-                     (save-json merged path)
-                     (= (scrape-last-fetch* id) (seconds))
-                     (save-fetchlog)
-                     merged)))))
-    ; collect users from the result whether freshly scraped or cached
-    (when (and result result!story)
-      (push-user-to-fetch result!story!by)
-      (each c (or result!comments nil)
-        (push-user-to-fetch c!by)))
+  (if (and (no force) (recently-fetched-item? id))
+      (do (scrapelog "  skip " id " (fetched recently)")
+          (push-scraped-users:load-json (+ scrape-item-dir* id ".json")))
+      (do
+        (scrapelog "  item " id)
+        (let html (fetch-hn-item id)
+          (if (no html)
+              (do (scrapelog "  FAILED to fetch " id) nil)
+              (push-scraped-users:scrape-html! id html))))))
+
+(def scrape-item-and-users! (id (o force))
+  (do1 (scrape-item! id force)
+       (let users (scraping-users)
+         (scrape-users! users)
+         (each u users (pop-user-to-fetch u)))))
+
+(def scrape-and-import! (id (o force))
+  (let it (scrape-item! id force)
+    (scrape-users!)
+    ; users first (so items have authors)
+    (import-scraped-users!)
+    (import-scraped-item! id)
+    it))
+
+(def push-scraped-users (result)
+  ; collect users from the result whether freshly scraped or cached
+  (when (and result result!story)
+    (push-user-to-fetch result!story!by)
+    (each c result!comments
+      (push-user-to-fetch c!by)))
+  result)
+
+(def scrape-html! (id (o html (fetch-hn-item id)))
+  (whenlet result (scrape-html id html)
+    (save-json result (scraped-item-path id))
+    (= (scrape-last-fetch* id) (seconds))
+    (save-fetchlog)
     result))
+
+(def scrape-html (id (o html (fetch-hn-item id)))
+  (when html
+    (withs (parsed (parse-item-page html)
+            path   (scraped-item-path id)
+            old    (and (file-exists path) (load-json path)))
+      (build-item-json parsed old))))
 
 (def build-item-json (parsed old)
   ; parsed = (obj story story comments comments).
@@ -450,19 +506,25 @@
          old-comments (and old old!comments))
     (= story!fetched_at (seconds))
     (let merged (merge-comments old-comments comments)
-      (each c merged
-        (each u (collect-users-from-comment c)
-          (push-user-to-fetch u)))
-      (push-user-to-fetch story!by)
       (obj story story comments merged))))
-
-(def collect-users-from-comment (c) (if c!by (list c!by) nil))
 
 ; users discovered during scraping; processed at end
 (or= scrape-users-to-fetch* (table))
 
 (def push-user-to-fetch (u)
   (when u (set (scrape-users-to-fetch* u))))
+
+(def pop-user-to-fetch (u)
+  (when u (wipe (scrape-users-to-fetch* u))))
+
+(def scraping-users ()
+  (keys scrape-users-to-fetch*))
+
+(def scraping-user (u)
+  (scrape-users-to-fetch* u))
+
+(def finished-scraping-users ()
+  (= scrape-users-to-fetch* (table)))
 
 
 ; ----- User scrape -----
@@ -475,7 +537,7 @@
 ; `}`.
 
 (def scrape-user! (id (o force))
-  (when (or force (no (recently-fetched? (sym (+ "u/" id)))))
+  (when (or force (~recently-fetched-user? id))
     (let raw (curl-get-public (+ scrape-api-host* "/user/" id ".json"))
       (when (and raw (>= (len raw) 2))
         (dispfile (inject-fetched-at raw (seconds))
@@ -509,17 +571,19 @@
 ; all of that.
 
 (def scrape-users-parallel! (users (o force) (o batch-size scrape-user-concurrency*))
-  (let pending (if force users
-                   (rem [recently-fetched? (sym (+ "u/" _))] users))
+  (let pending (if force users (rem recently-fetched-user? users))
     (with (total (len pending) done 0)
       (each batch (tuples pending batch-size)
         (scrape-user-batch! batch)
         (= done (+ done (len batch)))
         (when (is 0 (mod done (max 1 (* batch-size 5))))
-          (prn "  users " done "/" total)
+          (scrapelog "  users " done "/" total)
           (flushout))))))
 
 (def scrape-user-batch! (ids)
+  (atomic
+    (= ids (keep scraping-user ids))
+    (each id ids (pop-user-to-fetch id)))
   ; build a single shell command that backgrounds one `curl` per id
   ; and waits for them all.
   (let cmd
@@ -539,39 +603,58 @@
           (when (file-exists raw-path)
             (let raw (errsafe:filechars raw-path)
               (when (and raw (>= (len raw) 2))
-                (writefile-raw (inject-fetched-at raw now)
-                               (+ scrape-user-dir* id ".json"))
+                (dispfile (inject-fetched-at raw now)
+                          (+ scrape-user-dir* id ".json"))
                 (= (scrape-last-fetch* (sym (+ "u/" id))) now)))
             (errsafe:rmfile raw-path)))))))
 
 
 ; ----- Top-level entry -----
 
-(def scrape! ((o force) (o limit 60))
-  ; `limit` caps how many ranked stories to fetch.  Default 60 ~= the
-  ; first two HN pages.  Use a smaller value for dev/testing.
+(def load-scrape ((o limit 60))
   (map ensure-dir (list scrape-dir* scrape-item-dir* scrape-user-dir*))
   (load-fetchlog)
-  (prn "crawl-delay: " scrape-crawl-delay* "s limit=" limit)
-  (ensure-login)
-  (let ids (firstn limit (or (fetch-top-stories) nil))
-    (prn "topstories: " (len ids) " ids")
+  (scrapelog "crawl-delay: " scrape-crawl-delay* "s limit=" limit)
+  (ensure-login))
+
+(def scrape-topstories! ((o limit 60))
+  ; `limit` caps how many ranked stories to fetch.  Default 60 ~= the
+  ; first two HN pages.  Use a smaller value for dev/testing.
+  (let ids (firstn limit (fetch-topstories))
     ; record current rank for the importer (and for forensics).
     (let front (let i 0
                  (map (fn (id) (++ i)
-                        (obj id id
-                             page (if (<= i 30) 1 2)
-                             rank (if (<= i 30) i (- i 30))))
+                        (obj page (+ 1 (trunc:/ i 30))
+                             rank (+ 1 i)))
                       ids))
       (save-json front (+ scrape-dir* "front.json")))
-    (each id ids
-      (scrape-item! id force))
-    (save-fetchlog)
-    (prn "scraping " (len (keys scrape-users-to-fetch*)) " users "
-         "(" scrape-user-concurrency* "-way parallel)")
-    (scrape-users-parallel! (keys scrape-users-to-fetch*) force)
-    (save-fetchlog)
-    (prn "done.")))
+    ids))
+
+(def scrape! ((o force) (o limit 60))
+  (load-scrape limit)
+  ; `limit` caps how many ranked stories to fetch.  Default 60 ~= the
+  ; first two HN pages.  Use a smaller value for dev/testing.
+  (let ids (scrape-topstories! limit)
+    (scrapelog "topstories: " (len ids) " ids")
+    (scrape-items-and-users! ids force)))
+
+(def scrape-items-and-users! (ids (o force))
+  (scrape-items! ids force)
+  (scrape-users! (scraping-users))
+  (finished-scraping-users))
+
+(def scrape-items! (ids (o force))
+  (parallel scrape-item! ids scrape-item-concurrency*)
+  ;(each id ids
+  ;  (scrape-item! id force))
+  (save-fetchlog))
+
+(def scrape-users! ((o users (scraping-users)) (o force))
+  (scrapelog "scraping up to " (len users) " users "
+             "(" scrape-user-concurrency* "-way parallel)")
+  (scrape-users-parallel! users force)
+  (save-fetchlog)
+  (scrapelog "done."))
 
 
 ; ----- Import scraped JSON into News -----
@@ -590,10 +673,44 @@
 
 ; Shared dev password installed on every imported user that has no
 ; entry in hpasswords*.  Read from scrape.json's "dev-password" field,
-; defaults to "password".  Set this to nil/empty in scrape.json to skip
+; defaults to "unknown".  Set this to nil/empty in scrape.json to skip
 ; password installation entirely.
-(= scrape-dev-password* "password")
+(= scrape-dev-password* "unknown")
 
+(def scraped-front-path () (+ scrape-dir* "front.json"))
+
+(def scraped-item-path (id) (+ scrape-item-dir* id ".json"))
+
+(def scraped-user-path (u) (+ scrape-user-dir* u ".json"))
+
+(def scraped-front ()
+  (aif (file-exists:scraped-front-path) (load-json it)))
+
+(def scraped-front-ids () (map !id (scraped-front)))
+
+(def scraped-item (id)
+  (aif (file-exists:scraped-item-path id) (load-json it)))
+
+(def scraped-user (u)
+  (aif (file-exists:scraped-user-path u) (load-json it)))
+
+(def scraped-items ()
+  (map int (scraped-files scrape-item-dir*)))
+
+(def scraped-usernames ()
+  (scraped-files scrape-user-dir*))
+
+(def scraped-files (path)
+  (map trim-file-ext
+       (keep [endmatch ".json" _]
+             (files path))))
+
+
+(def trim-file-ext (x)
+  (aif (lastpos #\. x)
+       (cut x 0 it)
+       x))
+       
 (def import-scrape! ()
   (map ensure-dir (list scrape-dir* scrape-item-dir* scrape-user-dir*
                         arcdir* newsdir* storydir* profdir* votedir*))
@@ -608,28 +725,19 @@
       (= scrape-dev-password* cfg!dev-password)))
   (let ranked nil
     ; users first (so items have authors)
-    (let users (dir scrape-user-dir*)
-      (prn "importing @(len users) users")
-      (noisy-each 100 u users
-        (aif (load-json (+ scrape-user-dir* u))
-             (import-scraped-user it))))
+    (import-scraped-users!)
     ; then items, walking front.json (page+rank order from the scrape)
-    (let front (or (load-json (+ scrape-dir* "front.json")) nil)
-      (each entry front
-        (aif (load-json (+ scrape-item-dir* entry!id ".json"))
-             (when it!story
-               (import-scraped-story it!story)
-               (each c (or it!comments nil)
-                 (import-scraped-comment c))
-               (push it!story ranked)))))
+    (each tem (import-scraped-items!)
+      (push tem!story ranked))
     (let stories (rev ranked)
       (= stories* (map [item _!id] stories)
          ranked-stories* (map [item _!id] stories)))
-    ; news's load-items normally populates comments* alongside
-    ; stories*, but it only runs from (nsv) when stories* is nil --
-    ; we've just set stories*, so we have to seed comments*
-    ; ourselves or /newcomments shows an empty list.
-    (= comments* (sort (compare > !id) (keep acomment (vals items*))))
+    ;; news's load-items normally populates comments* alongside
+    ;; stories*, but it only runs from (nsv) when stories* is nil --
+    ;; we've just set stories*, so we have to seed comments*
+    ;; ourselves or /newcomments shows an empty list.
+    ;(= comments* (sort (compare > !id) (keep acomment (vals items*))))
+
     ; Persist the ranking so a subsequent (nsv) -> (ensure-topstories)
     ; reads our order from disk instead of calling gen-topstories (which
     ; walks down by 1 from maxid*; with HN ids in the tens of millions
@@ -638,128 +746,184 @@
     ; import-scraped-user staged any newly-set passwords in hpasswords*
     ; without writing -- flush once now (set-pw saves per call, which
     ; would be O(n^2) over a 1000-user import).
-    (save-table hpasswords* hpwfile*)
-    (prn "imported " (len ranked) " stories")))
+    (save-pws)
+    (scrapelog "imported " (len ranked) " stories")))
 
+(def import-scraped-items! ((o ids (scraped-front-ids)))
+  (accum a
+    (each id ids
+      (only&a (import-scraped-item! id)))))
 
-; news.arc's gen-topstories walks `(down id maxid* 1)` calling (item
-; id) for every integer from maxid* down to 1.  With imported HN ids
-; maxid* is ~48M, so a cold (nsv) (no topstories file on disk) freezes
-; trying to do 48 million hash lookups + file probes.  Override it
-; with an items*-driven version that touches only the ids we have.
-(def gen-topstories ()
-  (let metas (keep metastory (map item (keys items*)))
-    (= ranked-stories*
-       (or (sort (compare > (memo frontpage-rank)) metas)
-           nil))))
+(def import-scraped-item! (id)
+  (aif (scraped-item id)
+       (when (and it!story it!story!by)
+         (import-scraped-story it!story)
+         (import-scraped-comments it!comments)
+         it)))
+
+;; news.arc's gen-topstories walks `(down id maxid* 1)` calling (item
+;; id) for every integer from maxid* down to 1.  With imported HN ids
+;; maxid* is ~48M, so a cold (nsv) (no topstories file on disk) freezes
+;; trying to do 48 million hash lookups + file probes.  Override it
+;; with an items*-driven version that touches only the ids we have.
+;(def gen-topstories ()
+;  (let metas (keep metastory (map item (keys items*)))
+;    (= ranked-stories*
+;       (or (sort (compare > (memo frontpage-rank)) metas)
+;           nil))))
+
+(def get-user-uid (u)
+  (let p (assert (profile u) "No such profile for @u")
+    (assert p!uid)))
 
 (def import-scraped-story (s)
-  (let id s!id
-    (let it (or (items* id)
-                (= (items* id)
-                   (inst 'item
-                         'id id
-                         'type (sym (or s!type "story"))
-                         'by   s!by
-                         'time (or s!time (seconds))
-                         'url  s!url
-                         'title s!title
-                         'text  s!text
-                         'score (or s!score 0)
-                         'dead  s!dead
-                         'deleted s!deleted)))
-      (when (> id maxid*) (= maxid* id))
-      (= it!score (or s!score it!score))
-      (= it!title (or s!title it!title))
-      (= it!url   (or s!url   it!url))
-      (= it!by    (or s!by    it!by))
-      ; record the story under the author's submitted list (used by
-      ; /submitted and /threads).
-      (when s!by
-        (whenlet author (profile s!by)
-          (unless (mem id author!submitted)
-            (= author!submitted (cons id author!submitted))
-            (save-prof s!by))))
-      (save-item it)
-      it)))
+  (let it (story-from-scraped-story s)
+    ; record the story under the author's submitted list (used by
+    ; /submitted and /threads).
+    (whenlet author (only&profile s!by)
+      (unless (mem it!id author!submitted)
+        (push it!id author!submitted)
+        (save-prof s!by)))
+    (save-item it)
+    (put-item it stories*)
+    (register-story it)
+    it))
+
+(def story-from-scraped-story (s)
+  (let it (or= (items* s!id)
+               (inst 'item 'id s!id))
+    ;(when (> id maxid*) (= maxid* id))
+    (= it!by    (get-user-uid s!by))
+    (= it!type  (sym (or s!type it!type "story")))
+    (= it!time  (or s!time  it!time  (seconds)))
+    (= it!text  (or s!text  it!text))
+    (= it!score (or s!score it!score 0))
+    (= it!title (or s!title it!title))
+    (= it!url   (or s!url   it!url))
+    (= it!dead  (or s!dead  it!dead))
+    (= it!deleted (or s!deleted  it!deleted))
+    (unless (blank it!text)
+      (when (posmatch "<a href" it!text)
+        (pushnew 'links it!keys)))
+    (scrape-ero:tablist it)
+    it))
+
+(def import-scraped-comments (comments)
+  (each c comments
+    (import-scraped-comment c)))
 
 (def import-scraped-comment (c)
-  (let id c!id
-    (let it (or (items* id)
-                (= (items* id)
-                   (inst 'item
-                         'id id
-                         'type 'comment
-                         'by c!by
-                         'time (or c!time (seconds))
-                         'text c!text
-                         'parent c!parent
-                         ; HN comments start with 1 point (author's auto-upvote).
-                         ; We don't observe the live score from HTML, so 1 is the
-                         ; right baseline.
-                         'score 1
-                         'dead  c!dead
-                         'deleted c!deleted)))
-      (when (> id maxid*) (= maxid* id))
-      (= it!text (or c!text it!text))
-      (= it!by   (or c!by   it!by))
-      (= it!dead (or c!dead it!dead))
-      ; if newly observed as [flagged] and the scraper isn't already
-      ; on the flag list, add it.
-      (when c!flagged
-        (pushnew 'flagged it!keys)
-        (pushnew scrape-flagger* it!flags))
-      ; link this comment under its parent's kids list.  Without this
-      ; an item page renders the story but no comments -- news.arc's
-      ; display-subcomments walks parent!kids, not (keep [is _!parent
-      ; parent-id] all-items).
-      (whenlet p (and c!parent (items* c!parent))
-        (unless (mem id p!kids)
-          (= p!kids (+ p!kids (list id)))
-          (save-item p)))
-      ; record this comment under the author's submitted list so
-      ; news's (comments user) -- which walks (uvar user submitted) --
-      ; picks it up for /threads?id=USER.
-      (when c!by
-        (whenlet author (profs* c!by)
-          (unless (mem id author!submitted)
-            (= author!submitted (cons id author!submitted))
-            (save-prof c!by))))
-      (save-item it)
-      it)))
+  (let it (comment-from-scraped-comment c)
+    ; link this comment under its parent's kids list.  Without this
+    ; an item page renders the story but no comments -- news.arc's
+    ; display-subcomments walks parent!kids, not (keep [is _!parent
+    ; parent-id] all-items).
+    (whenlet p (and c!parent (item c!parent))
+      (unless (mem it!id p!kids)
+        (++ p!kids (list it!id))
+        (save-item p)))
+    ; record this comment under the author's submitted list so
+    ; news's (comments user) -- which walks (uvar user submitted) --
+    ; picks it up for /threads?id=USER.
+    (when c!by
+      (whenlet author (profile c!by)
+        (unless (mem it!id author!submitted)
+          (= author!submitted (cons it!id author!submitted))
+          (save-prof c!by))))
+    (save-item it)
+    (put-item it comments*)
+    (register-comment it (unmarkdown it!text))
+    it))
 
-(def import-scraped-user (u)
-  ; Note: we deliberately do NOT copy u!submitted (the firebase
-  ; user's recent-submissions list) into the profile.  Firebase
-  ; returns up to ~10000 ids, the vast majority of which we never
-  ; scraped, so (item id) -> nil for them.  News's `comments` then
-  ; calls (acomment nil) which is (nil 'type) -> error.  We build
-  ; submitted from below instead, in import-scraped-{story,comment},
-  ; restricting it to items we actually have.
+(def comment-from-scraped-comment (c)
+  (lets it (or= (items* c!id)
+                (inst 'item 'id c!id))
+    ;(when (> id maxid*) (= maxid* id))
+    (= it!by     (get-user-uid c!by)
+       it!type   'comment
+       it!parent (or c!parent it!parent)
+       it!score  (scraped-comment-score c it!score)
+       it!time   (or c!time it!time)
+       it!text   (or c!text it!text)
+       it!dead   (or c!dead it!dead)
+       it!deleted (or c!deleted it!deleted)
+       (mem 'flagged it!keys)         c!flagged
+       (mem scrape-flagger* it!flags) c!flagged
+       (mem 'collapsed it!keys)       c!collapsed)))
+
+(def scraped-comment-score (c (o curscore))
+  (if c!dead     1
+      c!deleted  (or curscore 1)
+                 (score-from-comment-class c!color)))
+
+
+(def import-scraped-users! ((o users (scraped-usernames)) (o force))
+  (let users (if force users (filter-scraped-usernames users))
+    (scrapelog "importing @(len users) users")
+    (after
+      (parallel [unless (profile _)
+                  (aif (scraped-user _) (import-scraped-user! it))]
+                users 50 (if (scrape-verbose) 10))
+      (save-pws))))
+
+(def filter-scraped-usernames (users)
+  (rem profile users))
+
+(def import-scraped-user! (u)
+  (lets p (user-from-scraped-user u)
+    ; Install the dev password so you can log in as imported
+    ; users locally.  Only set if hpasswords* doesn't already
+    ; have an entry (don't clobber a real password if one was
+    ; set via the web UI later).  Skip entirely if dev-password
+    ; is nil/empty.
+    (awhen (aand scrape-dev-password* (check it ~empty))
+      (or= (hpasswords* p!id) (password-hash it)))
+    (save-prof p!id)))
+
+(defmemo password-hash (pw) (bhash pw))
+
+(def user-from-scraped-user (u)
   (let id (string u!id)
     (when (goodname id)
-      ; init-user sets up both profs* and an empty votes* table (plus
-      ; saves both).  Without the votes* table, rendering the front
-      ; page while logged in as an imported user crashes:
-      ; (votelinks i ...) calls ((votes) i!id), (votes) returns nil
-      ; when there's no on-disk file, and (nil id) -> "Function call
-      ; on non-function: NIL".  Re-using news's init-user keeps that
-      ; setup in one place.
       (unless (profile id) (init-user id))
-      (let p (profs* id)
+      (lets p (profs* id)
         (when u!created (= p!created u!created))
         (when u!karma   (= p!karma   u!karma))
-        (when u!about   (= p!about   u!about))
-        (save-prof id)
-        ; Install the dev password so you can log in as imported
-        ; users locally.  Only set if hpasswords* doesn't already
-        ; have an entry (don't clobber a real password if one was
-        ; set via the web UI later).  Skip entirely if dev-password
-        ; is nil/empty.
-        (when (and scrape-dev-password*
-                   (~empty scrape-dev-password*))
-          (or= (hpasswords* id) (scrape-dev-password-hash)))
-        p))))
+        (when u!about   (= p!about   u!about))))))
 
-(defmemo scrape-dev-password-hash ()
-  (bhash scrape-dev-password*))
+
+(= scrape-hn* t scrape-delay* 0.5)
+
+(def scrape-hn-stories ((o ids (shuffle (fetch-topstories))))
+  (each id ids
+    (sleep scrape-delay*)
+    (on-err [report-error _] {scrape-and-import! id})))
+
+(mac defscrape (name secs . body)
+  `(defbg ,name ,secs
+     (if scrape-hn*
+         (let ids (fetch-topstories)
+           ,@body))))
+
+(defscrape scrape-update-frontpage
+  5 (= ranked-stories* (rem nil (map item ids)))
+    (save-topstories))
+
+(defscrape scrape-new-stories
+  1 (scrape-hn-stories (rem item (shuffle ids))))
+
+(defscrape scrape-new-frontpage-stories
+  2 (scrape-hn-stories (rem item (firstn 60 ids))))
+
+(defscrape scrape-stories-p1
+  3 (scrape-hn-stories (firstn 30 ids)))
+
+(defscrape scrape-stories-p2-p3
+  5 (scrape-hn-stories (cut ids 30 90)))
+
+(defscrape scrape-remaining-stories
+  7 (scrape-hn-stories (cut ids 90)))
+
+(when (main)
+  (nsv)
+  (repl))
