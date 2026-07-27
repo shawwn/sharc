@@ -1,3 +1,10 @@
 #!/bin/sh
 DIR="$(cd "$(dirname "$0")" && pwd)"
-exec sbcl --dynamic-space-size "${SHARC_HEAP_MB:-10240}" --script "$DIR/boot.lisp" "$@"
+
+# # Fix utf-8 encoding errors
+# export LC_CTYPE="${LC_CTYPE:-en_US.UTF-8}"
+
+exec sbcl \
+  --control-stack-size "${SHARC_CONTROL_MB:-16}" \
+  --dynamic-space-size "${SHARC_HEAP_MB:-10240}" \
+  --script "$DIR/boot.lisp" "$@"
