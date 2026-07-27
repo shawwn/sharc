@@ -243,13 +243,13 @@
        
 (def mem (test seq (o same is))
   (let f (testify test same)
-    (reclist [if (f:car _) _] seq)))
+    (reclist f:car&idfn seq)))
 
 (def find (test seq (o same is))
   (let f (testify test same)
     (if (alist seq)
-        (reclist   [if (f:car _) (car _)] seq)
-        (recstring [if (f:seq _) (seq _)] seq))))
+        (reclist   f:car&car seq)
+        (recstring f:seq&seq seq))))
 
 (def isa (x . y)
   (if y
