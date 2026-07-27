@@ -925,6 +925,18 @@ c"
     (test? 3 **)
     (test? 4 break)))
 
+(define-test literals
+  (test? true true)
+  (test? false false)
+  (test? true (< -inf -1e10))
+  (test? false (< inf -1e10))
+  (test? false (is nan nan))
+  (test? true (anan nan))
+  (test? true (anan (- nan)))
+  (test? true (anan (* nan 20)))
+  (test? -inf (- inf))
+  (test? inf (- -inf)))
+
 (define-test =
   (test? 1 (= xx 1))
   (test? 1 xx)

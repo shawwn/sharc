@@ -58,6 +58,8 @@
 
 (def no (x) (is x nil))
 
+(def anan (x) (no (is x x)))
+
 (def acons (x) (is (type x) 'cons))
 
 (def atom (x) (no (acons x)))

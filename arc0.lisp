@@ -99,6 +99,15 @@ the truth value t.  See the identity tests in test.arc."
 (defvar *arc-atstrings*     t)
 (defvar *arc-explicit-flush* nil)
 
+(sb-int:with-float-traps-masked (:overflow :divide-by-zero :invalid)
+  (xdef -inf (/ -1d0 0d0))
+  (xdef  inf (/  1d0 0d0))
+  (xdef  nan (/  0d0 0d0)))
+
+;; global, for the session
+; (sb-int::set-floating-point-modes :traps '(:invalid :divide-by-zero))
+; doesn't seem to work
+
 (xdef sig *arc-fn-signatures*)
 
 (defun arc-declare (key &optional (val t))
@@ -220,10 +229,9 @@ the truth value t.  See the identity tests in test.arc."
 
 ;; Returns true iff a and b are identical. 
 (defun arc-id (a b)
-  (or (eql a b)
-      (and (numberp a) (numberp b) (= a b))
-      (and (stringp a) (stringp b) (string= a b))
-      (and (null a) (null b))))
+  (cond ((and (numberp a) (numberp b)) (= a b))
+        ((and (stringp a) (stringp b)) (string= a b))
+        (t (or (eql a b) (and (null a) (null b))))))
 
 (xdef id #'arc-id)
 
