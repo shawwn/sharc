@@ -117,7 +117,7 @@
 
 (mac with (parms . body)
   `((fn ,(map1 car (pair parms))
-     ,@body)
+     (do ,@body))
     ,@(map1 cadr (pair parms))))
 
 (mac let (var val . body)
