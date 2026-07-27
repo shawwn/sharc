@@ -388,6 +388,9 @@
   (sp)
   (submit btext))
 
+(def hidden-input (name value)
+  (gentag input type 'hidden name name value value))
+
 (mac cdata body
   `(do (pr "<![CDATA[") 
        ,@body

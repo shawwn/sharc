@@ -250,8 +250,20 @@
 (def auth-for (user id)
   (and user (downcase (sha1::hmac-sha1-hex (auth-key) (string user "/" id)))))
 
-(def good-auth (user id (o auth arg!auth))
+(def good-auth (user id (o auth (or arg!auth arg!hmac)))
   (and user auth (is auth (auth-for user id))))
+
+(def auth-input (id (t u me))
+  (and u (hidden-input 'hmac (auth-for u id))))
+
+(mac item-form (action id whence . body)
+  (w/uniq gid
+    `(let ,gid ,id
+       (form ,action
+         (hidden-input 'id ,gid)
+         (hidden-input 'goto ,whence)
+         (auth-input ,gid)
+         ,@body))))
 
 
 ; Safe redirects.
