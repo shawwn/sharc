@@ -228,8 +228,7 @@
    start))
 
 (def testify (x (o same is))
-  (if (and (is same is)
-           (in (type x) 'fn 'table))
+  (if (and (is same is) (in (type x) 'fn 'table))
       x
       [same _ x]))
 
