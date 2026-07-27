@@ -7,7 +7,6 @@
 ; A user is simply a string: "pg". Use /whoami to test user cookie.
 
 (= hpwfile*    (string arcdir* "hpw")
-   oidfile*    (string arcdir* "openids")
    adminfile*  (string arcdir* "admins")
    cookfile*   (string arcdir* "cooks"))
 
@@ -15,44 +14,58 @@
   (load-userinfo)
   (serve port))
 
-(def safe-load-admins ()
-  (map string (errsafe (readfile adminfile*))))
-
-(def save-admins ()
-  (aand (tostring:map prn admins*)
-        (writefile (trim it) adminfile* disp)))
-
-; always reload admins. It's cheap, safe, and if the user modifies the
-; admin file and a source file, shows up on next page reload.
-;
-; Ultimately have some way to reload non-arc files.
-
-(= admins* (safe-load-admins))
-
 (or= hpasswords*   (table)
-     openids*      (table)
      cookie->user* (table)
      user->cookie* (table))
 
 (def load-userinfo ()
-  (= hpasswords*   (safe-load-table hpwfile*)
-     openids*      (safe-load-table oidfile*)
-     admins*       (safe-load-admins))
-  (safe-load-cookies))
+  (load-pws)
+  (load-cookies)
+  (load-admins)
+  t)
 
-(def safe-load-cookies ()
-  (= cookie->user* (safe-load-table cookfile*))
+(def load-pws ()
+  (= hpasswords* (load-table hpwfile*))
+  (register-accts)
+  t)
+
+(def register-accts ()
+  (= dc-usernames* (table [each (k v) hpasswords*
+                            (set (_:downcase k))])))
+
+(def load-cookies ()
+  (= cookie->user* (load-table cookfile*))
   (maptable (fn (k v) (= (user->cookie* v) k))
             cookie->user*))
+
+(def load-admins ()
+  (= admins* (map string (readfile adminfile*))))
+
+(def save-pws () (save-table hpasswords* hpwfile*) t)
+
+(def save-cookies () (save-table cookie->user* cookfile*) t)
+
+(def save-admins ()
+  (aand (apply string (intersperse #\newline admins*))
+        (dispfile it adminfile*)))
+
+; always reload admins on page refresh after modifying code.
+;
+; Ultimately have some way to reload non-arc files.
+
+(load-admins)
 
 ; idea: a bidirectional table, so don't need two vars (and sets)
 
 (or= cookie->user* (table) user->cookie* (table) logins* (table))
 
-(def get-user ((t req))
-  (let u (aand (alref req!cooks "user") (cookie->user* it))
-    (when u (= (logins* u) (ip)))
-    u))
+(def user-from-cookie ((t req))
+  (aand (alref req!cooks "user")
+        (cookie->user* it)))
+
+(def get-user ()
+  (whenlets u (user-from-cookie)
+    (= (logins* u) (ip))))
 
 ; (me)        --- read the current request's user
 ; (me other)  --- the current user, only if it equals other
@@ -142,47 +155,55 @@
         (pwfields "create (server) account")))))
 
 (def cook-user (user)
-  (let id (new-user-cookie user)
-    (= (cookie->user*   id) user
-       (user->cookie* user)   id)
-    (save-table cookie->user* cookfile*)
-    id))
+  (do1 (link-cookie user)
+       (save-cookies)))
+
+(def link-cookie (user (o cookie (new-user-cookie user)))
+  (= (cookie->user* cookie) user
+     (user->cookie* user) cookie))
 
 (def new-user-cookie (user)
-  (let id (+ user "&" (rand-string 32))
-    (if (cookie->user* id) (new-user-cookie user) id)))
+  (evtil (+ (assert user) "&" (rand-string 32)) ~cookie->user*))
 
 (def logout-user ((t user me))
   (wipe (logins* user))
   (wipe (cookie->user* (user->cookie* user)) (user->cookie* user))
-  (save-table cookie->user* cookfile*))
+  (save-cookies))
 
 (def create-acct (user pw)
-  (set (dc-usernames* (downcase user)))
   (set-pw user pw)
+  (save-pws)
+  user)
+
+(def register-acct (user)
+  (set (dc-usernames* (downcase user)))
   user)
 
 (def disable-acct (user)
   (set-pw user (rand-string 20))
+  (save-pws)
   (logout-user user)
   user)
+
+(def set-hpw (user hpw)
+  (when hpw
+    (= (hpasswords* user) hpw)
+    (register-acct user)
+    user))
   
 (def set-pw (user pw)
-  (= (hpasswords* user) (and pw (bhash pw)))
-  (save-pws)
-  user)
-
-(def save-pws ()
-  (save-table hpasswords* hpwfile*)
-  t)
+  (awhen (and pw (bhash pw))
+    (set-hpw user it)
+    user))
 
 (def copy-account (old new)
   (assert (acct-exists old))
   (assert (~acct-exists new))
   (logout-user old)
   (logout-user new)
-  (= (hpasswords* new) (hpasswords* old))
-  (save-pws))
+  (set-hpw new (hpasswords* old))
+  (save-pws)
+  new)
 
 (def hello-page ()
   (whitepage (prs "hello" (me) "at" (ip))))
@@ -349,12 +370,15 @@
 
 (def good-login (user pw ip)
   (let record (list (seconds) ip user)
-    (if (and user pw (aand (hpasswords* user) (bcheckpw pw it)))
+    (if (check-pw user pw)
         (do (unless (user->cookie* user) (cook-user user))
             (enq-limit record good-logins*)
             user)
         (do (enq-limit record bad-logins*)
             nil))))
+
+(def check-pw (user pw)
+  (aand (hpasswords* user) (bcheckpw pw it)))
 
 ; bcrypt password hashing (cost 10, matching HN's $2b$10$ format).
 
@@ -367,10 +391,7 @@
 (or= dc-usernames* (table))
 
 (def username-conflicts (user)
-  (when (empty dc-usernames*)
-    (each (k v) hpasswords*
-      (set (dc-usernames* (downcase k)))))
-  (dc-usernames* (downcase user)))
+  (dc-usernames*:downcase user))
 
 (def bad-newacct (user pw)
   (if (and (recaptcha-required)
