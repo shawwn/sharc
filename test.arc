@@ -678,6 +678,88 @@ c"
   (test? "" (urlencode ""))
   (test? "" (urldecode "")))
 
+; ----- http-fetch -----
+;
+; only the cases reachable without a network: the interesting ones
+; (stalled peer, a server that never closes) need a listener, and live
+; in the manual checks noted in the http-timeouts handoff.
+
+(define-test http-fetch-errors
+  ; unsupported scheme
+  (test? nil (errsafe (http-fetch "ftp://example.com/")))
+  ; connection refused fails fast rather than hanging
+  (test? nil (errsafe (http-fetch "http://127.0.0.1:1/"))))
+
+; ----- cookies.arc -----
+
+(def jar-line args
+  (apply + (intersperse #\tab args)))
+
+; a fixture jar covering the cases that bite: the #HttpOnly_ prefix, an
+; include-subdomains cookie, an expired one, an empty value (trailing
+; tab), a real comment, and a malformed line.
+(= test-jar*
+   (+ "# Netscape HTTP Cookie File\n"
+      (jar-line "#HttpOnly_news.ycombinator.com" "FALSE" "/" "TRUE"
+                "2147368447" "user" "hnscraper&tok") "\n"
+      (jar-line "example.com" "TRUE"  "/a" "FALSE" "0" "sess"  "abc") "\n"
+      (jar-line "example.com" "FALSE" "/"  "FALSE" "1" "old"   "gone") "\n"
+      (jar-line "example.com" "FALSE" "/"  "FALSE" "0" "empty" "") "\n"
+      "# a comment\n"
+      "garbage\n"))
+
+(def with-test-jar (f)
+  ; write the fixture, run f on its path, always clean up
+  (let path "test-cookies.tmp"
+    (after (do (dispfile test-jar* path) (f path))
+           (rmfile path))))
+
+(define-test url-parts
+  (test? '("https" "news.ycombinator.com" "/item?id=1")
+         (url-parts "https://news.ycombinator.com/item?id=1"))
+  (test? '("http" "example.com" "/")     (url-parts "http://example.com"))
+  (test? '("https" "example.com" "/a/b") (url-parts "https://example.com:8443/a/b"))
+  (test? nil (url-parts "news.ycombinator.com/x"))) ; no scheme
+
+(define-test read-cookie-jar
+  (with-test-jar
+    (fn (path)
+      (let cs (read-cookie-jar path)
+        (test? 4 (len cs))                        ; comment + garbage skipped
+        (test? "news.ycombinator.com" ((car cs) 'domain)) ; #HttpOnly_ stripped
+        (test? "hnscraper&tok"        ((car cs) 'value))  ; & not decoded
+        (test? t                      ((car cs) 'httponly))
+        (test? "empty" ((last cs) 'name))
+        (test? ""      ((last cs) 'value)))))     ; empty value keeps its column
+  (test? nil (read-cookie-jar "no-such-jar.tmp")))
+
+(define-test cookies-for
+  (with-test-jar
+    (fn (path)
+      (let cs (read-cookie-jar path)
+        ; longest path first, and the expired cookie is dropped
+        (test? '("sess" "empty")
+               (map [_ 'name] (cookies-for cs "http://example.com/a/b")))
+        (test? nil (cookies-for cs "http://other.org/"))))))
+
+(define-test cookie-header
+  (with-test-jar
+    (fn (path)
+      (let cs (read-cookie-jar path)
+        (test? "user=hnscraper&tok"
+               (cookie-header cs "https://news.ycombinator.com/item?id=1"))
+        ; secure cookies don't go over plain http
+        (test? nil (cookie-header cs "http://news.ycombinator.com/x"))
+        ; the subdomains flag matches a subdomain; host-only cookies don't
+        (test? "sess=abc" (cookie-header cs "http://sub.example.com/a/b"))
+        (test? "sess=abc; empty=" (cookie-header cs "http://example.com/a/b"))
+        ; /a doesn't match /ab
+        (test? "empty=" (cookie-header cs "http://example.com/ab"))))))
+
+; litmatch/endmatch unroll a literal pattern at macroexpansion and hand
+; anything else to litmatch2/endmatch2 at runtime, so both paths need
+; covering -- and they need to agree.
+
 (define-test litmatch
   (test? true  (litmatch "ab" "abcdef"))
   (test? true  (litmatch "cd" "abcdef" 2)) ; match at offset
