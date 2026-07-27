@@ -363,6 +363,13 @@
                ,@body))
            ',name)))
 
+(mac defplace (name place)
+  `(defset ,name (s)
+     (w/uniq i
+       (list (list i s)
+             (,place i)
+             `(fn (val) (= ,(,place i) val))))))
+
 (defset car (x)
   (w/uniq g
     (list (list g x)
