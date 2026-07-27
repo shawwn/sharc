@@ -831,7 +831,7 @@
                (self (cdr seq) (+ n 1))))
          (nthcdr start seq)
          start)
-        (recstring [if (f (seq _)) _] seq start))))
+        (recstring f:seq&idfn seq start))))
 
 (def positions (test seq (o start 0))
   (let f (testify test)
@@ -843,7 +843,7 @@
                (self (cdr seq) (+ n 1))))
            (nthcdr start seq))
           (for i start (edge seq)
-            (if (f (seq i)) (a i)))))))
+            (f:seq&a i))))))
 
 (def lastpos (test seq (o start 0))
   (last:positions test seq start))
