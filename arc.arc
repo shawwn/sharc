@@ -1172,11 +1172,15 @@
   (each (k v) (pair data) (= (table k) v))
   table)
 
-(def keys (h) 
-  (accumulate a (each (k v) h (a k))))
+(def keys (h (o test idfn))
+  (let f (testify test)
+    (accumulate a
+      (each (k v) h (f&a k)))))
 
-(def vals (h) 
-  (accumulate a (each (k v) h (a v))))
+(def vals (h (o test idfn))
+  (let f (testify test)
+    (accumulate a
+      (each (k v) h (f&a v)))))
 
 ; These two should really be done by coerce.  Wrap coerce?
 
