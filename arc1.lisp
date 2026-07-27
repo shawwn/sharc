@@ -509,45 +509,41 @@ errors out clearly rather than polluting (often locked) CL packages."
 
 (defun ac (s)
   (cond
-    ((stringp s)   (ac-string s))
-    ((literal-p s)  s)
+    ((stringp s)                                 (ac-string s))
+    ((literal-p s)                               s)
     ;; Arc nil/t with preserved case from arc-read
-    ((and (arc-sym= s "nil") (not (lex-p s))) nil)
+    ((and (arc-sym= s "nil") (not (lex-p s)))    nil)
     ;; Free reference to t -> cl:t; lex-bound t falls through to ac-var-ref
-    ((and (arc-sym= s "t") (not (lex-p s))) t)
-    ((ssyntax-p s) (ac (expand-ssyntax s)))
-    ((symbolp s)   (ac-var-ref s))
-    ((arc-car? s #'ssyntax-p) (ac (cons (expand-ssyntax (car s)) (cdr s))))
-    ((arc-sym= (arc-car? s) "function") (cl-quoted (cadr s)))
-    ((arc-sym= (arc-caar? s) "function") (mapcar #'ac s))
+    ((and (arc-sym= s "t") (not (lex-p s)))      t)
+    ((ssyntax-p s)                               (ac (expand-ssyntax s)))
+    ((symbolp s)                                 (ac-var-ref s))
+    ((arc-car? s #'ssyntax-p)                    (ac (cons (expand-ssyntax (car s)) (cdr s))))
+    ((arc-sym= (arc-car? s) "function")          (cl-quoted (cadr s)))
+    ((arc-sym= (arc-caar? s) "function")         (mapcar #'ac s))
     ;; (pkg::fn args...) compiles to a direct CL call -- same path as
     ;; ((function fn) args...) above, but lets you drop the #'.
-    ((foreign-cl-call-p s)
-     (cons (car s) (mapcar #'ac (cdr s))))
-    ((arc-sym= (arc-car? s) "quote") (list 'quote (ac-quoted (cadr s) t)))
-    ((arc-sym= (arc-car? s) "quasiquote") (ac-qq (cadr s)))
-    ((arc-sym= (arc-car? s) "quasisyntax") (ac-qs (cadr s)))
-    ((arc-sym= (arc-car? s) "unsyntax")
-     (error "unsyntax outside quasisyntax: ~S" s))
-    ((arc-sym= (arc-car? s) "unsyntax-splicing")
-     (error "unsyntax-splicing outside quasisyntax: ~S" s))
-    ((arc-sym= (arc-car? s) "%do") `(progn ,@(ac-body* (cdr s))))
-    ((arc-sym= (arc-car? s) "if") (ac-if (cdr s)))
-    ((arc-sym= (arc-car? s) "fn") (ac-fn (cadr s) (cddr s)))
-    ((arc-sym= (arc-car? s) "assign") (ac-set (cdr s)))
+    ((foreign-cl-call-p s)                       (cons (car s) (mapcar #'ac (cdr s))))
+    ((arc-sym= (arc-car? s) "quote")             (list 'quote (ac-quoted (cadr s) t)))
+    ((arc-sym= (arc-car? s) "quasiquote")        (ac-qq (cadr s)))
+    ((arc-sym= (arc-car? s) "quasisyntax")       (ac-qs (cadr s)))
+    ((arc-sym= (arc-car? s) "unsyntax")          (error "unsyntax outside quasisyntax: ~S" s))
+    ((arc-sym= (arc-car? s) "unsyntax-splicing") (error "unsyntax-splicing outside quasisyntax: ~S" s))
+    ((arc-sym= (arc-car? s) "%do")               `(progn ,@(ac-body* (cdr s))))
+    ((arc-sym= (arc-car? s) "if")                (ac-if (cdr s)))
+    ((ac-fn-value-p s)                           (ac-fn (cadr s) (cddr s)))
+    ((arc-sym= (arc-car? s) "assign")            (ac-set (cdr s)))
     ;; the next three clauses could be removed without changing semantics
     ;; ... except that they work for macros (so prob should do this for
     ;; every elt of s, not just the car)
-    ((arc-sym= (arc-caar? s) "compose") (ac (decompose (cdar s) (cdr s))))
-    ((arc-sym= (arc-caar? s) "complement")
-     (ac `(,(intern "no" (sym-pkg (caar s)))
-           (,(cadar s) ,@(cdr s)))))
-    ((arc-sym= (arc-caar? s) "andf") (ac-andf s))
-    ((arc-sym= (arc-caar? s) "orf") (ac-orf s))
+    ((arc-sym= (arc-caar? s) "compose")          (ac (decompose (cdar s) (cdr s))))
+    ((arc-sym= (arc-caar? s) "complement")       (ac `(,(intern "no" (sym-pkg (caar s)))
+                                                        (,(cadar s) ,@(cdr s)))))
+    ((arc-sym= (arc-caar? s) "andf")             (ac-andf s))
+    ((arc-sym= (arc-caar? s) "orf")              (ac-orf s))
     ;; uncomment this next line to see which expression is causing a
     ;; crash due to a function call on non-function (e.g. nil/num/sym)
-    ;((consp s) (ac-safe-call (car s) (cdr s)))
-    ((consp s) (ac-call (car s) (cdr s)))
+    ;((consp s)                                  (ac-safe-call (car s) (cdr s)))
+    ((consp s)                                   (ac-call (car s) (cdr s)))
     (t (error "Bad object in expression: ~S" s))))
 
 ;;;; ---- Atstring expansion ----
@@ -1014,7 +1010,7 @@ isn't shadowed by a lexical binding."
   (let ((macfn (ac-macro-p fn)))
     (cond
       (macfn (ac-mac-call macfn args))
-      ((and (consp fn) (arc-sym= (car fn) "fn"))
+      ((ac-fn-value-p fn)
        ;; funcall, not ((ac fn) ...): ac fn may be a named-lambda, which
        ;; is illegal in operator position but fine as a funcall argument.
        `(funcall ,(ac fn) ,@(ac-named-args (cadr fn) args)))
@@ -1035,7 +1031,7 @@ isn't shadowed by a lexical binding."
         (expr (cons fn args)))
     (cond
       (macfn (ac-mac-call macfn args))
-      ((and (consp fn) (arc-sym= (car fn) "fn"))
+      ((ac-fn-value-p fn)
        `(funcall ,(ac fn) ,@(ac-named-args (cadr fn) args)))
       (t `(ar-safe-apply ',expr ,(ac fn) (list ,@(mapcar #'ac args)))))))
 
