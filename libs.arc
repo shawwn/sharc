@@ -1,4 +1,5 @@
 (map load '("strings.arc"
+            "cookies.arc"
             "parallel.arc"
             "pprint.arc"
             "code.arc"
