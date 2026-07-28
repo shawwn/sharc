@@ -249,15 +249,25 @@
 
 (def parse-titleline! (html start rec)
   (aif (between html "<span class=\"titleline\">" "</span>" start)
-       (withs (inner (car it)
-               m-url (between inner "<a href=\"" "\"" 0)
+       (withs (inner   (car it)
+               pseudo  (cut inner 0 (posmatch "<a " inner))
+               m-url   (between inner "<a " "\"" 0)
                m-title (and m-url (between inner ">" "</a>" (cadr m-url)))
-               url    (and m-url (uneschtml (car m-url))))
+               url     (and m-url (uneschtml (car m-url))))
+         (parse-pseudotext! pseudo rec)
          ; an "item?id=N" href on the title means this is an Ask/text
          ; submission with no external URL.
          (when (and url (no (begins url "item?id=")))
            (= rec!url url))
          (when m-title (= rec!title (uneschtml (car m-title)))))))
+
+(def parse-pseudotext! (html rec)
+  (unless (blank html)
+    (= rec!pseudo html)
+    (if (posmatch "[deleted]" html) (set rec!deleted))
+    (if (posmatch "[flagged]" html) (set rec!flagged))
+    (if (posmatch "[dead]"    html) (set rec!dead)))
+  rec)
 
 (def parse-subtext-row! (html start rec open-pat close-pat)
   (aif (between html open-pat close-pat start)
@@ -307,7 +317,7 @@
   ; The story page's top item lives inside <table class="fatitem"> as a
   ; <tr class="athing submission" id="N"> row followed by a subtext row.
   ; Story text (for Ask HN / text submissions) lives in <div class="toptext">.
-  (lets rec (obj type 'story dead nil deleted nil)
+  (lets rec (obj type 'story)
     (whenlet ft (posmatch "<table class=\"fatitem\"" html 0)
       (whenlet p (posmatch "<tr class=\"athing" html ft)
         (aif (html-attr html p "id")
@@ -320,10 +330,49 @@
                     (= text (cut text (+ it 1))))
                (= rec!text (uneschtml text))))))))
 
+(def parse-listpage (html)
+  ; Split the html into per-item chunks once, then parse each in
+  ; isolation.  Without this, posmatch's O(N) scans on the full 2MB
+  ; html which turns this into N*M-quadratic.
+  (accum a
+    (with (positions nil
+           start 0
+           anchor "<tr class=\"athing ")
+      (whilet p (posmatch anchor html start)
+        (push p positions)
+        (= start (+ p (len anchor))))
+      (let ps (rev positions)
+        (forlen i ps
+          (withs (p (ps i)
+                  end (or (errsafe:ps (+ i 1)) (len html))
+                  row (cut html p end))
+            (a (parse-listitem row))))))))
+
+(def parse-listitem (html (o start 0))
+  (lets rec (obj type 'story)
+    (let p 0 ; (posmatch "<tr class=\"athing" html start)
+      (aif (html-attr html 0 "id")
+           (= rec!id (errsafe:int it)))
+      (parse-titleline! html p rec)
+      (parse-subtext-row! html p rec "<td class=\"subtext\">" "</tr>"))))
+
+(def parse-morelink (html)
+  (whenlet inner (between html "<tr class=\"morespace" "More")
+    (whenlet url (between (car inner) "a href='" "'")
+      (car url))))
+
+(def parse-hn-itemlist ((o url "newest") (o n-pages 3))
+  (lets xs nil
+    (repeat n-pages
+      (when url
+        (whenlet html (fetch-hn-url url)
+          (++ xs (parse-listpage html))
+          (= url (parse-morelink html)))))))
+
 (def parse-comments (html story-id)
   ; Split the html into per-comment chunks once, then parse each in
   ; isolation.  Without this, posmatch's O(N) scans on the full 2MB
-  ; html turn parse-comments into N*M-quadratic.
+  ; html which turns this into N*M-quadratic.
   (accum a
     (with (positions nil
            start 0
@@ -446,10 +495,12 @@
       (when (> delay 0)
         (sleep delay)))))
 
+(def fetch-hn-url (op)
+  (scrape-delay!)
+  (curl-get (+ scrape-hn-host* "/" op)))
+
 (def fetch-hn-item (id)
-  (atomic
-    (scrape-delay!)
-    (curl-get (+ scrape-hn-host* "/item?id=" id))))
+  (fetch-hn-url (+ "item?id=" id)))
 
 (def scrape-item! (id (o force))
   (if (and (no force) (recently-fetched-item? id))
@@ -772,8 +823,8 @@
 ;       (or (sort (compare > (memo frontpage-rank)) metas)
 ;           nil))))
 
-(def get-user-uid (u)
-  (let p (assert (profile u) "No such profile for @u")
+(def get-user-uid (u id)
+  (let p (assert (profile u) "No such profile for @u on @id")
     (assert p!uid)))
 
 (def import-scraped-story (s)
@@ -793,7 +844,7 @@
   (let it (or= (items* s!id)
                (inst 'item 'id s!id))
     ;(when (> id maxid*) (= maxid* id))
-    (= it!by    (get-user-uid s!by))
+    (= it!by    (get-user-uid s!by s!id))
     (= it!type  (sym (or s!type it!type "story")))
     (= it!time  (or s!time  it!time  (seconds)))
     (= it!text  (or s!text  it!text))
@@ -839,7 +890,7 @@
   (lets it (or= (items* c!id)
                 (inst 'item 'id c!id))
     ;(when (> id maxid*) (= maxid* id))
-    (= it!by     (get-user-uid c!by)
+    (= it!by     (get-user-uid c!by c!id)
        it!type   'comment
        it!parent (or c!parent it!parent)
        it!score  (scraped-comment-score c it!score)
