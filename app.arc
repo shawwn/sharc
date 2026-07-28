@@ -661,8 +661,8 @@
                                (litmatch "https://" s i)))
                        (withs (n   (urlend s i)
                                url (cut s i n))
-                         (link (if (no maxurl) url (ellipsize url maxurl))
-                               url)
+                         (tag (a href url rel 'nofollow)
+                           (presc (if (no maxurl) url (ellipsize url maxurl))))
                          (= i (- n 1)))
                        (presc (s i))))))))
 
