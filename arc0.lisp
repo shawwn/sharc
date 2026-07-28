@@ -57,23 +57,97 @@ the truth value t.  See the identity tests in test.arc."
 
 ;;;; ============================================================
 ;;;; Global variable table  (key = lowercase string)
+;;;;
+;;;; Each global lives in a *cell*: a mutable box interned by name in
+;;;; *arc-globals*.  Compiled Arc code embeds the cell itself as a
+;;;; literal (see ac-var-ref / ac-set1 in arc1.lisp), so reading or
+;;;; assigning a global is a struct slot access rather than a hash
+;;;; lookup keyed by a freshly consed, downcased copy of the name.
+;;;;
+;;;; Cells are interned once per name and thereafter mutated in place,
+;;;; so bindings made *after* a reference was compiled -- forward
+;;;; references, redefinitions, hot reloads -- are seen by code that
+;;;; was already compiled against the cell.
 ;;;; ============================================================
 
-(defvar *arc-globals*       (make-hash-table :test #'equal :synchronized t))
+(defvar *arc-unbound* (make-symbol "UNBOUND")
+  "Marker held in a cell's value slot while the global is unbound.
+A defvar so its identity survives reloading this file.")
+
+(defstruct (gcell (:constructor make-gcell (name &optional (value *arc-unbound*)))
+                  (:print-object print-gcell)
+                  (:copier nil))
+  (name "" :read-only t)
+  value)
+
+(defun print-gcell (c stream)
+  ;; Deliberately does not print the value: cells appear inside compiled
+  ;; code, which is printed in backtraces, and a global's value can be
+  ;; arbitrarily large (or circular).
+  (format stream "#<gcell ~A>" (gcell-name c)))
+
+(defvar *arc-globals* (make-hash-table :test #'equal)
+  "Lowercase name string -> gcell.")
+
+(defvar *arc-globals-lock* (sb-thread:make-mutex :name "arc-globals"))
+
 (defvar *arc-fn-signatures* (make-hash-table :test #'equal :synchronized t))
 
-(defun arc-global (s)
+(defun find-gcell (s)
+  "The cell for S, or nil if nothing has ever referenced or bound S."
   (gethash (arc-sym-key s) *arc-globals*))
 
+(defun intern-gcell (s)
+  "The cell for S, creating an unbound one if it doesn't exist yet.
+Creation is serialized so two threads interning the same name can't end
+up holding two different cells for it."
+  (let ((key (arc-sym-key s)))
+    (or (gethash key *arc-globals*)
+        (sb-thread:with-recursive-lock (*arc-globals-lock*)
+          (or (gethash key *arc-globals*)
+              (setf (gethash key *arc-globals*) (make-gcell key)))))))
+
+(defun gcell-unbound (c)
+  (error "Unbound variable: ~A" (gcell-name c)))
+
+;;; Deliberately NOT declaimed inline.  Arc compiles a fresh form for every
+;;; top-level expression and every fn body, and this appears once per free
+;;; variable reference -- thousands of sites.  Inlining it (even with the
+;;; error out of line, as above) grew the IR1 and emitted code enough to
+;;; add ~0.7s to a test.arc run, wiping out more than it gained.  An
+;;; out-of-line call costs one call per reference at runtime, which is
+;;; still far cheaper than the hash lookup this replaced.
+(defun gcell-ref (c)
+  "Read a cell, erroring if the global is unbound.  This is what compiled
+Arc code calls for a free variable reference."
+  (let ((v (gcell-value c)))
+    (if (eq v *arc-unbound*)
+        (gcell-unbound c)
+        v)))
+
+(defun arc-global (s)
+  "Tolerant lookup: nil when S is unbound.  Used by runtime infrastructure
+that legitimately probes for maybe-unset globals."
+  (let ((c (find-gcell s)))
+    (if c
+        (let ((v (gcell-value c)))
+          (if (eq v *arc-unbound*) nil v))
+        nil)))
+
 (defun (setf arc-global) (val s)
-  (setf (gethash (arc-sym-key s) *arc-globals*) val))
+  (setf (gcell-value (intern-gcell s)) val))
 
 (defun arc-bound-p (s)
-  (nth-value 1 (gethash (arc-sym-key s) *arc-globals*)))
+  (let ((c (find-gcell s)))
+    (and c (not (eq (gcell-value c) *arc-unbound*)))))
 
 (defun arc-global-ref (s)
-  (multiple-value-bind (v present) (gethash (arc-sym-key s) *arc-globals*)
-    (if present v (error "Unbound variable: ~A" s))))
+  "Strict lookup by name: errors when S is unbound.  Compiled code goes
+straight to gcell-ref; this remains for callers holding only a symbol."
+  (let ((c (find-gcell s)))
+    (if c
+        (gcell-ref c)
+        (error "Unbound variable: ~A" s))))
 
 (defun (setf arc-global-ref) (val s)
   (setf (arc-global s) val))

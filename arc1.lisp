@@ -976,7 +976,9 @@ isn't shadowed by a lexical binding."
               ((lex-p a)          `(setq ,a zz))
               ((arc-sym= a "nil") (error "Can't rebind nil"))
               ((arc-sym= a "t")   (error "Can't rebind t"))
-              (t `(setf (arc-global ',a) zz)))
+              ;; Resolve the global to its cell now, at compile time, so
+              ;; the assignment is a slot write instead of a hash store.
+              (t `(setf (gcell-value ,(intern-gcell a)) zz)))
            zz))
       (error "First arg to assign must be a symbol: ~S" a)))
 
@@ -987,7 +989,13 @@ isn't shadowed by a lexical binding."
         ((or (arc-sym= s "scope")
              (arc-sym= s "scope%"))
          (ac `(%scope ,*env*)))
-        (t `(arc-global-ref ',s))))
+        ;; Free reference: resolve to the global's cell at compile time and
+        ;; embed the cell as a literal, so evaluating the reference is a
+        ;; slot read.  The cell is interned even when S is still unbound --
+        ;; forward references and recursive definitions are compiled before
+        ;; the name exists -- and gcell-ref defers the existence check to
+        ;; the moment the reference is actually evaluated.
+        (t `(gcell-ref ,(intern-gcell s)))))
 
 (defun lex-p (v) (member v *env* :test #'eq))
 
@@ -1040,7 +1048,7 @@ isn't shadowed by a lexical binding."
 
 (defun ac-macro-p (fn)
   (when (symbolp fn)
-    (let ((val (gethash (arc-sym-key fn) *arc-globals*)))
+    (let ((val (arc-global fn)))
       (when (and val (arc-tagged-p val)
                  (arc-sym= (arc-tagged-type val) "mac"))
         (arc-tagged-rep val)))))
