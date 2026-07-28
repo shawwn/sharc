@@ -275,9 +275,12 @@
 (def log-kill (i (t how me))
   (push (list i!id how) kill-log*))
 
+(def loaded-item-ids ()
+  (sort > (keys items*)))
+
 (mac each-loaded-item (var . body)
   (w/uniq g
-    `(each ,g (sort > (keys items*))
+    `(each ,g (loaded-item-ids)
        (whenlet ,var (items* ,g)
          ,@body))))
 
