@@ -251,7 +251,7 @@
   (aif (between html "<span class=\"titleline\">" "</span>" start)
        (withs (inner   (car it)
                pseudo  (cut inner 0 (posmatch "<a " inner))
-               m-url   (between inner "<a " "\"" 0)
+               m-url   (between inner "<a href=\"" "\"" 0)
                m-title (and m-url (between inner ">" "</a>" (cadr m-url)))
                url     (and m-url (uneschtml (car m-url))))
          (parse-pseudotext! pseudo rec)
