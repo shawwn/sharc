@@ -1909,7 +1909,7 @@
   (when th
     (unless (dead-thread th)
       (kill-thread th))
-    (until (dead-thread th) (sleep 0))
+    (join-thread th)
     (wipe (thread-locals* th))))
 
 (= main-thread* (current-thread))

@@ -1461,6 +1461,8 @@ straight to gcell-ref; this remains for callers holding only a symbol."
 
 (xdef dead-thread (th) (tnil (not (sb-thread:thread-alive-p th))))
 
+(xdef join-thread (th) (tnil (sb-thread:join-thread th)))
+
 (xdef sleep (n) (sleep n) nil)
 
 ;;;; ---- atomic-invoke ----
