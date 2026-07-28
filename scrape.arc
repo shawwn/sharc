@@ -49,7 +49,7 @@
 
 (or= scrape-last-fetch* (table))     ; id -> unix seconds when last fetched
 
-(= scrape-verbose* t)
+(= scrape-verbose* nil)
 
 (def scrape-verbose ()
   (or scrape-verbose* (main-thread)))
@@ -868,6 +868,8 @@
     (unless (blank it!text)
       (when (posmatch "<a href" it!text)
         (pushnew 'links it!keys)))
+    (pushnew 'imported it!keys)
+    (wipe it!kids)
     (scrape-ero:tablist it)
     it))
 
@@ -896,6 +898,7 @@
     (save-item it)
     (put-item it comments*)
     (register-comment it (unmarkdown it!text))
+    (wipe (comment-cache* it!id))
     it))
 
 (def comment-from-scraped-comment (c)
@@ -912,7 +915,9 @@
        it!score  (scraped-comment-score c it!score)
        (mem 'flagged it!keys)         c!flagged
        (mem scrape-flagger* it!flags) c!flagged
-       (mem 'collapsed it!keys)       c!collapsed)))
+       (mem 'collapsed it!keys)       c!collapsed)
+    (wipe it!kids)
+    (pushnew 'imported it!keys)))
 
 (def scraped-comment-score (c (o curscore))
   (aif c!dead     1
