@@ -520,12 +520,11 @@
          (each u users (pop-user-to-fetch u)))))
 
 (def scrape-and-import! (id (o force))
-  (let it (scrape-item! id force)
+  (lets it (scrape-item! id force)
     (scrape-users!)
     ; users first (so items have authors)
     (import-scraped-users!)
-    (import-scraped-item! id)
-    it))
+    (import-scraped-item! id)))
 
 (def push-scraped-users (result)
   ; collect users from the result whether freshly scraped or cached
