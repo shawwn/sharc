@@ -517,10 +517,9 @@
                (< end 0)  (+ (len seq) end) 
                           end)
     (if (isa!string seq)
-        (let s2 (newstring (- end start))
+        (lets s2 (newstring (- end start))
           (for i 0 (- end start 1)
-            (= (s2 i) (seq (+ start i))))
-          s2)
+            (= (s2 i) (seq (+ start i)))))
         (firstn (- end start) (nthcdr start seq)))))
 
 (def edge (xs (o i 1) . n)
