@@ -1894,6 +1894,10 @@
   `(w/assign (the ,var) ,val
      ,@body))
 
+(mac w/the-if (var val . body)
+  `(w/the ,var (or ,val (the ,var))
+     ,@body))
+
 (def start-thread (f)
   (new-thread {after (f)
                 (wipe (thread-locals* (current-thread)))}))
