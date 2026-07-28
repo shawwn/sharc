@@ -586,10 +586,13 @@
 ; and inject `fetched_at` with a tiny string surgery on the trailing
 ; `}`.
 
+(def scrape-user-url (id)
+  (+ scrape-api-host* "/user/" id ".json"))
+
 (def scrape-user! (id (o force))
   (when (or force (~recently-fetched-user? id))
-    (let raw (curl-get-public (+ scrape-api-host* "/user/" id ".json"))
-      (when (and raw (>= (len raw) 2))
+    (let raw (curl-get-public (scrape-user-url id))
+      (when (and raw (isnt raw "null") (>= (len raw) 2))
         (dispfile (inject-fetched-at raw (seconds))
                   (+ scrape-user-dir* id ".json"))
         (= (scrape-last-fetch* (sym (+ "u/" id))) (seconds))
@@ -665,7 +668,17 @@
   (map ensure-dir (list scrape-dir* scrape-item-dir* scrape-user-dir*))
   (load-fetchlog)
   (scrapelog "crawl-delay: " scrape-crawl-delay* "s limit=" limit)
-  (ensure-login))
+  (ensure-login)
+  ; deleted comments are assigned to user "deleted", so import
+  ; "deleted" now.
+  (scrape-and-import-user! "deleted")
+  t)
+
+(def scrape-and-import-user! (u (o force))
+  (scrape-user! u force)
+  (awhen (scraped-user u)
+    (import-scraped-user! it)
+    u))
 
 (def scrape-topstories! ((o limit 60))
   ; `limit` caps how many ranked stories to fetch.  Default 60 ~= the
@@ -849,9 +862,9 @@
     (= it!text  (or s!text  it!text))
     (= it!score (or s!score it!score 0))
     (= it!title (or s!title it!title))
-    (= it!url   (or s!url   it!url))
-    (= it!dead  (or s!dead  it!dead))
-    (= it!deleted (or s!deleted  it!deleted))
+    (= it!url   s!url)
+    (= it!dead  s!dead)
+    (= it!deleted s!deleted)
     (unless (blank it!text)
       (when (posmatch "<a href" it!text)
         (pushnew 'links it!keys)))
@@ -875,11 +888,11 @@
     ; record this comment under the author's submitted list so
     ; news's (comments user) -- which walks (uvar user submitted) --
     ; picks it up for /threads?id=USER.
-    (when c!by
-      (whenlet author (profile c!by)
+    (let user (or c!by "deleted")
+      (whenlet author (profile user)
         (unless (mem it!id author!submitted)
           (= author!submitted (cons it!id author!submitted))
-          (save-prof c!by))))
+          (save-prof user))))
     (save-item it)
     (put-item it comments*)
     (register-comment it (unmarkdown it!text))
@@ -889,22 +902,23 @@
   (lets it (or= (items* c!id)
                 (inst 'item 'id c!id))
     ;(when (> id maxid*) (= maxid* id))
-    (= it!by     (get-user-uid c!by c!id)
+    (= it!by     (get-user-uid (or c!by "deleted") c!id)
        it!type   'comment
        it!parent (or c!parent it!parent)
-       it!score  (scraped-comment-score c it!score)
        it!time   (or c!time it!time)
        it!text   (or c!text it!text)
        it!dead   (or c!dead it!dead)
-       it!deleted (or c!deleted it!deleted)
+       it!deleted (or c!deleted it!deleted (no c!by))
+       it!score  (scraped-comment-score c it!score)
        (mem 'flagged it!keys)         c!flagged
        (mem scrape-flagger* it!flags) c!flagged
        (mem 'collapsed it!keys)       c!collapsed)))
 
 (def scraped-comment-score (c (o curscore))
-  (if c!dead     1
-      c!deleted  (or curscore 1)
-                 (score-from-comment-class c!color)))
+  (aif c!dead     1
+       c!deleted  (or curscore 1)
+       c!color    (score-from-comment-class it)
+                  1))
 
 
 (def import-scraped-users! ((o users (scraped-usernames)) (o force))
