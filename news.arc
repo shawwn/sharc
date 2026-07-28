@@ -7,14 +7,15 @@
 
 ; bug: somehow (+ votedir* nil) is getting evaluated.
 
-(= this-site*    "HN Simulator"
-   site-url*     "http://localhost:8080" ; no trailing slash
-   site-email*   "hn@@ycombinator.lol"
-   parent-url*   "/"
-   favicon-url*  ""
-   site-desc*    "Hacker News simulator" ; for rss feed
-   site-color*   (color 170 170 230)
-   border-color* (color 170 170 230))
+(let port (readenv "PORT" 8080)
+  (= this-site*    "HN Simulator"
+     site-url*     "http://localhost:@port" ; no trailing slash
+     site-email*   "hn@@ycombinator.lol"
+     parent-url*   "/"
+     favicon-url*  ""
+     site-desc*    "Hacker News simulator" ; for rss feed
+     site-color*   (color 170 170 230)
+     border-color* (color 170 170 230)))
 
 
 ; Structures
