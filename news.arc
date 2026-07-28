@@ -600,7 +600,7 @@
 (def login-url (whence)
   (string "login?goto=" (urlencode:safe-goto whence)))
 
-(= noob-days* 7) ; how long a user's name is colored green
+(= noob-days* 14) ; how long a user's name is colored green
 
 (def noob ((t user me))
   (and user (< (days-since (uvar user created)) noob-days*)))
