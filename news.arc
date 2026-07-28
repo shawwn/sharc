@@ -473,14 +473,14 @@
 (def footer ()
   (spanclass yclinks
     (w/bars
-      (link "Guidelines" "newsguidelines.html")
-      (link "FAQ" "newsfaq.html")
-      (link "Lists" "lists")
-      (link "API" "https://github.com/HackerNews/API")
-      (link "Security" "security.html")
-      (link "DMCA" "dmca.html")
+      (link "Guidelines"  "newsguidelines.html")
+      (link "FAQ"         "newsfaq.html")
+      (link "Lists"       "lists")
+      (link "API"         "https://github.com/HackerNews/API")
+      (link "Security"    "security.html")
+      (link "DMCA"        "dmca.html")
       (link "Apply to YC" "https://www.ycombinator.com/apply/")
-      (link "Contact" "mailto:@site-email*"))))
+      (link "Contact"     "mailto:@site-email*"))))
 
 (def gc ((o full t))
   (sb-ext::gc :full full))
