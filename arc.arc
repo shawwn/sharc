@@ -1911,8 +1911,8 @@
   (when th
     (unless (dead-thread th)
       (kill-thread th))
-    (join-thread th)
-    (wipe (thread-locals* th))))
+    (after (join-thread th)
+      (cleanup-thread th))))
 
 (= main-thread* (current-thread))
 

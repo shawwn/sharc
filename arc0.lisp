@@ -1459,9 +1459,10 @@ straight to gcell-ref; this remains for callers holding only a symbol."
 
 (xdef current-thread () sb-thread:*current-thread*)
 
-(xdef dead-thread (th) (tnil (not (sb-thread:thread-alive-p th))))
+(xdef dead-thread (th) (not (sb-thread:thread-alive-p th)))
 
-(xdef join-thread (th) (tnil (sb-thread:join-thread th)))
+(xdef join-thread (th &optional (default t))
+  (sb-thread:join-thread th :default default))
 
 (xdef sleep (n) (sleep n) nil)
 
