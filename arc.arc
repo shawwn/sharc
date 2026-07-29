@@ -1382,11 +1382,6 @@
     (each (k v) (pair args)
       (= (x k) v))))
 
-; To write something to be read by temread, (write (tablist x))
-
-(def temread (tem (o str (stdin)))
-  (templatize tem (read str)))
-
 ; Converts the read-time symbols 't/'T to t and 'nil to nil.
 ; Applied in templatize (so field values read back from disk get
 ; real t/nil instead of bare symbols). Fixes a bug where the json
@@ -1412,6 +1407,11 @@
       (when (assoc k fields)
         (= (x k) (temquote v))))
     x))
+
+; To write something to be read by temread, (write (tablist x))
+
+(def temread (tem (o str (stdin)))
+  (templatize tem (read str)))
 
 (def temload (tem file)
   (w/infile i file (temread tem i)))
