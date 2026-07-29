@@ -142,10 +142,11 @@
     nil))
 
 (def headmatch (pat seq (o start 0))
-  (let p (len pat) 
-    ((afn (i)      
-       (or (is i p) 
-           (and (is (pat i) (seq (+ i start)))
+  (with (p (len pat) n (len seq))
+    ((afn (i)
+       (or (is i p)
+           (and (< (+ i start) n)
+                (is (pat i) (seq (+ i start)))
                 (self (+ i 1)))))
      0)))
 
