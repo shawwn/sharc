@@ -519,12 +519,16 @@
          (scrape-users! users)
          (each u users (pop-user-to-fetch u)))))
 
+(def scraped-users (tem)
+  (dedup (cons tem!story!by (map !by tem!comments))))
+
 (def scrape-and-import! (id (o force))
   (lets it (scrape-item! id force)
-    (scrape-users!)
-    ; users first (so items have authors)
-    (import-scraped-users!)
-    (import-scraped-item! id)))
+    (let authors (scraped-users it)
+      (scrape-users! authors)
+      ; users first (so items have authors)
+      (import-scraped-users! authors)
+      (import-scraped-item! id))))
 
 (def push-scraped-users (result)
   ; collect users from the result whether freshly scraped or cached
@@ -836,8 +840,8 @@
 ;           nil))))
 
 (def get-user-uid (u id)
-  (let p (assert (profile u) "No such profile for @u on @id")
-    (assert p!uid)))
+  (assert (profile u) "No such profile for @u on @id")
+  (assert (lookup-uid u) "No such uid for @u on @id"))
 
 (def import-scraped-story (s)
   (let it (story-from-scraped-story s)
@@ -853,9 +857,7 @@
     it))
 
 (def story-from-scraped-story (s)
-  (let it (or= (items* s!id)
-               (inst 'item 'id s!id))
-    ;(when (> id maxid*) (= maxid* id))
+  (lets it (or= (items* s!id) (inst 'item 'id s!id))
     (= it!by    (get-user-uid s!by s!id))
     (= it!type  (sym (or s!type it!type "story")))
     (= it!time  (or s!time  it!time  (seconds)))
@@ -870,15 +872,14 @@
         (pushnew 'links it!keys)))
     (pushnew 'imported it!keys)
     (wipe it!kids)
-    (scrape-ero:tablist it)
-    it))
+    (scrape-ero:tablist it)))
 
 (def import-scraped-comments (comments)
   (each c comments
     (import-scraped-comment c)))
 
 (def import-scraped-comment (c)
-  (let it (comment-from-scraped-comment c)
+  (lets it (comment-from-scraped-comment c)
     ; link this comment under its parent's kids list.  Without this
     ; an item page renders the story but no comments -- news.arc's
     ; display-subcomments walks parent!kids, not (keep [is _!parent
@@ -898,12 +899,10 @@
     (save-item it)
     (put-item it comments*)
     (register-comment it (unmarkdown it!text))
-    (wipe (comment-cache* it!id))
-    it))
+    (wipe (comment-cache* it!id))))
 
 (def comment-from-scraped-comment (c)
-  (lets it (or= (items* c!id)
-                (inst 'item 'id c!id))
+  (lets it (or= (items* c!id) (inst 'item 'id c!id))
     ;(when (> id maxid*) (= maxid* id))
     (= it!by     (get-user-uid (or c!by "deleted") c!id)
        it!type   'comment
@@ -929,14 +928,13 @@
 (def import-scraped-users! ((o users (scraped-usernames)) (o force))
   (let users (if force users (filter-scraped-usernames users))
     (scrapelog "importing @(len users) users")
-    (after
-      (parallel [unless (profile _)
-                  (aif (scraped-user _) (import-scraped-user! it))]
-                users 50 (if (scrape-verbose) 10))
-      (save-pws))))
+    (w/creating-users
+      (parallel [do (= (the creating-users) t)
+                    (aif (scraped-user _) (import-scraped-user! it))]
+                users 50 (if (scrape-verbose) 10)))))
 
 (def filter-scraped-usernames (users)
-  (rem profile users))
+  (rem profile&user->uid*&hpasswords* users))
 
 (def import-scraped-user! (u)
   (lets p (user-from-scraped-user u)
@@ -966,13 +964,14 @@
 (def scrape-hn-stories ((o ids (shuffle (fetch-topstories))))
   (each id ids
     (sleep scrape-delay*)
-    (on-err [report-error _] {scrape-and-import! id})))
+    (when scrape-hn*
+      (on-err [report-error _] {scrape-and-import! id}))))
 
 (mac defscrape (name secs . body)
   `(defbg ,name ,secs
-     (if scrape-hn*
-         (let ids (fetch-topstories)
-           ,@body))))
+     (when scrape-hn*
+       (let ids (fetch-topstories)
+         ,@body))))
 
 (defscrape scrape-update-frontpage
   5 (= ranked-stories* (rem nil (map item ids)))
