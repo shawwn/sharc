@@ -328,10 +328,10 @@ c"
     (test? true  (admin|~editor 'a))
     (test? false (admin|~editor 'e))
     (test? true  (admin|~editor 'x)))
-  ; precedence between operators: & is outermost, then |, then :
-  (test? '(andf a b|c)    (ssexpand 'a&b|c))   ; a AND (b|c)
-  (test? '(andf a|b c)    (ssexpand 'a|b&c))   ; (a|b) AND c
-  (test? '(orf  a:b c)    (ssexpand 'a:b|c))   ; (a:b) OR c
+  ; precedence between operators: | is outermost, then &, then :
+  (test? '(orf a&b c)    (ssexpand 'a&b|c))   ; (a AND b) OR c
+  (test? '(orf a b&c)    (ssexpand 'a|b&c))   ; a OR (b AND c)
+  (test? '(orf a:b c)    (ssexpand 'a:b|c))   ; (a:b) OR c
   (test? '(compose a b c) (ssexpand 'a:b:c)))
 
 ; Keywords: read from a leading OR trailing colon -- foo: and :foo are the

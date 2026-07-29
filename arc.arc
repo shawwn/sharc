@@ -1172,7 +1172,7 @@
     (ontree f (cdr tree))))
 
 (def dotted (x)
-  (if (atom x) nil (only&atom|dotted (cdr x))))
+  (aand (~atom x) (cdr x) (atom|dotted it)))
 
 (def fill-table (table data)
   (each (k v) (pair data) (= (table k) v))

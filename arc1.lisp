@@ -443,8 +443,8 @@ errors out clearly rather than polluting (often locked) CL packages."
 (defun expand-ssyntax (sym)
   (let ((n (symbol-name sym)))
     (cond
-      ((find #\& n) (expand-and sym))
       ((find #\| n) (expand-or sym))
+      ((find #\& n) (expand-and sym))
       ((or (find-outside-cl-marker #\: n) (find #\~ n)) (expand-compose sym))
       ((or (find #\. n) (find #\! n)) (expand-sexpr sym))
       (t (error "Unknown ssyntax: ~S" sym)))))
