@@ -84,6 +84,14 @@
 (mac w/me (val . body)
   `(w/the me ,val ,@body))
 
+(mac w/args (args . body)
+  `(w/the req (fake-req ,args)
+     ,@body))
+
+(def fake-req ((o args) (t u me))
+  (inst 'request 'args (pair (map string args))
+        'ip (ip) 'cooks (aand (user->cookie* u) `(("user" ,it)))))
+
 (mac when-umatch (user . body)
   `(if (me ,user)
        (do ,@body)
