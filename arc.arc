@@ -1899,8 +1899,10 @@
      ,@body))
 
 (def start-thread (f)
-  (new-thread {after (f)
-                (wipe (thread-locals* (current-thread)))}))
+  (new-thread {after (f) (cleanup-thread)}))
+
+(def cleanup-thread ((o th (current-thread)))
+  (wipe (thread-locals* th)))
 
 (mac thread body
   `(start-thread {do ,@body}))
