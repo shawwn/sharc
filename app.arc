@@ -8,21 +8,58 @@
 
 (= hpwfile*    (string arcdir* "hpw")
    adminfile*  (string arcdir* "admins")
-   cookfile*   (string arcdir* "cooks"))
+   cookfile*   (string arcdir* "cooks")
+   uidfile*    (string arcdir* "uids"))
+
+(diskvar maxuid* (+ arcdir* "max-uid") 0)
 
 (def asv ((o port (readenv "PORT" 8080)))
   (load-userinfo)
   (serve port))
 
 (or= hpasswords*   (table)
-     cookie->user* (table)
-     user->cookie* (table))
+     cookie->user* (table) user->cookie* (table)
+     uid->user*    (table) user->uid*    (table))
 
 (def load-userinfo ()
+  (load-uids)
   (load-pws)
   (load-cookies)
   (load-admins)
   t)
+
+(def load-uids ()
+  (= user->uid* (load-table uidfile*))
+  (each (k v) user->uid* (= (uid->user* v) k)))
+
+(def save-uids ()
+  (unless (creating-users)
+    (save-table user->uid* uidfile*)))
+
+(def lookup-uid ((t u me))
+  (user->uid* u))
+
+(def user-id ((t u me))
+  (assert (lookup-uid u) "No uid for user @u"))
+
+(def link-uid (u uid)
+  (= (uid->user* uid) u
+     (user->uid* u) uid)
+  uid)
+
+(def new-user-id ()
+  (lets uid (evtil (++ maxuid*) ~uid->user*)
+    (todisk maxuid*)))
+
+(def ensure-uid ((t u me))
+  (atomic
+    (or (lookup-uid u)
+        (lets uid (new-user-id)
+          (link-uid u uid)
+          (save-uids)))))
+
+(def users ((o f idfn)) 
+  (keys user->uid* f))
 
 (def load-pws ()
   (= hpasswords* (load-table hpwfile*))
@@ -33,15 +70,40 @@
   (= dc-usernames* (table [each (k v) hpasswords*
                             (set (_:downcase k))])))
 
+(def fake-username ()
+  (evtil (memorable-name) ~lookup-uid))
+
+(def fake-usernames (n)
+  (n-dedup n (fake-username)))
+
+(mac w/creating-users body
+  `(after (w/the creating-users t
+            ,@body)
+     (save-uids)
+     (save-pws)))
+
+(def creating-users () (the creating-users))
+
+(def create-users (n pw (o init))
+  (lets names (fake-usernames n)
+    (let hpw (bhash pw)
+      (w/creating-users
+        (noisy-each 1000 u names
+          (ensure-uid u)
+          (set-hpw u hpw)
+          (if init (unless (init u) (ero "Failed to init @u"))))))))
+
+
 (def load-cookies ()
   (= cookie->user* (load-table cookfile*))
-  (maptable (fn (k v) (= (user->cookie* v) k))
-            cookie->user*))
+  (each (k v) cookie->user* (= (user->cookie* v) k)))
 
 (def load-admins ()
   (= admins* (map string (readfile adminfile*))))
 
-(def save-pws () (save-table hpasswords* hpwfile*) t)
+(def save-pws ()
+  (unless (creating-users)
+    (save-table hpasswords* hpwfile*) t))
 
 (def save-cookies () (save-table cookie->user* cookfile*) t)
 
@@ -63,8 +125,8 @@
   (aand (alref req!cooks "user")
         (cookie->user* it)))
 
-(def get-user ()
-  (whenlets u (user-from-cookie)
+(def get-user ((t req))
+  (whenlets u (user-from-cookie req)
     (= (logins* u) (ip))))
 
 ; (me)        --- read the current request's user
@@ -182,7 +244,6 @@
 
 (def create-acct (user pw)
   (set-pw user pw)
-  (save-pws)
   user)
 
 (def register-acct (user)
@@ -191,14 +252,15 @@
 
 (def disable-acct (user)
   (set-pw user (rand-string 20))
-  (save-pws)
   (logout-user user)
   user)
 
 (def set-hpw (user hpw)
   (when hpw
+    (ensure-uid user)
     (= (hpasswords* user) hpw)
     (register-acct user)
+    (save-pws)
     user))
   
 (def set-pw (user pw)
@@ -212,7 +274,6 @@
   (logout-user old)
   (logout-user new)
   (set-hpw new (hpasswords* old))
-  (save-pws)
   new)
 
 (def hello-page ()
