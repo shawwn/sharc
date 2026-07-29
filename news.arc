@@ -251,11 +251,15 @@
   (safe-item:saferead (arg key)))
 
 (def safe-id     (id) (ok-id:saferead id))
+(def safe-uid    (id) (ok-uid:saferead id))
 (def safe-int    (id) (ok-int:saferead id))
 (def safe-whole  (id) (ok-whole:saferead id))
 (def safe-posint (id) (ok-posint:saferead id))
 
-(def ok-id     (id) (and (exact id) (<= 1 id maxid*) id))
+(def find-id   (id) (file-exists (item-path id)))
+
+(def ok-id     (id) (and (exact id) (find-id id) id))
+(def ok-uid    (id) (and (exact id) (uid->user* id) id))
 (def ok-int    (id) (and (exact id) id))
 (def ok-whole  (id) (and (exact id) (>= id 0) id))
 (def ok-posint (id) (and (exact id) (> id 0) id))
