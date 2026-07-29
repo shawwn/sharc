@@ -2709,14 +2709,13 @@
           (tag (div class (string "commtext " (comment-class c)))
             (pr c!text)))
       (tag (div class 'reply)
-        (when (and astree (cansee c) (live c))
+        (when (and astree (cansee c))
           (para)
           (tag (font size 1)
             (if (and (~mem 'neutered c!keys)
                      (replyable c indent)
                      (comments-active c))
-                (underline (replylink c whence))
-                (fontcolor sand (pr "-----")))))))))
+                (underline (replylink c whence)))))))))
 
 ; computes prev, next, root, and number of descendants for each
 ; comment.
