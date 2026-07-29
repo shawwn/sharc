@@ -2671,7 +2671,7 @@
 
 (def gen-comment-body (c whence astree indent showpar showon)
   (tag (td class 'default)
-    (tag (div style "margin-top:2px; margin-bottom:-10px; ")
+    (tag (div style "margin-top:2px; margin-bottom:-10px;")
       (spanclass comhead
         (itemline c whence)
         (deadmark c)
