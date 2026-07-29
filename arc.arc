@@ -1370,7 +1370,7 @@
 
 (mac addtem (name . fields)
   `(= (templates* ',name) 
-      (union (fn (x y) (is (car x) (car y)))
+      (union (compare is car)
              (list ,@(map (fn ((k v)) `(list ',k {do ,v}))
                           (pair fields)))
              (templates* ',name))))
