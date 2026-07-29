@@ -2662,12 +2662,12 @@
 ; Cache for the remainder of the current minute, hour, or day.
 
 (def cc-timeout (t0)
-  (let age (- (seconds) t0)
-    (+ t0 (if (< age 3600)
-               (* (+ (trunc (/ age    60)) 1)    60)
-              (< age 86400)
-               (* (+ (trunc (/ age  3600)) 1)  3600)
-               (* (+ (trunc (/ age 86400)) 1) 86400)))))
+  (let age (since t0)
+    (+ t0 (if (< age  3600) (cc-time age    60)
+              (< age 86400) (cc-time age  3600)
+                            (cc-time age 86400)))))
+
+(def cc-time (age secs) (* (+ (trunc:/ age secs) 1) secs))
 
 (def gen-comment-body (c whence astree indent showpar showon)
   (tag (td class 'default)
