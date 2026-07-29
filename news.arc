@@ -2659,6 +2659,9 @@
          (comment-cache* c!id)
           (tostring (gen-comment-body c whence t indent nil nil)))))
 
+(def uncache-comment (id)
+  (wipe (comment-cache* id)))
+
 ; Cache for the remainder of the current minute, hour, or day.
 
 (def cc-timeout (t0)
