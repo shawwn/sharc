@@ -79,7 +79,9 @@
 
 (def ip () (the ip))
 
-(def op () (the op))
+(def op args
+  (let o (the op)
+    (if args (is o (car args)) o)))
 
 (mac w/me (val . body)
   `(w/the me ,val ,@body))
