@@ -678,6 +678,8 @@ straight to gcell-ref; this remains for callers holding only a symbol."
       ((vectorp x)
        (cond ((string= tname "cons") (coerce x 'list))
              (t (error "Can't coerce vector ~S to ~S" x type))))
+      ((functionp x)
+       (error "Can't coerce function ~S to ~S" x type))
       (t x))))
 
 (xdef coerce (x type &rest args) (arc-coerce x type (car args)))
