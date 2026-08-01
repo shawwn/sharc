@@ -117,9 +117,7 @@
   (< (string a) (string b)))
 
 (def save-json (x file (o pretty))
-  (let tmp (+ file ".tmp")
-    (w/outfile o tmp (to-json x pretty o))
-    (mvfile tmp file))
+  (writefile x file (fn (val o) (to-json val pretty o)))
   x)
 
 
