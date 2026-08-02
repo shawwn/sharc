@@ -2987,7 +2987,7 @@
 ; comment.
 
 (def comment-navs (tops)
-  (let nav (table)
+  (lets nav (table)
     ((afn (sibs parent next-after root)
        (withs (vs   (keep cansee-descendant sibs) ; only the ones that render
                last (edge vs))
@@ -3002,8 +3002,7 @@
                       (= (nav c!id) (obj root rt prev prv next nxt n n))
                       n))) ; this comment's subtree size
                 (range 0 last)))))
-     tops nil nil nil)
-    nav))
+     tops nil nil nil)))
 
 (def cnav (c key (t comment-nav))
   (aand (comment-nav c!id) (it key)))
