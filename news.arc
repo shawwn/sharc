@@ -3497,7 +3497,7 @@ brackets&gt; and it should work.<br><br>")
 (defcache badips 300
   (with (bads (table) goods (table))
     (each-loaded-item s
-      (if (and s!dead (commentable s))
+      (if (dead&commentable s)
           (push s (bads  s!ip))
           (push s (goods s!ip))))
     (each (k v) bads  (zap rev (bads  k)))
