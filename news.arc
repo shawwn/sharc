@@ -2544,7 +2544,7 @@
         (when (news-type i)
           (obj by          (unless del (by i))
                dead        (unless del (~live i))
-               deleted     i!deleted
+               deleted     del
                descendants (unless del
                              (if (in i!type 'story 'poll)
                                (- (visible-family i) 1)))
