@@ -2657,9 +2657,7 @@
 
 (newsop edit (id)
   (let i (safe-item id)
-    (if (and i
-             (cansee i)
-             (editable-type i)
+    (if (and (only&cansee&editable-type i)
              (or (admin) (news-type|author i)))
         (edit-page i)
         (pr "No such item."))))
