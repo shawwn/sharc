@@ -640,6 +640,93 @@ c"
   (test? '("a" " b c")      (halve "a b c"))
   (test? '("novalue")       (halve "novalue"))) ; no sep -> single elt
 
+; split and cleave (both from arc.arc, but tested here next to the string
+; functions that use them) cut a sequence in two at an index.  Both halves
+; are fresh subsequences of the same type as the input.  A non-nil index
+; must be a valid one; nil means "no split point" and is handled specially.
+
+(define-test split
+  ; keepdelim defaults to t: nothing is dropped, so the halves rejoin
+  (test? '("ab" "cde")   (split "abcde" 2))
+  (test? "abcde"         (apply + (split "abcde" 2)))
+  (test? '("hello" " world") (split "hello world" 5))
+  ; keepdelim nil drops the element at pos -- the second half starts at pos+1
+  (test? '("ab" "de")        (split "abcde" 2 nil))
+  (test? '("hello" "world")  (split "hello world" 5 nil))
+  ; the edges: 0 and len both work, yielding one empty half
+  (test? '("" "abcde") (split "abcde" 0))
+  (test? '("abcde" "") (split "abcde" 5))
+  ; ...but pos must index the sequence: len is only in range because the
+  ; keepdelim cut is [0,pos)+[pos,len).  Dropping needs a pos+1 that exists.
+  (test? nil (errsafe (split "abcde" 5 nil)))
+  (test? nil (errsafe (split "abcde" 6)))
+  (test? nil (errsafe (split "abcde" -1)))
+  ; a nil pos is not an error but a miss -- it's what (pos ...) returns when
+  ; it finds nothing -- so the whole seq comes back with an empty remainder
+  (test? '("abcde" "") (split "abcde" nil))
+  (test? '("abcde" "") (split "abcde" (pos #\: "abcde"))) ; how it arises
+  (test? '("" "")      (split "" nil))
+  ; the "" filler is only for strings; other sequences get nil
+  (test? '("123" "")      (split "123" nil))
+  (test? '((1 2 3) ())    (split '(1 2 3) nil))
+  (test? '(#(1 2 3) #())  (split (as!vector '(1 2 3)) nil))
+  (test? '(nil nil)       (split nil nil))
+  ; keepdelim is moot when pos is nil: there is no element to keep or drop
+  (test? (split "abcde" nil) (split "abcde" nil nil))
+  (test? (split '(1 2 3) nil) (split '(1 2 3) nil nil))
+  ; the nil guard has to come first.  Arc's + treats a nil left operand as
+  ; the empty list, so the dropping branch's (+ pos 1) would quietly compute
+  ; 1 rather than erroring, and split would cut at the wrong place.
+  (test? 1 (+ nil 1))
+  (test? nil (errsafe (cut "abcde" nil))) ; the keeping branch would error
+  ; any sequence, and the halves keep the input's type
+  (test? '((1 2) (3 4 5)) (split '(1 2 3 4 5) 2))
+  (test? '((1 2) (4 5))   (split '(1 2 3 4 5) 2 nil))
+  (test? '(#(1) #(2 3))   (split (as!vector '(1 2 3)) 1))
+  (test? 'string (type (car (split "ab" 1))))
+  (test? '("" "") (split "" 0))
+  (test? '(nil (a b c)) (split '(a b c) 0)) ; an empty list half is nil
+  ; the halves are copies, so mutating one leaves the original alone
+  (test? "abc" (let s (string "abc")
+                 (= ((car (split s 2)) 0) #\z)
+                 s))
+  (test? '(1 2 3) (let xs (list 1 2 3)
+                    (= ((cadr (split xs 1)) 0) 99)
+                    xs))
+  ; srv.arc harvests fnids by destructuring the two halves
+  (test? '((1) (2 3)) (let (kill keep) (split '(1 2 3) 1)
+                        (list kill keep))))
+
+; cleave is split with the keepdelim default flipped to nil, so the element
+; at i is dropped unless you ask for it.  Everything else, including the nil
+; index, is split's behaviour and is tested above.
+
+(define-test cleave
+  ; the delimiter at i is dropped by default...
+  (test? '("a" "b")   (cleave "a:b" (pos #\: "a:b")))
+  (test? '("a" "b:c") (cleave "a:b:c" (pos #\: "a:b:c"))) ; only the first
+  ; ...but kept, leading the second half, with keepdelim -- which is
+  ; plain split's behaviour (split defaults keepdelim to t)
+  (test? '("a" ":b")  (cleave "a:b" (pos #\: "a:b") t))
+  (test? (split "a:b" 1) (cleave "a:b" 1 t))
+  (test? (split "a:b" 1 nil) (cleave "a:b" 1)) ; the flip, stated directly
+  ; a nil index passes straight through to split
+  (test? '("abc" "")    (cleave "abc" (pos #\: "abc")))
+  (test? '("" "")       (cleave "" (pos #\: "")))
+  (test? '("abc" "")    (cleave "abc" nil t)) ; keepdelim is moot here too
+  (test? '((1 2 3) nil) (cleave '(1 2 3) nil))
+  (test? (split "abc" nil) (cleave "abc" nil))
+  ; splitting at the edges
+  (test? '("" "bc")  (cleave "abc" 0))   ; leading delimiter -> empty head
+  (test? '("" "abc") (cleave "abc" 0 t))
+  (test? '("abc" "") (cleave "abc" 3 t)) ; i at the end -> empty tail
+  ; i past the last element is only legal with keepdelim; without it
+  ; cleave cuts from i+1, which is out of bounds
+  (test? nil (errsafe (cleave "abc" 3)))
+  ; not string-specific
+  (test? '((1) (3))   (cleave '(1 2 3) 1))
+  (test? '((1) (2 3)) (cleave '(1 2 3) 1 t)))
+
 (define-test positions
   (test? '(1 3 5) (positions #\a "banana"))
   (test? '(0 2 4) (positions odd '(1 2 3 4 5))) ; predicate form

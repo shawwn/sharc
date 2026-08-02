@@ -1245,10 +1245,22 @@
             table  (lets new (table)
                      (each (k v) x 
                        (= (new k) v)))
+            vector (as!vector:as!cons x)
                    (err "Can't copy " x))
     (each (k v) (pair args)
       (= (x2 k) v))
     x2))
+
+; like copy, but returns a new empty seq
+
+(def fresh (x)
+  (case (type x)
+    sym    x
+    cons   nil
+    string ""
+    table  (table)
+    vector (as!vector nil)
+           (err "Can't make a fresh @(type x)")))
 
 (def abs (n)
   (if (< n 0) (- n) n))
@@ -1367,8 +1379,14 @@
 (def bestn (n f seq)
   (firstn n (sort f seq)))
 
-(def split (seq pos)
-  (list (cut seq 0 pos) (cut seq pos)))
+(def split (seq pos (o keepdelim t))
+  (if pos
+      (let mid (if keepdelim pos (+ pos 1))
+        (list (cut seq 0 pos) (cut seq mid)))
+      (list seq (fresh seq))))
+
+(def cleave (seq pos (o keepdelim nil))
+  (split seq pos keepdelim))
 
 (mac time (expr)
   (w/uniq (t1 t2)
