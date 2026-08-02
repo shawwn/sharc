@@ -3087,8 +3087,7 @@
         (if user
             (addcomment-page i whence)
             (login-page 'both "You have to be logged in to comment."
-                        {do (ensure-news-user)
-                            (newslog 'comment-login)
+                        {do (newslog 'comment-login)
                             (addcomment-page i whence)}))
         (pr "No such item."))))
 
