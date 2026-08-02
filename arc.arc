@@ -1722,24 +1722,42 @@
        (deq q))
      (enq val q)))
 
-(mac noisy-each (n var val . body)
-  (w/uniq (gn gc)
-    `(with (,gn ,n ,gc 0)
-       (each ,var ,val
-         (noisy-report (++ ,gc) ,gn)
-         ,@body)
-       (noisy-flush ,gn))))
-
 (def noisy-report (n noisy)
-  (atomic
-    (when noisy
-      (when (multiple n noisy)
-        (pr ".") (flushout))
-      (when (multiple n (* 10 noisy))
-        (pr " ") (flushout)))))
+  (when noisy
+    (when (main-thread)
+      (w/stdout (stderr)
+        (when (multiple n noisy)
+          (pr ".") (flushout))
+        (when (multiple n (* noisy 10))
+          (pr " ") (flushout))
+        (when (multiple n (* noisy 100))
+          (prn) (flushout))
+        (when (multiple n (* noisy 1000))
+          (prn) (flushout))))))
 
 (def noisy-flush (noisy)
-  (when noisy (prn) (flushout)))
+  (when (main-thread)
+    (w/stdout (stderr)
+      (when noisy (prn) (flushout)))))
+
+(def noisy-iter (noisy)
+  (let i 0 {noisy-report (++ i) noisy}))
+
+(mac w/noisy (var noisy . body)
+  (w/uniq n
+    `(withs (,n ,noisy ,var (noisy-iter ,n))
+       (do1 (do ,@body)
+            (noisy-flush ,n)))))
+
+(mac w/noisy-loop (noisy body)
+  (w/uniq iter
+    `(w/noisy ,iter ,noisy
+       ,(+ body (list (list iter))))))
+
+(mac noisy-each (n var val . body)
+  `(w/noisy-loop ,n
+     (each ,var ,val
+       ,@body)))
 
 (mac point (name . body)
   (w/uniq (k val)
