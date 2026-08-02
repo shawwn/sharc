@@ -1223,7 +1223,7 @@
   (unless (blank s!url)
     (if (admin) (pr bar*))
     (let site (sitename s!url)
-      (link (if (admin) "from" site)
+      (link (if (admin) "from" (ellipsize site 40))
             (+ "from?site=" site)))))
 
 (def display-item-number (i)
