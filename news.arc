@@ -3193,13 +3193,9 @@
   (if (profile user)
       (with (label (+ user "'s submissions")
              here  (submitted-url user))
-        (longpage (msec) nil label label here
-          (if (or (~ignored user)
-                  (me user)
-                  (seesdead))
-              (aif (keep [metastory&cansee _]
-                         (submissions user))
-                   (display-items it label label here 0 perpage* t)))))
+        (longpage (pagems) nil label label here
+          (aif (keep cansee (stories user))
+               (display-items it label label here))))
       (pr "No such user.")))
 
 
