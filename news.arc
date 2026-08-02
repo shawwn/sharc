@@ -1548,7 +1548,7 @@
       (presc s!title))))
       
 (def pseudo-text (i)
-  (if i!deleted   "[deleted]"
+  (if (deleted i) "[deleted]"
       (flagged i) "[flagged]"
       (delayed i) "[delayed]"
                   "[dead]"))
@@ -1556,9 +1556,9 @@
 (def deadmark (i)
   (when (flagged i)
     (pr " [flagged] "))
-  (when (and i!dead (seesdead))
+  (when (and (dead i) (seesdead))
     (pr " [dead] "))
-  (when (and i!deleted (admin))
+  (when (and (deleted i) (admin))
     (pr " [deleted] ")))
 
 (= downvote-threshold* 0 downvote-time* 1440)
@@ -1602,7 +1602,7 @@
   (tag (a id    (if (me) (string dir '_ i!id))
           ; hn.js's click handler catches .clicky; nosee hides an arrow
           ; the user has already used (visibility:hidden) until unvote.
-          class (if (me) (string 'clicky (if ((votes) i!id) " nosee")))
+          class (if (me) (string 'clicky (if (voted i) " nosee")))
           href  (vote-url i dir whence))
     (if (is dir 'up)
         (out (tag (div class "votearrow"           title "upvote")))
