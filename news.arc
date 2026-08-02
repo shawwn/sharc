@@ -3385,6 +3385,7 @@ brackets&gt; and it should work.<br><br>")
         {resetpw-page "Passwords should be between 8 and 72 characters long.
                        Please choose another."})
       (do (set-pw (me) newpw)
+          (save-pws)
           "news")))
 
 
