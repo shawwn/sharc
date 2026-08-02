@@ -364,23 +364,24 @@
                     (= text (cut text (+ it 1))))
                (= rec!text (uneschtml text))))))))
 
-(def parse-listpage (html)
+(def parse-split (html (o anchor "<tr class=\"athing "))
   ; Split the html into per-item chunks once, then parse each in
   ; isolation.  Without this, posmatch's O(N) scans on the full 2MB
   ; html which turns this into N*M-quadratic.
   (accum a
-    (with (positions nil
-           start 0
-           anchor "<tr class=\"athing ")
+    (with (positions nil start 0)
       (whilet p (posmatch anchor html start)
         (push p positions)
         (= start (+ p (len anchor))))
       (let ps (rev positions)
         (forlen i ps
           (withs (p (ps i)
-                  end (or (errsafe:ps (+ i 1)) (len html))
-                  row (cut html p end))
-            (a (parse-listitem row))))))))
+                  end   (or (errsafe:ps (+ i 1)) (len html))
+                  inner (cut html p end))
+            (a inner)))))))
+
+(def parse-listpage (html)
+  (map parse-listitem (parse-split html)))
 
 (def parse-listitem (html (o start 0))
   (lets rec (obj type 'story)
