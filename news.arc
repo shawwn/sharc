@@ -2394,12 +2394,14 @@
 ; but the threshold may start to be higher because then you'd be
 ; dealing with trolls rather than spammers.
 
+(def should-ban-ip (s)
+  (when (and (dead s) (ignored (by s)))
+    (let bads (loaded-items (andf dead&astory [same-ip _ s]))
+      (and (len> bads ip-ban-threshold*)
+           (some [and (ignored:by _) (~same-author _ s)] bads)))))
+
 (def maybe-ban-ip (s)
-  (when (and s!dead (ignored (by s)))
-    (let bads (loaded-items [and _!dead (astory _) (is _!ip s!ip)])
-      (when (and (len> bads ip-ban-threshold*)
-                 (some [and (ignored (by _)) (isnt (by _) (by s))] bads))
-        (set-ip-ban s!ip t nil nil)))))
+  (if (should-ban-ip s) (set-ip-ban s!ip t nil nil)))
 
 (def killallby (user) 
   (map [kill _ 'all] (submissions user)))
