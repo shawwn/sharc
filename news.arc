@@ -1936,7 +1936,7 @@
                  whence)
       (pr "@(if (dead i) 'un)kill"))))
 
-; Allow links turns on clickable urls in story text.
+; "allow links" turns on clickable urls in story text.
 
 (def nolinks (s)
   (~mem 'links s!keys))
