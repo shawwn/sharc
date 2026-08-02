@@ -1387,7 +1387,7 @@
 ; Lets a logged-in user remove items from their own listings without
 ; affecting anyone else.  The hidden ids live in the user's profile.
 
-(def hidden (i (o user (me)))
+(def hidden (i (t user me))
   (and user (mem i!id (uvar user hidden))))
 
 (def hide-item (i user)
