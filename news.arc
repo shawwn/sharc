@@ -3257,7 +3257,7 @@
                              update-avg-threshold*)]))
 
 (def rand-user ((o test idfn))
-  (evtil (rand-key profs*) test))
+  (rand-elt (loaded-users test)))
 
 ; Ignore the most recent 5 comments since they may still be gaining votes.  
 ; Also ignore the highest-scoring comment, since possibly a fluff outlier.
