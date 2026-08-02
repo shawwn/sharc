@@ -264,8 +264,17 @@
 (def ok-whole  (id) (and (exact id) (>= id 0) id))
 (def ok-posint (id) (and (exact id) (> id 0) id))
 
-(def live (i) (nor i!dead i!deleted))
+(def dead (i)         i!dead)
+(def deleted (i)      i!deleted)
+(def announcement (i) (mem 'announce i!keys))
+(def imported (i)     (mem 'imported i!keys))
 
+(defplace dead         (fn (i) `(,i 'dead)))
+(defplace deleted      (fn (i) `(,i 'deleted)))
+(defplace announcement (fn (i) `(mem 'announce (,i 'keys))))
+(defplace imported     (fn (i) `(mem 'imported (,i 'keys))))
+
+(def live (i) (no (dead|deleted i)))
 (def save-item (i) (save-table i (+ storydir* i!id)))
 
 (def kill (i how)
@@ -1308,6 +1317,11 @@
                  ; page is generated on voting
                  (tag (span id (+ "down_" i!id)))))
         (hspace votewid*))))
+
+(def voted (i)
+  (aif (votes) (it i!id)))
+
+(defplace voted (fn (i) `((votes* (me)) (,i 'id))))
 
 ; could memoize votelink more, esp for non-logged in users,
 ; since only uparrow is shown; could straight memoize
