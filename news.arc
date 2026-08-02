@@ -1131,7 +1131,7 @@
 
 (or= caching* 1 perpage* 30 threads-perpage* 10)
 
-(= maxend* 210 cache-busters* '(perf p n next))
+(= maxend* nil cache-busters* '(perf p n next))
 
 (mac newscache (name args time . body)
   (w/uniq gc
