@@ -1246,6 +1246,19 @@
 (def noobs (n source)
   (retrieve n cansee&bynoob source))
 
+(newsop show () (showpage))
+
+(newscache showpage () 60
+  (listpage (msec) (showstories) "show" "Show"
+            (pageurl "show") t
+            [pageurl "show" (+ (curpage) 1)]))
+
+(def showstories ((o n maxend*))
+  (retrieve n shown&ashow stories*))
+
+(def ashow (i)
+  (headmatch "Show HN" i!title))
+
 
 (newsop from (site kind next)
   (w/the listpage-body
