@@ -1390,13 +1390,13 @@
 (def hidden (i (t user me))
   (and user (mem i!id (uvar user hidden))))
 
-(def hide-item (i user)
-  (pushnew i!id (uvar user hidden))
-  (save-prof user))
+(def hide-item (i)
+  (pushnew i!id my!hidden)
+  (save-prof))
 
-(def unhide-item (i user)
-  (pull i!id (uvar user hidden))
-  (save-prof user))
+(def unhide-item (i)
+  (pull i!id my!hidden)
+  (save-prof))
 
 (def hide-url (i un whence)
   (+ "hide?id=" i!id
@@ -1415,17 +1415,12 @@
               (hide-url i (hidden i) whence)))))
 
 (newsopr hide (id un auth goto)
-  (let i (safe-item id)
-    (if (no i)
-         (flink {pr "No such item."})
-        (no user)
-         (flink {pr "You have to be logged in to hide submissions."})
-        (~good-auth user i!id auth)
-         (flink {pr "User mismatch."})
-        (do (if (and un (~blank un))
-                (unhide-item i user)
-                (hide-item i user))
-            (safe-goto goto)))))
+  (when (good-auth user id)
+    (whenlet i (safe-item id)
+      (if (blank un)
+          (hide-item i)
+          (unhide-item i))))
+  (safe-goto goto))
 
 (newsopg hidden (id)
   (let subject (check id ~blank&goodname)
@@ -1455,7 +1450,7 @@
 (newsop snip-story (id auth onop next)
   (awhen (safe-item id)
     (when (and user (good-auth user it!id auth))
-      (hide-item it user)))
+      (hide-item it)))
   (to-json (snip-pair onop next)))
 
 ; /newest is ordered by id, so hn.js sends a next= item id: render the
