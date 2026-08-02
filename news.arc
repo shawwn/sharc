@@ -558,7 +558,7 @@
 
 (def latest-items (test (o stop) (o n) (o noisy))
   (accum a
-    (w/noisy iter
+    (w/noisy iter noisy
       (catch
         (each-item i
           (if (or (and stop (stop i)) (and n (<= n 0)))
