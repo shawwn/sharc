@@ -1961,7 +1961,7 @@
     (after (join-thread th)
       (cleanup-thread th))))
 
-(= main-thread* (current-thread))
+(or= main-thread* (current-thread))
 
 (def main-thread ((o th (current-thread)))
   (is th main-thread*))
