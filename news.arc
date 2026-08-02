@@ -2839,12 +2839,10 @@
 ; persists across page loads.  Fire-and-forget: the response is ignored.
 
 (newsop collapse (id un)
-  (when user
+  (when (me)
     (whenlet c (safe-item id)
-      (if un
-          (pull c!id (uvar user collapsed))
-          (pushnew c!id (uvar user collapsed)))
-      (save-prof user))))
+      (= (mem c!id my!collapsed) (no un))
+      (save-prof))))
 
 (def display-comments (cs whence (o indent 0) (o initialpar t) (o initialon t))
   (w/the comment-nav (comment-navs cs)
