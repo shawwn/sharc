@@ -170,6 +170,9 @@
 
 (def author (i (t u me)) (is u (by i)))
 
+(def same-author (i s) (is (by i) (by s)))
+
+(def same-ip (i s) (is i!ip s!ip))
 
 (or= stories* nil comments* nil 
      items* (table) url->story* (table)
