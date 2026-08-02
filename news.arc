@@ -2644,10 +2644,11 @@
   (aif i!parent (superparent:item it) i))
 
 (def display-item-text (s)
-  (when (and (metastory&cansee s)
-             (~blank s!text))
-    (spacerow 2)
-    (row "" s!text)))
+  (when (metastory&cansee s)
+    (unless (blank s!text)
+      (spacerow 2)
+      (row "" (tag (div class "toptext" style "margin-top:4px")
+                (pr s!text))))))
 
 
 ; Edit Item
