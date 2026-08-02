@@ -1877,7 +1877,7 @@
   (when (or (and (is (op) "item") (is arg!id (string i!id)))
             (and (is (op) "favorites") (me) (is arg!id (me))))
     (pr bar*)
-    (let un (and (me) (mem i!id (uvar (me) favorites)))
+    (let un (and (me) (mem i!id my!favorites))
       (link "@(if un 'un-)favorite"
             (fave-url i!id (auth-for (or (me) "") i!id) un)))))
 
