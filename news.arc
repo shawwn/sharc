@@ -1216,13 +1216,13 @@
 (newsop best () (bestpage))
 
 (newscache bestpage () 1000
-  (listpage (msec) (beststories maxend*) "best" "Top Links"
+  (listpage (msec) (beststories) "best" "Top Links"
             (pageurl "best") t
             [pageurl "best" (+ (curpage) 1)]))
 
 ; As no of stories gets huge, could test visibility in fn sent to best.
 
-(def beststories (n)
+(def beststories ((o n maxend*))
   (bestn n (compare > realscore) (visible stories*)))
 
 
