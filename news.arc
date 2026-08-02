@@ -1119,8 +1119,7 @@
                (link "comments" (favorites-url user t)))
              (unless items
                (para (string user " hasn't added any favorite "
-                             (if (in arg!comments "t" "T") 'comments 'submissions)
-                             " yet."))
+                             (if comments 'comments 'submissions) " yet."))
                (para "To add one to your own favorites, click on its timestamp"
                      " to go to its page, then click 'favorite' at the top."))}
       (listpage (msec) items "favorites" title
