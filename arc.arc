@@ -1448,6 +1448,16 @@
   (map (fn (pairs) (templatize tem pairs))       
        (w/infile in file (readall in))))
 
+(def serialize (x)
+  (if (acons x) (map serialize x)
+      (isa!table x) `(%table ,(map serialize (tablist x)))
+      x))
+
+(def deserialize (x)
+  (if (caris x '%table) (listtab (cadr (map deserialize x)))
+      (acons x) (map deserialize x)
+      (temquote x)))
+
 
 (def number (n) (in (type n) 'int 'num))
 
