@@ -3163,11 +3163,14 @@
                                     display comments label title end newend
                                     number moreurl))))))))))
 
-(def submissions (user (o limit)) 
-  (map item (firstn limit (uvar user submitted))))
+(def submissions ((t u me) (o n)) 
+  (map item (firstn n (uvar u submitted))))
 
-(def comments (user (o limit))
-  (map item (retrieve limit acomment:item (uvar user submitted))))
+(def comments ((t u me) (o n))
+  (keep acomment (submissions u n)))
+
+(def stories ((t u me) (o n))
+  (keep metastory (submissions u n)))
   
 (def subcomment (c)
   (some [and (acomment _) (is (by _) (by c)) (no _!deleted)]
