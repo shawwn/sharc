@@ -2528,7 +2528,7 @@
 (newsop item (id)
   (let s (safe-item id)
     (if (news-type s)
-        (do (if s!deleted (note-baditem))
+        (do (if (deleted s) (note-baditem))
             (item-page s))
         (do (note-baditem)
             (pr "No such item.")))))
@@ -2540,7 +2540,7 @@
 (def item-api (id)
   (w/me nil
     (whenlet i (safe-item id)
-      (let del i!deleted
+      (let del (deleted i)
         (when (news-type i)
           (obj by          (unless del (by i))
                dead        (unless del (~live i))
