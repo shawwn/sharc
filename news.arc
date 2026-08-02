@@ -1298,7 +1298,7 @@
 
 (def fromurl (site (o next arg!next) (o kind arg!kind))
   (whenceurl
-    (string "from?site=" (urlencode site)
+    (string "from?" (if site "site=") (only&urlencode site)
             (if (or kind next) "&kind=@(or kind "story")"))
     (only&string next)))
 
