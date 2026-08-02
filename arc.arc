@@ -1922,7 +1922,8 @@
 (or= thread-locals* (table))
 
 (def thread-locals ((o th (current-thread)))
-  (or= (thread-locals* th) (table)))
+  (or (thread-locals* th)
+      (atomic (or= (thread-locals* th) (table)))))
 
 (def thread-local (k) ((thread-locals) k))
 
