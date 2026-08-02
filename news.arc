@@ -60,7 +60,7 @@
   url        nil
   title      nil
   text       nil
-  votes      nil   ; elts each (time ip user type score)
+  votes      nil   ; elts each (time ip by dir score effects)
   score      0
   sockvotes  0
   flags      nil
@@ -2083,7 +2083,8 @@
 (def vote-for (i (o dir 'up))
   (when (votable i)
     (withs (ip   (logins* (me))
-            vote (list (seconds) ip (me) dir i!score))
+            vote (list (seconds) ip (user-id) dir i!score nil)
+            effect (fn (name n) (push (list name n) vote!5) n))
       (unless (or (and (or (ignored) check-key!novote)
                        (~author i))
                   (and (is dir 'down)
@@ -2097,48 +2098,48 @@
                        (find [is _!1 ip] i!votes))
                   (and (isnt i!type 'pollopt)
                        (biased-voter i vote)))
-        (++ i!score (case dir up 1 down -1))
+        (++ i!score (effect 'score (case dir up 1 down -1)))
         ; canvote protects against sockpuppet downvote of comments 
         (when (and (is dir 'up) (possible-sockpuppet))
-          (++ i!sockvotes))
+          (++ i!sockvotes (effect 'sockvotes 1)))
         (metastory&adjust-rank i)
         (unless (or (author i)
                     (and (is ip i!ip) (~editor))
                     (is i!type 'pollopt))
-          (++ (karma (by i)) (case dir up 1 down -1))
+          (++ (karma (by i)) (effect 'karma (case dir up 1 down -1)))
           (save-prof (by i)))
-        (wipe (comment-cache* i!id)))
+        (uncache-comment i!id))
       (if (admin) (pushnew 'nokill i!keys))
       (push vote i!votes)
       (save-item i)
-      (push (list (seconds) i!id i!by (sitename i!url) dir)
-            (uvar (me) votes))
-      (= ((votes* (me)) i!id) vote)
+      (let pvote (list (seconds) i!id (user-id) (sitename i!url) dir)
+        (push pvote my!votes))
+      (= (voted i) vote)
       (save-votes)
-      (zap [firstn votewindow* _] (uvar (me) votes))
+      (zap [firstn votewindow* _] my!votes)
       (save-prof)
       (push (cons i!id vote) recent-votes*))))
 
-; Inverse of vote-for: undo the current user's vote on i.  Mirrors the
-; recorded effects (score, karma, the vote records); hn.js sends how=un.
+; Inverse of vote-for: undo the current user's vote on i.
+; hn.js sends how=un.
 
 (def unvote-for (i)
-  (whenlet vote ((votes) i!id)
-    (let dir (vote 3)
-      (-- i!score (case dir up 1 down -1))
-      (metastory&adjust-rank i)
-      (unless (or (author i)
-                  (and (is (logins* (me)) i!ip) (~editor))
-                  (is i!type 'pollopt))
-        (-- (karma (by i)) (case dir up 1 down -1))
-        (save-prof (by i)))
-      (pull [is _!2 (me)] i!votes)
-      (save-item i)
-      (wipe ((votes* (me)) i!id))
-      (pull [is _!1 i!id] (uvar (me) votes))
-      (save-votes)
-      (save-prof)
-      (wipe (comment-cache* i!id)))))
+  (whenlet vote (voted i)
+    (each (name n) (errsafe vote!5) ; legacy votes don't have effects
+      (case name
+        score     (-- i!score n)
+        sockvotes (-- i!sockvotes n)
+        karma     (do (-- (karma (by i)) n)
+                      (save-prof (by i)))
+        (err "Unknown vote-for effect name @name")))
+    (metastory&adjust-rank i)
+    (pull [is _!2 (user-id)] i!votes)
+    (save-item i)
+    (wipe (voted i))
+    (save-votes)
+    (pull [is _!1 i!id] my!votes)
+    (save-prof)
+    (uncache-comment i!id)))
 
 ; redefined later
 
