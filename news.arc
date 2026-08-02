@@ -349,7 +349,7 @@
 (disktable lightweights* (+ newsdir* "lightweights"))
 
 (def lightweight (s)
-  (or s!dead
+  (or (dead s)
       (mem 'rally s!keys)  ; title is a rallying cry
       (mem 'image s!keys)  ; post is mainly image(s)
       (lightweights* (sitename s!url))
