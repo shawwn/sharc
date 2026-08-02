@@ -282,15 +282,39 @@
 (def parse-subtext-row! (html start rec open-pat close-pat)
   (aif (between html open-pat close-pat start)
        (let inner (car it)
-         (whenlet m-score (between inner "<span class=\"score\"" "</span>" 0)
-           (let txt (car m-score)
-             (awhen (posmatch ">" txt)
-               (= rec!score (errsafe:int:car:tokens (cut txt (+ it 1)))))))
-         (whenlet m-by (between inner "<a href=\"user?id=" "\"" 0)
-           (= rec!by (car m-by)))
-         (whenlet m-age (between inner "<span class=\"age\" title=\"" "\"" 0)
-           (whenlet toks (tokens (car m-age))
-             (= rec!time (errsafe:int (last toks))))))))
+         (= rec!score     (parse-subtext-score    inner)
+            rec!by        (parse-subtext-author   inner)
+            rec!time      (parse-subtext-age      inner)
+            rec!comments  (parse-subtext-comments inner)
+            rec!timestamp (parse-subtext-timestamp inner)
+            rec!seen      (seconds)))))
+
+(def parse-subtext-score (html)
+  (whenlet m-score (between html "<span class=\"score\"" "</span>" 0)
+    (let txt (car m-score)
+      (awhen (posmatch ">" txt)
+        (errsafe:int:car:tokens (cut txt (+ it 1)))))))
+
+(def parse-subtext-author (html)
+  (car:between html "<a href=\"user?id=" "\"" 0))
+
+(def parse-subtext-age (html)
+  (whenlet m-age (between html "<span class=\"age\" title=\"" "\"" 0)
+    (whenlet toks (tokens (car m-age))
+      (errsafe:int (last toks)))))
+
+(def parse-subtext-timestamp (html)
+  (whenlet m-timestamp (between html "><a href=\"item?id=" "</a>")
+    (whenlet p (posmatch ">" (car m-timestamp))
+      (cut (car m-timestamp) (+ p 1)))))
+
+(def parse-subtext-comments (html)
+  (whenlet m-comments (between html " | <a href=\"item?id=" "</a>")
+    (aand (posmatch ">" (car m-comments))
+          (cut (car m-comments) (+ it 1))
+          (whenlet p (posmatch "&nbsp;" it)
+            (errsafe:int (cut it 0 p))))))
+
 
 
 ; ----- Item / comment page parsing -----
