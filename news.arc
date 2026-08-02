@@ -1269,24 +1269,32 @@
 (def ashow (i)
   (headmatch "Show HN" i!title))
 
+(mac margin args
+  (tostring
+    (each (kind val) (pair args)
+      (pr "margin-" kind ":" val ";"))))
 
 (newsop from (site kind next)
-  (w/the listpage-body
-         {tag (div style "margin-left:36px; margin-top:6px; margin-bottom:12px")
-           (w/bars
-             (link "submissions" (fromurl site nil "story"))
-             (link "comments" (fromurl site nil "comment")))}
-    (let kind (saferead (or kind "story"))
-      (listpage (msec)
-                (case kind
-                  story   (items-from site metastory)
-                  comment (items-from site acomment))
-                "from"
-                (string (when (is kind 'story)
-                          "Submissions from ")
-                        site)
-                (fromurl site) nil
-                [fromurl site _]))))
+  (with (stories  (items-from site metastory)
+         comments (items-from site acomment))
+    (w/the listpage-body
+           {tag (div style (margin left 36px top 6px bottom 12px))
+             (w/bars
+               (link (plural (len stories) "submission")
+                     (fromurl site nil "story"))
+               (link (plural (len comments) "comment")
+                     (fromurl site nil "comment")))}
+      (let kind (saferead (or kind "story"))
+        (listpage (pagems)
+                  (case kind
+                    story   stories
+                    comment comments)
+                  "from"
+                  (string (when (is kind 'story)
+                            "Submissions from ")
+                          site)
+                  (fromurl site) nil
+                  [fromurl site _])))))
 
 (def fromurl (site (o next arg!next) (o kind arg!kind))
   (whenceurl
