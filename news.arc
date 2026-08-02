@@ -210,6 +210,17 @@
 (def acomment (i) (is i!type 'comment))
 (def apoll    (i) (is i!type 'poll))
 
+(def item (id) (items*|load-item id))
+
+(def sameitem (compare is !id))
+(def compitem (compare >  !time))
+
+(mac put-item (i var (o cmp 'compitem) (o same 'sameitem))
+  `(insortnew ,cmp ,i ,var ,same))
+
+(mac pull-item (i var (o same 'sameitem))
+  `(pull ,i ,var ,same))
+
 (def load-item (id)
   (when (isa!int id)
     (let i (temload 'item (+ storydir* id))
@@ -235,9 +246,6 @@
 
 (def new-item-id ()
   (evtil (++ maxid*) [~file-exists (+ storydir* _)]))
-
-(def item (id)
-  (or (items* id) (errsafe:load-item id)))
 
 (def kids (i) (map item i!kids))
 
