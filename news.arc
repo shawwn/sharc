@@ -1895,7 +1895,7 @@
 
 (def flaglink (i whence)
   (when (and (me)
-             (or (admin) (~me (by i)))
+             (or (admin) (~author i))
              (or (admin) (> (karma) flag-threshold*)))
     (pr bar*)
     (w/rlink (do (if (admin)
