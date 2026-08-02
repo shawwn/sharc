@@ -2094,7 +2094,7 @@
                            (just-downvoted (by i))))
                   (and (~legit-user)
                        (~author i)
-                       (find [is (cadr _) ip] i!votes))
+                       (find [is _!1 ip] i!votes))
                   (and (isnt i!type 'pollopt)
                        (biased-voter i vote)))
         (++ i!score (case dir up 1 down -1))
