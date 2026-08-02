@@ -310,19 +310,39 @@
    nourl-factor* .4 lightweight-factor* .3)
 
 (def frontpage-rank (s (o scorefn realscore) (o gravity gravity*))
-  (* (/ (let base (- (scorefn s) 1)
-          (if (> base 0) (expt base .8) base))
-        (expt (/ (+ (item-age s) timebase*) 60) gravity))
-     (if (no (in s!type 'story 'poll))  .5
-         (blank s!url)                  nourl-factor*
-         (lightweight s)                (min lightweight-factor* 
-                                             (contro-factor s))
-                                        (contro-factor s))))
+  (if (announcement s) inf
+      (imported s)     0
+                       (news-score s scorefn gravity)))
+
+(def news-score (s (o scorefn realscore) (o gravity gravity*))
+  (* (news-score-base (- (scorefn s) 0.5) (item-age s) gravity)
+     (frontpage-penalty s)))
+
+
+(def news-score-base (score age (o gravity gravity*))
+  (/ (news-score-mul score)
+     (news-score-div age gravity)))
+
+(def news-score-mul (score)
+  (if (> score 0) (expt score .8) score))
+
+(def news-score-div (age (o gravity gravity*))
+  (expt (/ (+ age timebase*) 60) gravity))
+
+(def frontpage-penalty (s)
+  (if (~in s!type 'story 'poll) .5
+      (blank s!url)             nourl-factor*
+      (lightweight s)           (min lightweight-factor* 
+                                     (contro-factor s))
+                                (contro-factor s)))
 
 (def contro-factor (s)
   (aif (check (visible-family s nil) [> _ 20])
-       (min 1 (expt (/ (realscore s) it) 2))
+       (contro-score (realscore s) it)
        1))
+
+(def contro-score (score ncomments)
+  (min 1 (expt (/ score ncomments) 2)))
 
 (def realscore (i) (- i!score i!sockvotes))
 
