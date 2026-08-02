@@ -2719,7 +2719,7 @@
       (vars-form ((fieldfn* i!type) i)
                  (fn (name val)
                    (unless (ignore-edit i name val)
-                     (when (and (is name 'dead) val (no i!dead))
+                     (when (and (is name 'dead) val (~dead i))
                        (log-kill i))
                      (= (i name) val)
                      (when (and (is name 'text) (acomment i))
@@ -2729,7 +2729,7 @@
                  {do (if (admin) (pushnew 'locked i!keys))
                      (save-item i)
                      (metastory&adjust-rank i)
-                     (wipe (comment-cache* i!id))
+                     (uncache-comment i!id)
                      here})
       (hook 'edit i))))
 
