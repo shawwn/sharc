@@ -1366,7 +1366,7 @@
              title (if (~me user)
                         "@{user}'s upvoted @(if comments 'comments 'submissions)"
                         "Upvoted @(if comments 'comments 'submissions)"))
-        (listpage (msec) items "upvoted" title
+        (listpage (pagems) items "upvoted" title
                   (nexturl (upvoted-url user comments)) (no comments)
                   [nexturl (upvoted-url user comments) _
                            (unless comments (+ (cur-n) perpage*))]))
