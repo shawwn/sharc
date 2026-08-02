@@ -247,9 +247,6 @@
 (def safe-item (id)
   (aif (safe-id id) (item it)))
 
-(def arg->item ((o key 'id))
-  (safe-item:saferead (arg key)))
-
 (def safe-id     (id) (ok-id:saferead id))
 (def safe-uid    (id) (ok-uid:saferead id))
 (def safe-int    (id) (ok-int:saferead id))
