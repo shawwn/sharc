@@ -2410,7 +2410,7 @@
 
 (def kill-whole-thread (c)
   (kill c 'thread)
-  (map kill-whole-thread:item c!kids))
+  (map0 kill-whole-thread (kids c)))
 
 
 ; Polls
