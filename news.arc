@@ -1864,7 +1864,7 @@
 (def own-changeable-item (i (t user me))
   (and (author i user)
        (~mem 'locked i!keys)
-       (no i!deleted)
+       (~deleted i)
        (or (everchange* i!type)
            (< (item-age i) user-changetime*))))
 
