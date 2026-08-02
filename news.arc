@@ -3464,7 +3464,7 @@ brackets&gt; and it should work.<br><br>")
 
 (defcache banned-site-items 300
   (table [each-loaded-item i
-           (awhen (and i!dead (check (sitename i!url) banned-sites*))
+           (awhen (and (dead i) (check (sitename i!url) banned-sites*))
              (push i (_ it)))]))
 
 ; Would be nice to auto unban ips whose most recent submission is > n 
