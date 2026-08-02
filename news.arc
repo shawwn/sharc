@@ -1205,12 +1205,15 @@
 ; cached page.  If this were a prob, could make deletion clear caches.
 
 (newscache newestpage () 40
-  (listpage (msec) (newstories maxend*) "new" "New Links"
+  (listpage (msec) (newstories) "new" "New Links"
             (nexturl "newest") t
             [nexturl "newest" _ (+ (cur-n) perpage*)]))
 
 (def newstories ((o n maxend*))
   (retrieve n shown stories*))
+
+;(def newstories ((o n maxend*) (o consider 2000))
+;  (rank-stories n consider !time shown))
 
 
 (newsop best () (bestpage))
