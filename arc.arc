@@ -1966,6 +1966,21 @@
 (def main-thread ((o th (current-thread)))
   (is th main-thread*))
 
+; > (= (list a b c) (list 1 2 3))
+; (1 2 3)
+; > (list a b c)
+; (1 2 3)
+
+(defset list vars
+  (list (list)
+        `(list ,@vars)
+        `(fn (val)
+           ,@(accum a
+               (forlen i vars
+                 (let var (vars i)
+                   (a `(= ,var (val ,i))))))
+           val)))
+
 ; Referencing the bare symbol `scope` (or `scope%`) compiles to
 ; (%scope env), where ac splices in its compile-time lexical environment.
 ; For each distinct lexical in scope, emit (name (fn () name) (fn (v) ...))
