@@ -1407,12 +1407,11 @@
 (def hidelink (i whence)
   (when (and (me) (news-type i))
     (pr bar*)
-    (if (in (the op) "" "news" "newest")
-        (clickylink (if (hidden i) "un-hide" "hide")
-                    (hide-url i (hidden i) whence)
-                    "clicky hider" nil)
-        (link (if (hidden i) "un-hide" "hide")
-              (hide-url i (hidden i) whence)))))
+    (with (label "@(if (hidden i) 'un-)hide"
+           url (hide-url i (hidden i) whence))
+      (if (in (op) "" "news" "newest")
+          (clickylink label url "clicky hider" nil)
+          (link label url)))))
 
 (newsopr hide (id un auth goto)
   (when (good-auth user id)
