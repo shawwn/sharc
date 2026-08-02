@@ -2468,13 +2468,12 @@
     (push p stories*)))
 
 (def create-pollopt (p url title text)
-  (let o (inst 'item 'type 'pollopt 'id (new-item-id)
-                     'url url 'title title 'text text 'parent p!id
-                     'by (me) 'ip (ip))
+  (lets o (inst 'item 'type 'pollopt 'id (new-item-id)
+                      'url url 'title title 'text text 'parent p!id
+                      'by (user-id) 'ip (ip))
     (save-item o)
     (= (items* o!id) o)
-    (vote-for o)
-    o))
+    (vote-for o)))
 
 (def add-pollopt-page (p)
   (minipage "Add Poll Choice"
