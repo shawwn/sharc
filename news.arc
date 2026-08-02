@@ -148,6 +148,7 @@
 (def save-prof  ((t u me)) (save-table (profs* u) (+ profdir* u)))
 
 (mac uvar (u k) `((profile ,u) ',k))
+(mac my (k) `((profile) ,k))
 
 ; '(me) (quoted) rather than (t u me): macro defaults evaluate
 ; at expansion time, so (t u me) would bake in (the me)'s value
