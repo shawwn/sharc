@@ -1156,12 +1156,22 @@
             (pageurl whence) t
             [pageurl whence (+ (curpage) 1)]))
 
-(def listpage (t1 items label title (o url label) (o number t) (o moreurl))
+(def listpage (t1 items label title (o url label) (o number t) (o moreurl) (o perpage perpage*))
   (hook 'listpage)
   (longpage t1 nil label title url
-    (awhen (the listpage-body) (it))
-    (let (start end numstart items) (paginate items perpage*)
-      (display-items items label title url start end number moreurl numstart))))
+    (when items
+      (aif (the listpage-body) (it))
+      (display-items items label title url number moreurl perpage))))
+
+(def paginated (display items label title (o url label) (o number t) (o moreurl) (o perpage perpage*))
+  (let (start end numstart items) (paginate items perpage)
+    (display-page display items label title url start end number moreurl numstart)))
+
+(def display-items (items label title whence (o number t) (o moreurl) (o perpage perpage*))
+  (paginated (fn (n i whence (o inlist))
+               (display-item n i whence inlist)
+               (spacerow (if (acomment i) 15 5) "spacer"))
+             items label title whence number moreurl perpage))
 
 (def curpage ()
   (or (safe-posint arg!p) 1))
