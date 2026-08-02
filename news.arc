@@ -3137,30 +3137,31 @@
               label (if (me user) "threads" title)
               here  (nexturl (threads-url user))
               moreurl [nexturl (threads-url user) _])
-        (longpage (msec) nil label title here
+        (longpage (pagems) nil label title here
           (awhen (user-comments user)
             (let (start end numstart items) (paginate it threads-perpage*)
-              (display-threads items label title here start end nil moreurl)))))
+              (display-threads display-comments items label title here start end nil moreurl)))))
       (prn "No such user.")))
 
 (def user-comments ((t user me))
   (keep [and (cansee _) (~subcomment _)]
         (comments user maxend*)))
 
-(def display-threads (comments label title whence
+(def display-threads (display comments label title whence
                       (o start 0) (o end threads-perpage*)
                       (o number) (o moreurl))
   (tab
-    (display-comments (cut comments start end) whence)
+    (display (cut comments start end) whence)
     (when end
       (let newend (+ end threads-perpage*)
-        (when (and (<= newend maxend*) (< end (len comments)))
+        (when (and (aif maxend* (<= newend it) t)
+                   (< end (len comments)))
           (spacerow 10)
           (row (tab (tr (td (hspace 0))
                         (td (hspace votewid*))
                         (tag (td class 'title)
                           (morelink display-threads
-                                    comments label title end newend
+                                    display comments label title end newend
                                     number moreurl))))))))))
 
 (def submissions (user (o limit)) 
