@@ -29,6 +29,7 @@
 (= scrape-dir*       (string arcdir* "scrape/")
    scrape-item-dir*  (string arcdir* "scrape/item/")
    scrape-user-dir*  (string arcdir* "scrape/user/")
+   scrape-lists-dir* (string arcdir* "scrape/lists/")
    scrape-cookies*   (string arcdir* "scrape/cookies.txt")
    scrape-fetchlog*  (string arcdir* "scrape/last-fetch.lisp")
    scrape-user-agent*
@@ -404,14 +405,6 @@
     (whenlet url (between (car inner) "a href='" "'")
       (car url))))
 
-(def parse-hn-itemlist ((o url "newest") (o n-pages 3))
-  (lets xs nil
-    (repeat n-pages
-      (when url
-        (whenlet html (fetch-hn-url url)
-          (++ xs (parse-listpage html))
-          (= url (parse-morelink html)))))))
-
 (def parse-comments (html story-id)
   ; Split the html into per-comment chunks once, then parse each in
   ; isolation.  Without this, posmatch's O(N) scans on the full 2MB
@@ -713,13 +706,15 @@
 ; ----- Top-level entry -----
 
 (def load-scrape ((o limit 60))
-  (map ensure-dir (list scrape-dir* scrape-item-dir* scrape-user-dir*))
+  (map0 ensure-dir (list scrape-dir* scrape-item-dir* scrape-user-dir* scrape-lists-dir*))
   (load-fetchlog)
   (scrapelog "crawl-delay: " scrape-crawl-delay* "s limit=" limit)
   (ensure-login)
   ; deleted comments are assigned to user "deleted", so import
   ; "deleted" now.
   (scrape-and-import-user! "deleted")
+  ; load previously-scraped lists.
+  (load-hn-lists)
   t)
 
 (def scrape-and-import-user! (u (o force))
@@ -766,6 +761,83 @@
   (scrape-users-parallel! users force)
   (save-fetchlog)
   (scrapelog "done."))
+
+
+; ----- Scraping HN Lists -----
+
+(or= hn-lists* (table))
+
+(= hn-list-names* '(ask show asknew shownew launches noobstories
+                    invited newest pool jobs
+                    news best active classic))
+
+(def ranked-op (op)
+  (in (sym op) 'news 'best 'active 'classic))
+
+(def scrape-hn-itemlist ((o op "newest") (o n-pages 3)
+                         (o noisy (if (main-thread) 1 nil)))
+  (withs (url op seen (memtable (map !id (hn-lists* (sym url)))))
+    (accum a
+      (w/noisy iter noisy
+        (catch
+          (repeat (or n-pages inf)
+            (if (no url)
+                (throw)
+                (whenlet html (fetch-hn-url url)
+                  (with (items (parse-listpage html) nseen 0)
+                    (each item items
+                      (if (seen item!id)
+                          (++ nseen)
+                          (a item)))
+                    (if (is nseen (len items))
+                        (throw)))
+                  (= url (parse-morelink html))))
+            (iter)))))))
+
+(def scrape-hn-list (name (o n-pages nil))
+  (let items (scrape-hn-itemlist (string name) n-pages)
+    (+ items (hn-lists* (sym name)))))
+
+(def scrape-hn-lists ((o names hn-list-names*))
+  (each name names
+    (scrapelog name)
+    (= (hn-lists* name) (scrape-hn-list name))))
+
+; arc> (time (scrape-hn-lists))
+; ask 
+; time: 391.9790000002831 msec.
+; show 
+; time: 3273.8270000000484 msec.
+; asknew 
+; time: 7114.925999999978 msec.
+; shownew 
+; time: 30799.324000000022 msec.
+; newest
+; time: 356613.6950000003 msec.
+
+(def rescrape-hn-lists ((o names hn-list-names*))
+  (scrape-hn-lists)
+  (save-hn-lists))
+
+(def hn-list-path (name)
+  (+ scrape-lists-dir* name))
+
+(def save-hn-list (name xs)
+  (writefile (serialize xs) (hn-list-path name))
+  t)
+
+(def load-hn-list (name)
+  (aand (file-exists (hn-list-path name))
+        (deserialize (readfile1 it))))
+
+(def save-hn-lists ()
+  (each (k xs) hn-lists*
+    (save-hn-list k xs))
+  t)
+
+(def load-hn-lists ()
+  (each name hn-list-names*
+    (= (hn-lists* name) (load-hn-list name))))
 
 
 ; ----- Import scraped JSON into News -----
@@ -1036,6 +1108,10 @@
 (defscrape scrape-remaining-stories
   7 (scrape-hn-stories (cut ids 90)))
 
+(defscrape scrape-lists
+  180 (rescrape-hn-lists))
+
 (when (main)
   (nsv)
+  (load-scrape)
   (repl))
