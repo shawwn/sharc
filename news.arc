@@ -430,8 +430,8 @@
 (= max-delay* 10)
 
 (def cansee (i (t user me))
-  (if i!deleted   (admin user)
-      i!dead      (or (author i user) (seesdead user))
+  (if (deleted i) (admin user)
+      (dead i)    (or (author i user) (seesdead user))
       (flagged i) (or (author i user) (seesdead user))
       (delayed i) (author i user)
       t))
