@@ -253,13 +253,22 @@
                pseudo  (cut inner 0 (posmatch "<a " inner))
                m-url   (between inner "<a href=\"" "\"" 0)
                m-title (and m-url (between inner ">" "</a>" (cadr m-url)))
-               url     (and m-url (uneschtml (car m-url))))
+               url     (and m-url (uneschtml (car m-url)))
+               m-site  (and m-url (parse-sitename html)))
          (parse-pseudotext! pseudo rec)
          ; an "item?id=N" href on the title means this is an Ask/text
          ; submission with no external URL.
          (when (and url (no (begins url "item?id=")))
            (= rec!url url))
-         (when m-title (= rec!title (uneschtml (car m-title)))))))
+         (if m-site  (= rec!site  (uneschtml (car m-site))))
+         (if m-title (= rec!title (uneschtml (car m-title)))))))
+
+(def parse-sitename (html)
+  ; this doens't work for domains so long that they're ellipsized,
+  ; e.g. "yetanothermathprogrammingconsultant.blogspot.com". Parse
+  ; it directly from the from?site= url instead.
+  ;(between html "<span class=\"sitestr\">" "</span>")
+  (between html "<a href=\"from?site=" "\">"))
 
 (def parse-pseudotext! (html rec)
   (unless (blank html)
