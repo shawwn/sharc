@@ -1843,8 +1843,8 @@
             (pr "discuss"))))))
 
 (def visible-family (i (t user me))
-  (+ (if i!deleted 0 (cansee i user) 1 0)
-     (sum [visible-family (item _) user] i!kids)))
+  (+ (if (deleted i) 0 (~cansee i user) 0 1)
+     (sum [visible-family _ user] (kids i))))
 
 (def threadavg (i)
   (only&avg (map [or (uvar _ avg) 1] 
