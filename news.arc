@@ -3450,7 +3450,7 @@ brackets&gt; and it should work.<br><br>")
 
 (defcache killedsites 300
   (let bads (table [each-loaded-item i
-                     (awhen (and i!dead (sitename i!url))
+                     (awhen (and (dead i) (sitename i!url))
                        (push i (_ it)))])
     (with (acc nil deadcount (table))
       (each (site items) bads
