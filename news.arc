@@ -3105,9 +3105,21 @@
        "c00"
       (and (~live c) (~author c))
        "cdd"
-       (withs (g ((comment-color c) 'r)
-               x (as!string g 16))
-         (string "c" (if (len< x 2) "0") x))))
+      (gray-to-comment-class ((comment-color c) 'r))))
+
+(def gray-to-comment-class (mono)
+  (let x (as!string mono 16)
+    (string "c" (if (len< x 2) "0") x)))
+
+(defmemo score-from-comment-class ((o str "c00"))
+  (let g (int (cut str 1) 16)
+    (if (is g 0) 1
+      (catch
+        (for i -7 0
+          (let c (int (cut (hexrep:grayrange i) 4) 16)
+            (when (is g c)
+              (throw i))))
+        (assert nil "No such score for comment class @str")))))
 
 ; Threads
 
