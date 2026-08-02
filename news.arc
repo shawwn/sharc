@@ -1239,7 +1239,7 @@
 (newsop noobcomments () (noobspage comments* "noobcomments"))
 
 (def noobspage (source whence)
-  (listpage (msec) (noobs maxend* source) "noobs" "New Accounts"
+  (listpage (msec) (noobs maxend* source) whence "New Accounts"
             (nexturl whence) nil
             [nexturl whence _]))
 
