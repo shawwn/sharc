@@ -3219,6 +3219,26 @@
   (tab (each u (users [is (uvar _ auth) 1])
          (row (userlink u)))))
 
+(adop users ()
+  (paginated display-user (userlist) "users" "New Users"
+             (pageurl "users") t
+             [pageurl "users" (+ (curpage) 1)]
+             5000))
+
+(def display-user (n u whence)
+  (prrow (lookup-uid u)
+         (hspace 5)
+         (len (keep metastory (submissions u)))
+         (hspace 10)
+         (len:comments u)
+         (hspace 5)
+         (userlink u)
+         (text-age:user-age u))
+  (spacerow 5))
+
+(defcache userlist 45
+  (sort (compare > lookup-uid) (users)))
+
 
 (= update-avg-threshold* 0)  ; redefined later
 
