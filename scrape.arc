@@ -1009,7 +1009,7 @@
   (each id ids
     (sleep scrape-delay*)
     (when scrape-hn*
-      (on-err [report-error _] {scrape-and-import! id}))))
+      (call-reporting {scrape-and-import! id}))))
 
 (mac defscrape (name secs . body)
   `(defbg ,name ,secs
