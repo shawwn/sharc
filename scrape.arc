@@ -275,7 +275,8 @@
     (= rec!pseudo html)
     (if (posmatch "[deleted]" html) (set rec!deleted))
     (if (posmatch "[flagged]" html) (set rec!flagged))
-    (if (posmatch "[dead]"    html) (set rec!dead)))
+    (if (posmatch "[dead]"    html) (set rec!dead))
+    (if (posmatch "[dupe]"    html) (set rec!dupe)))
   rec)
 
 (def parse-subtext-row! (html start rec open-pat close-pat)
