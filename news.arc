@@ -863,9 +863,13 @@
 (mac defope (name . body) `(defopt ,name editor " as an editor"        ,@body))
 (mac defopa (name . body) `(defopt ,name admin  " as an administrator" ,@body))
 
+(def pagems ()
+  (or (the ms) (msec)))
+
 (mac opexpand (definer name parms . body)
   `(,definer ,name
      (with (user (me) ip (ip))
+       (= (the ms) (msec))
        (with ,(mappend [list _ `(arg ',_)] parms)
          (newslog ',name ,@parms)
          ,@body))))
