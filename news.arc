@@ -2616,10 +2616,12 @@
 (= commentable-threshold* (* 60 24 14))
 
 (def comments-active (i)
-  (and (live&commentable i)
-       (live:superparent i)
-       (or (< (item-age i) commentable-threshold*)
-           (mem 'commentable i!keys))))
+  ;(or (admin)
+      (and (~announcement i)
+           (live&commentable i)
+           (live:superparent i)
+           (or (< (item-age i) commentable-threshold*)
+               (mem 'commentable i!keys))))
 
 
 (or= displayfn* (table))
