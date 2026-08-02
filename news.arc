@@ -3173,8 +3173,8 @@
   (keep metastory (submissions u n)))
   
 (def subcomment (c)
-  (some [and (acomment _) (is (by _) (by c)) (no _!deleted)]
-        (ancestors c)))
+  (some [same-author _ c]
+        (keep acomment&~deleted (ancestors c))))
 
 (def ancestors (i)
   (accum a (trav i!parent a:item self:!parent:item)))
