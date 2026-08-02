@@ -723,13 +723,21 @@
 (def admin-bar (elapsed whence)
   (when (or (admin) arg!perf)
     (w/bars
-      (pr (len fns*) " fnids")
-      (pr (len items*) "/" maxid* " loaded")
-      (pr (num:round:memory-after-gc) " bytes")
+      (pr (num:len fns*) " fnids")
+      (pr "loaded " (num:len items*) " of " (num:item-count) " items")
+      (pr (num:len:loaded-users) " of " (num maxuid*) " users")
+      (pr (num:len:loaded-votes) " of " (num maxuid*) " votes")
+      (pr (num:memory-after-gc) " bytes")
       (pr (num elapsed 3 t t) " msec")
       (when (admin)
         (link "settings" "newsadmin")
         (hook 'admin-bar whence)))))
+
+(defcache item-count 60
+  (len:all-item-ids))
+
+(def all-item-ids ()
+  (mappend item-ids (item-buckets)))
 
 (def color-stripe (c)
   (tag (table width "100%" cellspacing 0 cellpadding 1)
