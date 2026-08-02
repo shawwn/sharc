@@ -1348,7 +1348,8 @@
 ; Upvoted page
 
 (def voted-items (test (t user me))
-  (keep test (keep [cansee _ user] (map item (keys:votes user)))))
+  (keep (andf test [cansee _ user])
+        (map item (keys:votes user))))
 
 (def upvoted-url (user (o comments))
   (string "upvoted?id=" user (if comments "&comments=t")))
