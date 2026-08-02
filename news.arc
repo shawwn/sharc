@@ -1779,7 +1779,7 @@
 ; redefined later
 
 (def byline (i (o whence))
-  (userlink (by i))
+  (if (cansee i) (userlink (by i)))
   (pr " ")
   (agelink i)
   (pr " ")
