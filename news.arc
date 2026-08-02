@@ -1382,7 +1382,7 @@
   (string "favorites?id=" user (if comments "&comments=t")))
 
 (newsop favorites (id comments) 
-  (if (only&profile id)
+  (if (profile id)
       (favorites-page id (in comments "t" "T"))
       (pr "No such user.")))
 
