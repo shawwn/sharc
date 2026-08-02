@@ -522,9 +522,7 @@
 ; (nthcdr x y) = (cut y x).
 
 (def cut (seq start (o end))
-  (let end (if (no end)   (len seq)
-               (< end 0)  (+ (len seq) end) 
-                          end)
+  (let end (or end (len seq))
     (if (isa!string seq)
         (lets s2 (newstring (- end start))
           (for i 0 (- end start 1)
