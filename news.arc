@@ -1617,16 +1617,13 @@
      "&goto=" (urlencode (string whence (if (begins whence "item")
                                             (string "#" i!id))))))
 
-(= lowest-score* -4)
-
 ; Not much stricter than whether to generate the arrow.  Further tests 
 ; applied in vote-for.
 
 (def canvote (i dir (o ignore-voted))
   (and (me)
        (news-type&live i)
-       (or (is dir 'up) (> i!score lowest-score*))
-       (or ignore-voted (no ((votes) i!id)))
+       (or ignore-voted (~voted i!id))
        (or (is dir 'up)
            (and (acomment i)
                 (> (karma) downvote-threshold*)
