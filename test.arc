@@ -640,6 +640,48 @@ c"
   (test? '("a" " b c")      (halve "a b c"))
   (test? '("novalue")       (halve "novalue"))) ; no sep -> single elt
 
+; cut takes a subsequence.  An end past the last element is clamped to the
+; length rather than erroring, so callers computing an end by arithmetic --
+; paging with (cut items start (+ start perpage*)), where the last page
+; overruns -- don't have to bound it themselves.
+
+(define-test cut
+  ; the ordinary cases
+  (test? "bcde"  (cut "abcde" 1))
+  (test? "bcde"  (cut "abcde" 1 nil)) ; an explicit nil end means "the rest"
+  (test? "bc"    (cut "abcde" 1 3))
+  (test? "abcde" (cut "abcde" 0 5))   ; end at len exactly
+  (test? ""      (cut "abcde" 2 2))   ; empty when end is start
+  (test? ""      (cut "abcde" 5))     ; start at len is in range, and empty
+  ; an end past the end is clamped, not an error
+  (test? "bcde"  (cut "abcde" 1 10))
+  (test? "abcde" (cut "abcde" 0 1000000000))
+  (test? ""      (cut "abcde" 5 10))
+  (test? ""      (cut "" 0 5))
+  (test? nil     (cut nil 0 5))
+  ; ...for any sequence, and the type is still preserved
+  (test? '(2 3)   (cut '(1 2 3) 1 99))
+  (test? '#(1 2 3) (cut (as!vector '(1 2 3)) 0 99))
+  (test? 'string  (type (cut "abcde" 1 10)))
+  ; the paging case that motivates the clamp: the last page asks for more
+  ; items than are left
+  (test? '(c d) (let items '(a b c d) (cut items 2 (+ 2 30))))
+  ; only end is clamped.  A start past len, a negative index, or an end
+  ; before start are all still errors
+  (test? nil (errsafe (cut "abcde" 6 10)))
+  (test? nil (errsafe (cut "abcde" 6)))
+  (test? nil (errsafe (cut "abcde" 3 1)))
+  (test? nil (errsafe (cut "abcde" 1 -1)))
+  (test? nil (errsafe (cut "abcde" -1 2)))
+  ; cut1, the pure-Arc version cut2 replaced, does not clamp -- the two
+  ; disagree on exactly the case above
+  (test? nil    (errsafe (cut1 "abcde" 1 10)))
+  (test? "bcde" (cut1 "abcde" 1))
+  (test? "bc"   (cut1 "abcde" 1 3))
+  ; almost is cut to (edge xs), so it stays in range
+  (test? "abcd" (almost "abcde"))
+  (test? '(1 2) (almost '(1 2 3))))
+
 ; split and cleave (both from arc.arc, but tested here next to the string
 ; functions that use them) cut a sequence in two at an index.  Both halves
 ; are fresh subsequences of the same type as the input.  A non-nil index

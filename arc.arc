@@ -532,7 +532,8 @@
 ; optimization at the expense of Arc purity
 
 (def cut2 (seq start (o end))
-  (#'subseq seq start end))
+  (let end (if end (min end (len seq)))
+    (#'subseq seq start end)))
 
 (def cut cut2) ; use the optimized version
 
