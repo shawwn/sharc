@@ -2290,15 +2290,14 @@
 
 (def create-story (url title text)
   (newslog 'create url (list title))
-  (let s (inst 'item 'type 'story 'id (new-item-id)
-                     'url url 'title title
-                     'text (only&md-from-form text t)
-                     'by (me) 'ip (ip))
+  (lets s (inst 'item 'type 'story 'id (new-item-id)
+                      'url url 'title title
+                      'text (only&md-from-form text t)
+                      'by (user-id) 'ip (ip))
     (save-item s)
     (= (items* s!id) s)
     (register-story s)
-    (push s stories*)
-    s))
+    (push s stories*)))
 
 (def register-story (s (o url s!url) (o site (sitename url)))
   (unless (blank url)
