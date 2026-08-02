@@ -507,6 +507,13 @@
             (for ,gv 0 (edge ,gseq)
               (let ,var (,gseq ,gv) ,@body))))))
 
+(def mapv (f seq)
+  (if (isa!table seq)
+      (lets h (table)
+        (each (k v) seq
+          (= (h k) (f v))))
+      (map f seq)))
+
 (def clamp (n lo hi)
   (if (< n lo) lo
       (> n hi) hi
