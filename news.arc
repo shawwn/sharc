@@ -781,7 +781,6 @@
                   (spanclass pagetop
                     (tag (b class 'hnname)
                       (link this-site* "news"))
-                    (hspace 10)
                     (toprow label))))
              (if (is switch 'full)
                  (tag (td style "text-align:right;padding-right:4px;")
