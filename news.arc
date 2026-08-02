@@ -2177,8 +2177,7 @@
 
 (def submit-login-warning ((o url "") (o title "") (o text ""))
   (login-page 'both "You have to be logged in to submit."
-              {do (ensure-news-user)
-                  (newslog 'submit-login)
+              {do (newslog 'submit-login)
                   (submit-page url title text)}))
 
 (def submit-page ((o url "") (o title "") (o text "") (o msg))
