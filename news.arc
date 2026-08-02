@@ -2165,7 +2165,7 @@
 ; in one with the voter in the car and the other without.
 
 (def recent-votes-by ((t user me))
-  (keep [is _!3 user] recent-votes*))
+  (keep [is _!3 (user-id user)] recent-votes*))
 
 
 ; Story Submission
