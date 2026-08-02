@@ -2149,8 +2149,8 @@
 
 (def downvote-ratio ((o sample 20))
   (ratio [is _!1!3 'down]
-         (keep [let by (by (item (car _)))
-                 (nor (me by) (ignored by))]
+         (keep [let u (by (item _!0))
+                 (no (me|ignored u))]
                (bestn sample (compare > car:cadr) (tablist (votes))))))
 
 (def just-downvoted (victim (o n 3))
