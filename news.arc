@@ -3264,7 +3264,7 @@
 
 (def comment-score (user)
   (aif (check (nthcdr 5 (comments user 50)) [len> _ 10])
-       (avg (cdr (sort > (map !score (rem !deleted it)))))
+       (avg (cdr (sort > (map !score (rem deleted it)))))
        nil))
 
 
