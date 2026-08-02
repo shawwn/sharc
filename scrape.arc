@@ -531,15 +531,16 @@
 (or= last-fetch-time* (now))
 
 (def scrape-delay! ()
-  (atomic
-    (let delay (- scrape-crawl-delay* (- (now) last-fetch-time*))
-      (= last-fetch-time* (now))
-      (when (> delay 0)
-        (sleep delay)))))
+  (withs (t0      (now)
+          elapsed (- t0 last-fetch-time*)
+          delay   (- scrape-crawl-delay* elapsed))
+    (= last-fetch-time* t0)
+    (if (> delay 0) (sleep delay))))
 
 (def fetch-hn-url (op)
-  (scrape-delay!)
-  (curl-get (+ scrape-hn-host* "/" op)))
+  (atomic
+    (scrape-delay!)
+    (curl-get (+ scrape-hn-host* "/" op))))
 
 (def fetch-hn-item (id)
   (fetch-hn-url (+ "item?id=" id)))
