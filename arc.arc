@@ -1297,7 +1297,7 @@
 ; Destructive stable merge-sort, adapted from slib and improved 
 ; by Eli Barzilay for MzLib; re-written in Arc.
 
-(def mergesort (less? lst)
+(def mergesort1 (less? lst)
   (let n (len lst)
     (if (<= n 1) lst
         ; check if the list is already sorted
@@ -1313,7 +1313,7 @@
                 (withs (j (/ (if (even n) n (- n 1)) 2) ; faster than round
                         a (self j)
                         b (self (- n j)))
-                  (merge less? a b))
+                  (merge1 less? a b))
                ; the following case just inlines the length 2 case,
                ; it can be removed (and use the above case for n>1)
                ; and the code still works, except a little slower
@@ -1332,7 +1332,7 @@
 
 ; Also by Eli. Merges two lists that are already sorted.
 
-(def merge (less? x y)
+(def merge1 (less? x y)
   (if (no x) y
       (no y) x
       (w/defs
@@ -1349,6 +1349,20 @@
           ; (car x) <= (car y)
           (do (if (cdr x) (lup x (cdr x) y t) (scdr x y))
               x)))))
+
+; CL-optimized versions of the sorting functions above.
+; Speedup is ~1.7x to ~3x, but sacrifices Arc purity.
+
+(def mergesort2 (less? lst)
+  (#'stable-sort lst less?))
+
+(def merge2 (less? x y)
+  (#'merge #''list x y less?))
+
+; use the optimized versions.
+
+(def mergesort mergesort2)
+(def merge     merge2)
 
 (def bestn (n f seq)
   (firstn n (sort f seq)))
