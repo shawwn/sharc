@@ -2300,27 +2300,31 @@
     (push s stories*)
     s))
 
-(def register-story (s (o url s!url) (o urlname (sitename url)))
+(def register-story (s (o url s!url) (o site (sitename url)))
   (unless (blank url)
-    (process-url s url urlname)
-    (todisk sitename->items*)
-    (register-url s url)))
+    (register-url s url)
+    (process-url s url site)
+    (save-site-items)))
+
+(def register-comment (c text)
+  (awhen (urls text)
+    (each url it (process-url c url))
+    (save-site-items)))
+
+(def process-url (i (o url i!url) (o site (sitename url)))
+  (when site
+    (put-site-item i site)
+    ; for e.g. "github.com/antirez", also register "github.com"
+    (aif (root-site site) (put-site-item i it))))
+
+(def root-site (site) (aif (pos #\/ site) (cut site 0 it)))
 
 (disktable sitename->items* (+ newsdir* "sitename-items"))
 
-(def process-url (i (o url i!url) (o urlname (sitename url)))
-  (awhen urlname
-    (pushnew i!id (sitename->items* it))
-    ; for e.g. "github.com/antirez", also register "github.com"
-    (whenlet p (pos #\/ it)
-      (pushnew i!id (sitename->items* (cut it 0 p))))))
+(def save-site-items () (todisk sitename->items*))
 
-(def unregister-item (s (o url s!url) (o urlname (sitename url)))
-  (awhen urlname
-    (pull s!id (sitename->items* it))
-    (whenlet p (pos #\/ it)
-      (pull s!id (sitename->items* (cut it 0 p)))))
-  (todisk sitename->items*))
+(def put-site-item (i (o site (sitename i!url)))
+  (if site (insortnew > i!id (sitename->items* site))))
 
 
 ; Bans
@@ -2818,13 +2822,7 @@
     (push c!id parent!kids)
     (save-item parent)
     (push c comments*)
-    (register-comment c text)
-    c))
-
-(def register-comment (c text)
-  (each url (urls text)
-    (process-url c url))
-  (todisk sitename->items*))
+    (register-comment c text)))
 
 ; Comment Display
 
