@@ -418,7 +418,7 @@
 ; thus get stuck in front of it. I avoid this by regularly adjusting 
 ; the rank of a random top story.
 
-(defbg rerank-random 30 (rerank-random))
+;(defbg rerank-random 30 (rerank-random))
 
 (def rerank-random ()
   (when ranked-stories*
