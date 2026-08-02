@@ -1989,47 +1989,7 @@
 (def live-story-w/url (url) 
   (aand (url->story* (canonical-url url)) (check (item it) live)))
 
-(def parse-site (url)
-  (rev (tokens (cadr (tokens url [in _ #\/ #\?])) #\.)))
-
-(defmemo sitename (url)
-  (and (valid-url url)
-       (only&downcase
-         (withs (parts (tokens (rem #\space url) [in _ #\/ #\?])
-                 host  (downcase parts!1) ; hosts are case-insensitive
-                 path1 parts!2            ; first path segment, if any
-                 toks  (rev (tokens host #\.)))
-           (if (isa!int (saferead (car toks)))
-               (tostring (prall toks "" "."))
-               (let (t1 t2 t3 . rest) toks
-                 (let suffix (and t2 (+ t2 "." t1))
-                   (if (mem suffix subdomain-sites*)
-                        host                   ; e.g. name.github.io -> name.github.io
-                       (let site (if (and (~in t3 nil "www")
-                                          (or (mem t1 multi-tld-countries*)
-                                              (mem t2 long-domains*)))
-                                     (+ t3 "." t2 "." t1)
-                                     suffix)
-                         (if (and (mem site username-sites*) path1)
-                             ; strip a leading @ or ~ from the username
-                             (+ site "/" (if (in (path1 0) #\@ #\~)
-                                             (cut path1 1)
-                                             path1))
-                             site))))))))))
-
-; sites where the first path segment (a username) is part of the name
-(= username-sites* '("twitter.com" "x.com" "github.com" "medium.com"))
-
-; sites where the subdomain matters (name.github.io, not just github.io)
-(= subdomain-sites* '("github.io"))
-
-(= multi-tld-countries* '("uk" "jp" "au" "in" "ph" "tr" "za" "my" "nz" "br" 
-                          "mx" "th" "sg" "id" "pk" "eg" "il" "at" "pl"))
-
-(= long-domains* '("blogspot" "wordpress" "livejournal" "blogs" "typepad" 
-                   "weebly" "posterous" "blog-city" "supersized" "dreamhosters"
-                   ; "sampasite"  "multiply" "wetpaint" ; all spam, just ban
-                   "eurekster" "blogsome" "edogo" "ycombinator" "blog" "com"))
+(load "sitename.arc")
 
 (def create-story (url title text)
   (newslog 'create url (list title))
