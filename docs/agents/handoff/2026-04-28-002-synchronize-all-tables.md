@@ -97,14 +97,59 @@ two relaxations are available:
 
 Neither is needed yet. Revisit when there's evidence.
 
-## What dang says
+## What dang says (answered 2026-04-28, folded in 2026-08-02)
 
-Asked dang what clarc does — sent the question while making this
-change, haven't heard back yet. Worth folding his answer in
-whenever he replies; clarc has a longer history of arc-on-CL use
-than sharc and may have hit this question already. If clarc went
-opt-in for perf reasons that apply here, that's good evidence to
-revisit.
+Asked dang what clarc does while making this change. **Reply
+received the same day; it confirms the choice made here.** Verbatim:
+
+> I set :synchronized for every table. Btw weak hashtables dont work
+> well with :synchronized - I got burned by that.
+>
+> Eventually dropped Arc's global atomic-invoke form because it was
+> too much of a bottleneck.
+
+Three things follow.
+
+1. **Synchronize-by-default is validated.** clarc, with a longer
+   history of arc-on-CL use than sharc, independently made the same
+   call. The opt-in relaxations sketched under "Trade-off
+   acknowledged" above stay available but there is now no evidence
+   pulling toward them. Consider that open question closed.
+
+2. **Weak hash tables are the exception, and the blanket rule hides
+   it.** `:synchronized t` does not make a weak table safe, because
+   weakness is implemented by the GC, which runs outside the table's
+   mutex. This has its own writeup:
+   `docs/agents/plans/2026-08-02-002-weak-tables-and-synchronized.md`.
+   sharc has no weak tables today, so nothing is broken; read that
+   doc before adding the first one.
+
+3. **The global mutex is a known bottleneck in practice, not just in
+   theory.** "Eventually" is doing real work in that sentence: clarc
+   shipped with `atomic-invoke` for a while before removing it. This
+   is direct corroboration for
+   `docs/agents/plans/2026-08-02-001-remove-global-mutex.md`. What
+   the reply does *not* say is what replaced it; see that plan's
+   open-question section.
+
+### Footnote: "every table" is no longer literally true here
+
+As of `0d6e994` (compile-time global cells, handoff
+`2026-07-27-001-global-cells.md`), `*arc-globals*` is deliberately
+**not** `:synchronized`. Reads and writes of a bound global are now a
+plain struct slot access, and only cell *creation* is serialized, by
+a dedicated `*arc-globals-lock*`. That is a considered deviation from
+the policy in this doc, not an oversight.
+
+Still synchronized, and matching dang: the `(xdef table)` and
+`(xdef isotable)` constructors, `*arc-fn-signatures*`, and the
+socket-option tables. The one other unsynchronized table is a local
+`eq` table inside `arc-heap-hist`, built after a full GC inside a
+single debug call, where it cannot be shared.
+
+(References here are by name rather than `arc0.lisp:NNN` on purpose;
+that file moves often enough that line numbers in docs go stale
+quickly.)
 
 ## Things this does NOT fix
 
@@ -121,5 +166,9 @@ that checks the flag at each yield. Documented but not implemented.
 - `examples/coroutines.arc`: unchanged. `coros*` is just `(table)`
   and now inherits `:synchronized t` automatically.
 - Test suite: 207/207.
-- Open question: dang's clarc choice may inform whether we keep
-  the global default or move to opt-in.
+- ~~Open question: dang's clarc choice may inform whether we keep
+  the global default or move to opt-in.~~ **Resolved 2026-04-28,
+  folded in 2026-08-02: clarc synchronizes every table too. Keep
+  the global default.** See "What dang says" above; note the two
+  caveats it raised (weak tables, and the global mutex as a
+  bottleneck), each of which now has a plan doc.

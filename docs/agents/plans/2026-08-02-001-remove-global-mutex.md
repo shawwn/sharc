@@ -195,11 +195,59 @@ conversion will deadlock against itself.
 
 ## Open question: what clarc actually did
 
-Unverified. The claim that dang removed the global mutex in clarc has not been
-checked against clarc's source from this session, and his design is not
-reproduced here. Before committing to the phase plan above, diff clarc's
-`atomic-invoke` and its call sites against this codebase's and note where the
-two designs agree or diverge.
+**Partly answered 2026-08-02.** dang confirmed the premise directly by email:
+
+> I set :synchronized for every table. Btw weak hashtables dont work well
+> with :synchronized - I got burned by that.
+>
+> Eventually dropped Arc's global atomic-invoke form because it was too much
+> of a bottleneck.
+
+What this settles:
+
+- **The premise is no longer a guess.** clarc really did drop
+  `atomic-invoke`, and the stated reason is the same one this plan is built
+  on: it is a bottleneck. This plan is not speculative work.
+- **"Eventually" matters.** clarc ran in production with the global mutex
+  for a long time before removing it. That supports the phased approach
+  above rather than a single flag-day conversion.
+- **The starting position is identical.** clarc also synchronizes every
+  table, which is the precondition this plan leans on in fact 1 (the global
+  mutex is only protecting composite invariants, not basic table access).
+  The two codebases are converging from the same place, so clarc's answer is
+  more transferable than it would otherwise be.
+
+What it does **not** settle, and what to ask next:
+
+> **What replaced it?**
+
+This is the highest-value unknown in the whole plan. Three possibilities,
+which imply very different amounts of work:
+
+1. `atomic` became a no-op, leaning entirely on synchronized tables. Cheapest,
+   and would mean the composite invariants this plan worries about either did
+   not matter in practice or were fixed some other way.
+2. Per-structure locks replaced the world lock. Middle cost; closest to the
+   phase plan above.
+3. A narrow global lock was kept for a small set of genuinely cross-structure
+   invariants, with everything else unlocked. This is what this plan bets is
+   correct.
+
+Confirming which, from someone who has already run the result in production,
+would de-risk this effort more than any further local analysis. **Ask before
+starting phase 1.**
+
+Independently of the reply, still worth doing: diff clarc's `atomic-invoke`
+and its call sites against this codebase's and note where the two designs
+agree or diverge.
+
+### Related caveat
+
+The same reply flagged that weak hash tables do not work well with
+`:synchronized`. That is orthogonal to removing the mutex, but it constrains
+any "replace the world lock with a weak cache" idea that might come up during
+this work. Writeup:
+`docs/agents/plans/2026-08-02-002-weak-tables-and-synchronized.md`.
 
 ## Suggested first commit
 
