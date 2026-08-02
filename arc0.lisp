@@ -345,7 +345,12 @@ straight to gcell-ref; this remains for callers holding only a symbol."
               ((and (characterp x) (characterp y)) (char> x y))
               (t (> x y)))))
 
-(xdef > (&rest args) (pairwise #'arc->2 args))
+(xdef > (x y &rest args)
+  (if args
+      (and (arc->2 x y)
+           (arc->2 y (car args))
+           (pairwise #'arc->2 args))
+      (arc->2 x y)))
 
 (defun arc-<2 (x y)
   (tnil (cond ((and (numberp x) (numberp y)) (< x y))
@@ -355,7 +360,12 @@ straight to gcell-ref; this remains for callers holding only a symbol."
               ((and (characterp x) (characterp y)) (char< x y))
               (t (< x y)))))
 
-(xdef < (&rest args) (pairwise #'arc-<2 args))
+(xdef < (x y &rest args)
+  (if args
+      (and (arc-<2 x y)
+           (arc-<2 y (car args))
+           (pairwise #'arc-<2 args))
+      (arc-<2 x y)))
 
 ;;;; ---- math operators ----
 
