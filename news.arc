@@ -980,10 +980,12 @@
 
 ; Users
 
-(newsop user (id)
-  (if (only&profile id)
-      (user-page id)
-      (pr "No such user.")))
+(newsop user (id uid)
+  (aif (only&profile id)
+        (user-page id)
+       (safe-uid uid)
+        (user-page (uid->user* it))
+        (pr "No such user.")))
 
 (def prjson (x)
   (to-json x (is (downcase arg!print) "pretty")))
