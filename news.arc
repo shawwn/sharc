@@ -840,9 +840,14 @@
 
 (= noob-days* 14) ; how long a user's name is colored green
 
-(def noob ((t user me))
-  (and user (< (days-since (uvar user created)) noob-days*)))
+(def noob ((t u me) (t i story))
+  (and u (if i
+             (bynoob i u)
+             (< (days-since (uvar u created)) noob-days*))))
 
+(def bynoob (i (o u (by i)))
+  (and u (< (- (user-age u) (item-age i))
+            (* 60 24 noob-days*))))
 
 ; News-Specific Defop Variants
 
@@ -1230,10 +1235,8 @@
             [nexturl whence _]))
 
 (def noobs (n source)
-  (retrieve n [cansee&bynoob _] source))
+  (retrieve n cansee&bynoob source))
 
-(def bynoob (i)
-  (< (- (user-age (by i)) (item-age i)) (* 60 24 noob-days*)))
 
 (newsop from (site kind next)
   (w/the listpage-body
