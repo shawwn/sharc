@@ -2770,7 +2770,8 @@
   (tarform 1800
            (when-umatch/r user
              (process-comment parent arg!text whence))
-    (textarea "text" 8 80
+    (tag (textarea name "text" rows 8 cols 80
+                   wrap 'virtual style "vertical-align:bottom")
       (aif text (prn (unmarkdown it))))
     (formatdoc-link)
     (when (and noob-comment-msg* (noob user))
