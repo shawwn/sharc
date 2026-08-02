@@ -3313,7 +3313,7 @@
             [pageurl "active" (+ (curpage) 1)]))
 
 (def actives ((o n maxend*) (o consider 2000))
-  (visible (rank-stories n consider (memo active-rank))))
+  (rank-stories n consider (memo active-rank) shown))
 
 (= active-threshold* 1500)
 
