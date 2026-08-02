@@ -2817,9 +2817,9 @@
 
 (def create-comment (parent text)
   (newslog 'comment parent!id)
-  (let c (inst 'item 'type 'comment 'id (new-item-id)
-                     'text (md-from-form text) 'parent parent!id
-                     'by (me) 'ip (ip))
+  (lets c (inst 'item 'type 'comment 'id (new-item-id)
+                      'text (md-from-form text) 'parent parent!id
+                      'by (user-id) 'ip (ip))
     (save-item c)
     (= (items* c!id) c)
     (push c!id parent!kids)
