@@ -290,6 +290,8 @@
                   (self (map1 cdr seqs)))))
        seqs)))
 
+(def zip args (apply map list args))
+
 (def mappend (f . args)
   (apply + nil (apply map f args)))
 
@@ -310,8 +312,6 @@
       nil
       (cons (firstn n xs)
             (tuples (nthcdr n xs) n))))
-
-(def zip args (apply map list args))
 
 ; If ok to do with =, why not with def?  But see if use it.
 
