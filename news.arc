@@ -1926,6 +1926,14 @@
 (def user-voted-for (i test)
   (find test:uid->user*:!2 i!votes))
 
+(def announcelink (i whence)
+  (when (editor)
+    (pr bar*)
+    (w/rlink (do (zap no (announcement i))
+                 (save-item i)
+                 whence)
+      (pr "@(if (announcement i) 'un-)announce"))))
+
 (def killlink (i whence)
   (when (admin)
     (pr bar*)
@@ -2945,6 +2953,8 @@
           (editlink c)
           (favelink c)
           (let whenceid (if astree (string whence "#" c!id) whence)
+            (when (and (is indent 0) (op "item"))
+              (announcelink c whenceid))
             (killlink c whenceid)
             (blastlink c whenceid)
             (deletelink c whenceid)
