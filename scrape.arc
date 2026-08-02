@@ -385,10 +385,18 @@
 (def parse-listitem (html (o start 0))
   (lets rec (obj type 'story)
     (let p 0 ; (posmatch "<tr class=\"athing" html start)
-      (aif (html-attr html 0 "id")
-           (= rec!id (errsafe:int it)))
+      (= rec!id   (parse-item-id html)
+         rec!rank (parse-item-rank html))
       (parse-titleline! html p rec)
       (parse-subtext-row! html p rec "<td class=\"subtext\">" "</tr>"))))
+
+(def parse-item-id (html)
+  (awhen (html-attr html 0 "id")
+    (errsafe:int it)))
+
+(def parse-item-rank (html)
+  (whenlet inner (between html "<span class=\"rank\">" ".</span>")
+    (errsafe:int (car inner))))
 
 (def parse-morelink (html)
   (whenlet inner (between html "<tr class=\"morespace" "More")
