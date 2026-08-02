@@ -673,11 +673,18 @@ c"
   (test? nil (errsafe (cut "abcde" 3 1)))
   (test? nil (errsafe (cut "abcde" 1 -1)))
   (test? nil (errsafe (cut "abcde" -1 2)))
-  ; cut1, the pure-Arc version cut2 replaced, does not clamp -- the two
-  ; disagree on exactly the case above
+  ; cut1, the pure-Arc version cut2 replaced, only needed the clamp on its
+  ; string branch: the list branch is firstn, which already stops at the end
+  (test? '(2 3 4 5) (cut1 '(1 2 3 4 5) 1 10))
+  (test? (cut '(1 2 3 4 5) 1 10) (cut1 '(1 2 3 4 5) 1 10)) ; agrees with cut2
+  ; the string branch fills a newstring by indexing seq, so it runs off the
+  ; end where cut2 now clamps -- the one case the two still disagree on
   (test? nil    (errsafe (cut1 "abcde" 1 10)))
   (test? "bcde" (cut1 "abcde" 1))
   (test? "bc"   (cut1 "abcde" 1 3))
+  ; (vectors are outside cut1 entirely -- nthcdr/firstn don't take them --
+  ; so this is unrelated to the bounds)
+  (test? nil (errsafe (cut1 (as!vector '(1 2 3)) 0 2)))
   ; almost is cut to (edge xs), so it stays in range
   (test? "abcd" (almost "abcde"))
   (test? '(1 2) (almost '(1 2 3))))
