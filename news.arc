@@ -275,10 +275,10 @@
 (def save-item (i) (save-table i (+ storydir* i!id)))
 
 (def kill (i how)
-  (unless i!dead
+  (unless (dead i)
     (log-kill i how)
-    (wipe (comment-cache* i!id))
-    (set i!dead)
+    (uncache-comment i!id)
+    (set (dead i))
     (save-item i)))
 
 (or= kill-log* nil)
