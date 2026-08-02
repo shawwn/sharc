@@ -2093,7 +2093,7 @@
                            ; prevention of karma-bombing
                            (just-downvoted (by i))))
                   (and (~legit-user)
-                       (~me (by i))
+                       (~author i)
                        (find [is (cadr _) ip] i!votes))
                   (and (isnt i!type 'pollopt)
                        (biased-voter i vote)))
