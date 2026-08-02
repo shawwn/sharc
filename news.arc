@@ -1469,7 +1469,7 @@
                                       end number moreurl args)))})))
           class 'morelink
           rel 'next)
-    (pr "More")))
+    (pr "@(- (len items) start) More")))
 
 (def moreitem (x)
   (if (isa!table x) x!id x))
