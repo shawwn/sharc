@@ -857,8 +857,7 @@
      (if (,test (me))
          (do ,@body)
          (login-page 'both (+ "Please log in" ,msg ".")
-                     (list {ensure-news-user}
-                           (string ',name (reassemble-args)))))))
+                     (list {} (string ',name (reassemble-args)))))))
 
 (mac defopg (name . body) `(defopt ,name idfn   ""                     ,@body))
 (mac defope (name . body) `(defopt ,name editor " as an editor"        ,@body))
