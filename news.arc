@@ -1906,7 +1906,7 @@
                             (~mem 'nokill i!keys)
                             (len> i!flags flag-kill-threshold*)
                             (< (realscore i) 10)
-                            (~find admin:by:!2 i!vote))
+                            (~user-voted-for i admin))
                    (pushnew 'flagged i!keys)
                    (kill i 'flags))
                  whence)
@@ -1918,6 +1918,9 @@
                    (save-item i)
                    whence)
         (pr (if (mem 'nokill i!keys) "un-notice" "noted"))))))
+
+(def user-voted-for (i test)
+  (find test:uid->user*:!2 i!votes))
 
 (def killlink (i whence)
   (when (admin)
