@@ -3144,8 +3144,7 @@
       (prn "No such user.")))
 
 (def user-comments ((t user me))
-  (keep [and (cansee _) (~subcomment _)]
-        (comments user maxend*)))
+  (keep cansee&~subcomment (comments user maxend*)))
 
 (def display-threads (display comments label title whence
                       (o start 0) (o end threads-perpage*)
