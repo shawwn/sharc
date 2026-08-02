@@ -1479,7 +1479,7 @@
 
 (def cansee-score (i)
   (or (isnt i!type 'comment)
-      (me (by i))
+      (author i)
       (admin)))
 
 (def itemline (i (o whence))
