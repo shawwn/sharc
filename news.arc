@@ -2831,9 +2831,9 @@
 ; A comment is collapsed if an admin marks it as collapsed with the
 ; "collapse" link or the user collapsed it with the [-] button.
 
-(def collapsed (c (o user (me)))
+(def collapsed (c)
   (or (mem 'collapsed c!keys)
-      (and user (mem c!id (uvar user collapsed)))))
+      (and (me) (mem c!id my!collapsed))))
 
 ; hn.js sends this on every [-]/[+] toggle (when logged in) so the choice
 ; persists across page loads.  Fire-and-forget: the response is ignored.
