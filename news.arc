@@ -2279,9 +2279,8 @@
 (diskvar scrubrules* (+ newsdir* "scrubrules"))
 
 (def process-title (s)
-  (let s2 (multisubst scrubrules* s)
-    (zap upcase (s2 0))
-    s2))
+  (lets s2 (multisubst scrubrules* s)
+    (zap upcase (s2 0))))
 
 (def live-story-w/url (url) 
   (aand (url->story* (canonical-url url)) (check (item it) live)))
