@@ -406,7 +406,7 @@
 (def metastory (i) (and i (in i!type 'story 'poll)))
 
 (def adjust-rank (s (o scorefn frontpage-rank))
-  (insortnew (compare > (memo scorefn)) s ranked-stories*)
+  (put-item s ranked-stories* (compare > (memo scorefn)))
   (save-topstories))
 
 ; If something rose high then stopped getting votes, its score would
