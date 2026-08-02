@@ -2458,15 +2458,14 @@
 
 (def create-poll (title text opts)
   (newslog 'create-poll title)
-  (let p (inst 'item 'type 'poll 'id (new-item-id)
-                     'title title 'text text
-                     'by (me) 'ip (ip))
+  (lets p (inst 'item 'type 'poll 'id (new-item-id)
+                      'title title 'text text
+                      'by (user-id) 'ip (ip))
     (= p!parts (map !id (map [create-pollopt p nil nil _]
                              (paras opts))))
     (save-item p)
     (= (items* p!id) p)
-    (push p stories*)
-    p))
+    (push p stories*)))
 
 (def create-pollopt (p url title text)
   (let o (inst 'item 'type 'pollopt 'id (new-item-id)
