@@ -443,6 +443,34 @@
        (or (begins url "http://")
            (begins url "https://"))))
 
+(def parse-url (url (o allow-fragments t))
+  (let (scheme netloc url query fragment) (urlsplit url allow-fragments)
+    (obj scheme   (or scheme "")
+         netloc   (or netloc "")
+         path     (or url "")
+         query    (or query "")
+         fragment (or fragment ""))))
+
+(def urlsplit (url (o allow-fragments t))
+  (let (scheme netloc query fragment) nil
+    (whenlet i (pos #\: url)
+      (when (and (> i 0) (letter (url 0)))
+        (= scheme (downcase (cut url 0 i))
+           url    (cut url (+ i 1)))))
+    (when (begins url "//")
+      (= (list netloc url) (split-netloc url 2)))
+    (when allow-fragments
+      (whenlet p (pos #\# url)
+        (= (list url fragment) (cleave url p))))
+    (whenlet p (pos #\? url)
+      (= (list url query) (cleave url p)))
+    (list scheme netloc url query fragment)))
+
+(def split-netloc (url (o start 0))
+  (iflet delim (pos [in _ #\/ #\? #\#] url start)
+         (list (cut url start delim) (cut url delim))
+         (list (cut url start) "")))
+
 (mac fontcolor (c . body)
   (w/uniq g
     `(let ,g ,c
