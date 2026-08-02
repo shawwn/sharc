@@ -3534,7 +3534,7 @@ brackets&gt; and it should work.<br><br>")
            (len> i!flags many-flags*))))
 
 (edop killed ()
-  (display-selected-items [retrieve maxend* !dead _] "killed"))
+  (display-selected-items [retrieve maxend* dead _] "killed"))
 
 (def display-selected-items (f whence)
   (display-items (f stories*) nil nil whence)
