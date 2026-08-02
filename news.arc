@@ -2900,15 +2900,19 @@
 
 (def display-comment-body (c whence astree indent showpar showon)
   (++ comments-printed*)
-  (if (and comment-caching*
-           astree (no showpar) (no showon)
-           (live c)
-           (nor (admin) (editor) (author c))
-           (~collapsed c) ; per-user state; don't bake into the shared cache
-           (< (- maxid* c!id) cc-window*)
-           (> (- (seconds) c!time) 60)) ; was 3600
+  (if (should-cache-comment c whence astree indent showpar showon)
       (pr (cached-comment-body c whence indent))
       (gen-comment-body c whence astree indent showpar showon)))
+
+(def should-cache-comment (c whence astree indent showpar showon)
+  ;(ero `(should-cache-comment ,c!id ,whence ,astree ,indent ,showpar ,showon))
+  (and comment-caching*
+       astree (no showpar) (no showon)
+       (live c)
+       (nor (admin) (editor) (author c))
+       (~collapsed c) ; per-user state; don't bake into the shared cache
+       ;(< (- maxid* c!id) cc-window*)
+       (> (since c!time) 60))) ; was 3600
 
 (def cached-comment-body (c whence indent)
   (or (and (> (or (comment-cache-timeout* c!id) 0) (seconds))
