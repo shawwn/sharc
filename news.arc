@@ -2245,8 +2245,8 @@
              "newest"))))
 
 (def submit-item (i)
-  (push i!id (uvar (me) submitted))
-  (save-prof (me))
+  (push i!id my!submitted)
+  (save-prof)
   (vote-for i))
 
 (def recent-spam (site)
