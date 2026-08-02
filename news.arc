@@ -372,23 +372,27 @@
   (writefile (map !id (firstn 180 ranked-stories*))
              (+ newsdir* "topstories")))
  
-(def rank-stories (n consider scorefn)
-  (bestn n (compare > scorefn) (latest-items metastory nil consider)))
+(def rank-items (n consider scorefn (o test idfn))
+  (bestn n (compare > scorefn) (latest-items test nil consider)))
 
-; With virtual lists the above call to latest-items could be simply:
-; (map item (retrieve consider metastory:item (gen maxid* [- _ 1])))
+(def rank-stories (n consider scorefn (o test idfn))
+  (rank-items n consider scorefn metastory&test))
 
-(def latest-items (test (o stop) (o n))
+(def rank-comments (n consider scorefn (o test idfn))
+  (rank-items n consider scorefn acomment&test))
+
+(def latest-items (test (o stop) (o n) (o noisy))
   (accum a
-    (catch 
-      (down id maxid* 1
-        (let i (item id)
-          (if (or (and stop (stop i)) (and n (<= n 0))) 
+    (w/noisy iter
+      (catch
+        (each-item i
+          (if (or (and stop (stop i)) (and n (<= n 0)))
               (throw))
-          (when (test i) 
-            (a i) 
-            (if n (-- n))))))))
-             
+          (when (test i)
+            (a i)
+            (if n (-- n))
+            (iter)))))))
+
 ; redefined later
 
 (def metastory (i) (and i (in i!type 'story 'poll)))
