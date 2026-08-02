@@ -526,7 +526,44 @@ straight to gcell-ref; this remains for callers holding only a symbol."
   (write-byte b (if args (car args) *standard-output*))
   b)
 
-(defun arc-disp-val (x port)
+(defun print-level-exceeded-p (depth)
+  "True when a nested object at DEPTH should print as # per *print-level*."
+  (and *print-level* (>= depth *print-level*)))
+
+(defun write-remaining-level (x port depth)
+  "Fall back to CL's printer, charging DEPTH against *print-level*."
+  (let ((*print-level* (and *print-level* (max 0 (- *print-level* depth)))))
+    (write x :stream port :readably nil)))
+
+(defun arc-print-list (x port depth printer)
+  "Print list X as (elem elem ...) using PRINTER, honouring *print-length*."
+  (write-char #\( port)
+  (let ((rest x) (n 0))
+    (loop while rest do
+      (cond
+        ((and *print-length* (>= n *print-length*))
+         ;; Out of budget: a dotted atom tail is still printed in full
+         ;; (CL prints (1 . 2) even with *print-length* 1), but any
+         ;; remaining elements collapse to "...".
+         (cond ((consp rest)
+                (when (plusp n) (write-char #\space port))
+                (write-string "..." port))
+               (t
+                (write-string " . " port)
+                (funcall printer rest port (1+ depth))))
+         (setf rest nil))
+        ((consp rest)
+         (when (plusp n) (write-char #\space port))
+         (funcall printer (car rest) port (1+ depth))
+         (incf n)
+         (setf rest (cdr rest)))
+        (t
+         (write-string " . " port)
+         (funcall printer rest port (1+ depth))
+         (setf rest nil)))))
+  (write-char #\) port))
+
+(defun arc-disp-val (x port &optional (depth 0))
   (cond
     ((stringp x)    (write-string x port))
     ((characterp x) (write-char x port))
@@ -536,23 +573,12 @@ straight to gcell-ref; this remains for callers holding only a symbol."
     ((symbolp x)    (write-string (symbol-name x) port))
     ((typep x 'double-float) (format port "~F" x))
     ((consp x)
-     (write-char #\( port)
-     (arc-disp-val (car x) port)
-     (let ((rest (cdr x)))
-       (loop while rest do
-         (cond
-           ((consp rest)
-            (write-char #\space port)
-            (arc-disp-val (car rest) port)
-            (setf rest (cdr rest)))
-           (t
-            (write-string " . " port)
-            (arc-disp-val rest port)
-            (setf rest nil)))))
-     (write-char #\) port))
-    (t (write x :stream port :readably nil))))
+     (if (print-level-exceeded-p depth)
+         (write-char #\# port)
+         (arc-print-list x port depth 'arc-disp-val)))
+    (t (write-remaining-level x port depth))))
 
-(defun arc-write-val (x port)
+(defun arc-write-val (x port &optional (depth 0))
   (cond
     ((stringp x)    (write x :stream port))  ; quoted
     ((characterp x) (write x :stream port))
@@ -562,21 +588,10 @@ straight to gcell-ref; this remains for callers holding only a symbol."
                     (write-string (string-downcase (symbol-name x)) port))
     ((symbolp x)    (write-string (symbol-name x) port))
     ((consp x)
-     (write-char #\( port)
-     (arc-write-val (car x) port)
-     (let ((rest (cdr x)))
-       (loop while rest do
-         (cond
-           ((consp rest)
-            (write-char #\space port)
-            (arc-write-val (car rest) port)
-            (setf rest (cdr rest)))
-           (t
-            (write-string " . " port)
-            (arc-write-val rest port)
-            (setf rest nil)))))
-     (write-char #\) port))
-    (t (write x :stream port :readably nil))))
+     (if (print-level-exceeded-p depth)
+         (write-char #\# port)
+         (arc-print-list x port depth 'arc-write-val)))
+    (t (write-remaining-level x port depth))))
 
 (xdef disp (&rest args)
   (let ((port (if (cdr args) (cadr args) *standard-output*)))
@@ -1800,33 +1815,40 @@ straight to gcell-ref; this remains for callers holding only a symbol."
 
 (xdef report-frame #'arc-report-frame)
 
+(defvar *arc-err-print-length* 10)
+(defvar *arc-err-print-level* 4)
+
 (defun arc-map-backtrace (fn)
   (sb-debug:map-backtrace fn))
 
 (xdef map-backtrace #'arc-map-backtrace)
 
 (defun arc-report-backtrace (&optional (stream *error-output*) (report-frame #'arc-report-frame))
-  (format stream "Backtrace for: ~A~%" sb-thread:*current-thread*)
-  (let ((i 0)
-        (count 30)
-        (stop nil))
-    (arc-map-backtrace
-     (lambda (frame)
-       (when (and (not stop) (< i count))
-         (format stream "~D: " i)
-         (funcall report-frame frame stream)
-         (incf i)
-         (let ((name (sb-di:debug-fun-name (sb-di:frame-debug-fun frame))))
-           (when (and (symbolp name)
-                      (string= (symbol-name name) "ARC-BOOT"))
-             (setf stop t)))))))
-  (terpri stream)
-  (force-output stream))
+  (let ((*print-length* *arc-err-print-length*)
+        (*print-level* *arc-err-print-level*))
+    (format stream "Backtrace for: ~A~%" sb-thread:*current-thread*)
+    (let ((i 0)
+          (count 30)
+          (stop nil))
+      (arc-map-backtrace
+       (lambda (frame)
+         (when (and (not stop) (< i count))
+           (format stream "~D: " i)
+           (funcall report-frame frame stream)
+           (incf i)
+           (let ((name (sb-di:debug-fun-name (sb-di:frame-debug-fun frame))))
+             (when (and (symbolp name)
+                        (string= (symbol-name name) "ARC-BOOT"))
+               (setf stop t)))))))
+    (terpri stream)
+    (force-output stream)))
 
 (xdef report-backtrace #'arc-report-backtrace)
 
 (defun arc-report-error (c &optional (stream *error-output*))
-  (format stream "Error: ~A~%" c)
+  (let ((*print-length* *arc-err-print-length*)
+        (*print-level* *arc-err-print-level*))
+    (format stream "Error: ~A~%" c))
   (arc-report-backtrace stream))
 
 (xdef report-error #'arc-report-error)
@@ -1836,6 +1858,9 @@ straight to gcell-ref; this remains for callers holding only a symbol."
   (arc-tl2))
 
 (xdef repl #'arc-tl)
+
+(defvar *arc-repl-print-length* 100)
+(defvar *arc-repl-print-level* 8)
 
 (defun arc-tl2 ()
   (format t "arc> ")
@@ -1859,7 +1884,9 @@ straight to gcell-ref; this remains for callers holding only a symbol."
           ((or (eq expr :eof) (equal expr :a)) (return-from arc-tl2 'done))
           (t
            (let ((val (arc-eval expr)))
-             (arc-write-val val *standard-output*)
+             (let ((*print-length* *arc-repl-print-length*)
+                   (*print-level* *arc-repl-print-level*))
+               (arc-write-val val *standard-output*))
              (terpri)
              (setf (arc-global '|that|)     val)
              (setf (arc-global '|thatexpr|) expr)))))))
