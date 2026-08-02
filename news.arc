@@ -1436,41 +1436,43 @@
 
 ; Story Display
 
-(def display-items (items label title whence
-                    (o start 0) (o end perpage*) (o number) (o moreurl)
-                    (o numstart (+ start 1)))
+(def display-page (display items label title whence
+                   (o start 0) (o end perpage*) (o number)
+                   (o moreurl) (o numstart (+ start 1)))
   (zerotable
     (let n (- numstart 1)
       (each i (cut items start end)
-        (display-item (and number (++ n)) i whence t)
-        (spacerow (if (acomment i) 15 5) "spacer")))
+        (display (and number (++ n)) i whence)))
     (when end
       (when (< end (len items))
         (spacerow 10 "morespace")
         (tr (tag (td colspan (if number 2 1)))
             (tag (td class 'title)
-              (morelink display-items
-                        items label title end (+ end perpage*)
+              (morelink display-page
+                        display items label title end (+ end perpage*)
                         number moreurl (+ numstart perpage*))))))))
 
 ; This code is inevitably complex because the More fn needs to know 
 ; its own fnid in order to supply a correct whence arg to stuff on 
 ; the page it generates, like logout and delete links.
 
-(def morelink (f items label title start end number moreurl . args)
+(def morelink (f display items label title start end number moreurl . args)
   (tag (a href
           (if moreurl
-              (moreurl ((items start) 'id))
+              (moreurl (moreitem (items start)))
               (url-for
                 (afnid {do (prn)
                            (let url (url-for it) ; it bound by afnid
                              (newslog 'more label)
                              (longpage (msec) nil label title url
-                               (apply f items label title url start
+                               (apply f display items label title url start
                                       end number moreurl args)))})))
           class 'morelink
           rel 'next)
     (pr "More")))
+
+(def moreitem (x)
+  (if (isa!table x) x!id x))
 
 (def display-story (i s whence)
   (when (cansee|!kids s)
