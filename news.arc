@@ -1929,14 +1929,12 @@
 (def killlink (i whence)
   (when (admin)
     (pr bar*)
-    (w/rlink (do (zap no i!dead)
-                 (if i!dead
-                     (do (pull 'nokill i!keys)
-                         (log-kill i))
-                     (pushnew 'nokill i!keys))
+    (w/rlink (do (zap no (dead i))
+                 (= (mem 'nokill i!keys) (~dead i))
+                 (dead&log-kill i)
                  (save-item i)
                  whence)
-      (pr "@(if i!dead 'un)kill"))))
+      (pr "@(if (dead i) 'un)kill"))))
 
 ; Allow links turns on clickable urls in story text.
 
