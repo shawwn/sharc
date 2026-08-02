@@ -1644,8 +1644,7 @@
         (no user)
          (flink
            {login-page 'both "You have to be logged in to vote."
-                       (list {do (ensure-news-user)
-                                 (newslog 'vote-login)
+                       (list {do (newslog 'vote-login)
                                  (when (canvote i how)
                                    (vote-for i how)
                                    (logvote i))}
