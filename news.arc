@@ -425,9 +425,7 @@
     (adjust-rank (ranked-stories* (rand (min 50 (len ranked-stories*)))))))
 
 (def topstories (n (o threshold front-threshold*))
-  (retrieve n
-            [and (>= (realscore _) threshold) (cansee _) (~hidden _)]
-            ranked-stories*))
+  (retrieve n (andf shown [>= (realscore _) threshold]) ranked-stories*))
 
 (= max-delay* 10)
 
