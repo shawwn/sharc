@@ -1399,7 +1399,7 @@
                              (if comments 'comments 'submissions) " yet."))
                (para "To add one to your own favorites, click on its timestamp"
                      " to go to its page, then click 'favorite' at the top."))}
-      (listpage (msec) items "favorites" title
+      (listpage (pagems) items "favorites" title
                 (nexturl (favorites-url user comments)) (no comments)
                 [nexturl (favorites-url user comments) _
                          (unless comments (+ (cur-n) perpage*))]))))
