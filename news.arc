@@ -3370,7 +3370,7 @@ brackets&gt; and it should work.<br><br>")
   (minipage "Reset Password"
     (if msg
          (pr msg)
-        (blank (uvar (me) email))
+        (blank my!email)
          (do (pr "Before you do this, please add your email address to your ")
              (underlink "profile" (user-url (me)))
              (pr ". Otherwise you could lose your account if you mistype
