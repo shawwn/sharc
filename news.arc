@@ -1209,8 +1209,8 @@
             (nexturl "newest") t
             [nexturl "newest" _ (+ (cur-n) perpage*)]))
 
-(def newstories (n)
-  (retrieve n [and (cansee _) (~hidden _)] stories*))
+(def newstories ((o n maxend*))
+  (retrieve n shown stories*))
 
 
 (newsop best () (bestpage))
