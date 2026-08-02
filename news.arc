@@ -1835,7 +1835,7 @@
   (when (cansee i)
     (pr bar*)
     (tag (a href (item-url i!id))
-      (let n (- (visible-family i) 1)
+      (let n (w/loading-items (- (visible-family i) 1))
         (if (> n 0)
             (do (pr (plural n "comment"))
                 (awhen (and show-threadavg* (admin user) (threadavg i))
