@@ -1966,14 +1966,14 @@
 (def toggle-blast (i (o nuke))
   (atomic
     (if (ignored (by i))
-        (do (wipe i!dead (ignored (by i)))
+        (do (wipe (dead i) (ignored (by i)))
             (awhen (and nuke (sitename i!url))
               (set-site-ban it nil)))
-        (do (set i!dead)
+        (do (set (dead i))
             (ignore (by i) (if nuke 'nuke 'blast))
             (awhen (and nuke (sitename i!url))
               (set-site-ban it 'ignore))))
-    (if i!dead (log-kill i))
+    (if (dead i) (log-kill i))
     (save-item i)
     (save-prof (by i))))
 
