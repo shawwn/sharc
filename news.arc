@@ -1809,12 +1809,12 @@
   ; across refreshes.
   (tag (span id (string "unv_" i!id))
     ; not (author i): you auto-upvote your own items but can't unvote them
-    (whenlet vote (and (me) (~author i) ((votes) i!id))
+    (whenlet vote (and (me) (~author i) (voted i))
       (pr bar*)
       (tag (a id    (string "un_" i!id)
               class 'clicky
               href  (vote-url i 'un (or whence "news")))
-        (pr (if (is (vote 3) 'up) "unvote" "undown"))))))
+        (pr (if (is vote!3 'up) "unvote" "undown"))))))
 
 (= noob-color* (color 60 150 60))
 
