@@ -521,13 +521,20 @@
 
 ; (nthcdr x y) = (cut y x).
 
-(def cut (seq start (o end))
+(def cut1 (seq start (o end))
   (let end (or end (len seq))
     (if (isa!string seq)
         (lets s2 (newstring (- end start))
           (for i 0 (- end start 1)
             (= (s2 i) (seq (+ start i)))))
         (firstn (- end start) (nthcdr start seq)))))
+
+; optimization at the expense of Arc purity
+
+(def cut2 (seq start (o end))
+  (#'subseq seq start end))
+
+(def cut cut2) ; use the optimized version
 
 (def edge (xs (o i 1) . n)
   (apply - (len xs) i n))
