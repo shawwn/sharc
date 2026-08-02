@@ -2085,7 +2085,7 @@
     (withs (ip   (logins* (me))
             vote (list (seconds) ip (me) dir i!score))
       (unless (or (and (or (ignored) check-key!novote)
-                       (~me (by i)))
+                       (~author i))
                   (and (is dir 'down)
                        (~editor)
                        (or check-key!nodowns
