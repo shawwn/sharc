@@ -2072,14 +2072,16 @@
 
 (or= recent-votes* nil)
 
+(def votable (i)
+  (and (~voted i) (live|author i)))
+
 ; Note: if vote-for by one user changes (s 'score) while s is being
 ; edited by another, the save after the edit will overwrite the change.
 ; Actual votes can't be lost because that field is not editable.  Not a
 ; big enough problem to drag in locking.
 
 (def vote-for (i (o dir 'up))
-  (unless (or ((votes) i!id) 
-              (and (~live i) (~me (by i))))
+  (when (votable i)
     (withs (ip   (logins* (me))
             vote (list (seconds) ip (me) dir i!score))
       (unless (or (and (or (ignored) check-key!novote)
