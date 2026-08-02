@@ -2808,7 +2808,8 @@
   (catch
     (each k parent!kids
       (whenlet i (item k)
-        (when (and (me (by i)) (cansee i) (is (unmarkdown i!text) text))
+        (when (and (author&cansee i)
+                   (is (unmarkdown i!text) text))
           (throw i))))))
 
 (def bad-user ((t u me))
