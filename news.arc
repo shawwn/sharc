@@ -307,7 +307,7 @@
 ; Would be interesting to scale gravity in a slider.
 
 (= gravity* 1.8 timebase* 120 front-threshold* 1 
-   nourl-factor* .4 lightweight-factor* .3 )
+   nourl-factor* .4 lightweight-factor* .3)
 
 (def frontpage-rank (s (o scorefn realscore) (o gravity gravity*))
   (* (/ (let base (- (scorefn s) 1)
