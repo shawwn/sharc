@@ -3244,14 +3244,17 @@
 
 (defbg update-avg 45
   (unless (or (empty profs*) (no stories*))
-    (update-avg (rand-user [and (only&> (car (uvar _ submitted)) 
-                                        (- maxid* initload*))
-                                (len> (uvar _ submitted) 
-                                      update-avg-threshold*)]))))
+    (only&update-avg (update-avg-user))))
 
 (def update-avg (user)
   (= (uvar user avg) (comment-score user))
   (save-prof user))
+
+(def update-avg-user ()
+  (rand-user [and (only&> (car (uvar _ submitted)) 
+                          (- maxid* initload*))
+                  (only&len> (uvar _ submitted) 
+                             update-avg-threshold*)]))
 
 (def rand-user ((o test idfn))
   (evtil (rand-key profs*) test))
