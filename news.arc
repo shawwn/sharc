@@ -812,7 +812,8 @@
     (hook 'toprow label)
     (link "submit")
     (unless (mem label toplabels*)
-      (fontcolor white (pr label)))))
+      (tag (a href label)
+        (fontcolor white (presc label))))))
 
 (def toplink (name dest label)
   (tag-if (is name label) (span class 'topsel)
