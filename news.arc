@@ -85,67 +85,73 @@
 
 (def nsv ((o port (readenv "PORT" 8080)))
   (load-news)
-  (asv port))
+  (serve port))
 
 (def load-news ()
   (map ensure-dir (list arcdir* newsdir* storydir* votedir* profdir*))
-  (unless stories* (load-items))
+  (load-userinfo)
+  (unless stories*
+    (load-items)
+    (ensure-topstories))
   (if (and initload-users* (empty profs*)) (load-users)))
 
 (def load-users ()
   (pr "load users: ")
-  (noisy-each 100 id (dir profdir*)
-    (load-user id)))
+  (noisy-each 1000 u (users)
+    (profile u)))
 
-(def load-user (u)
-  (= (votes* u) (load-table (+ votedir* u))
-     (profs* u) (temload 'profile (+ profdir* u)))
-  u)
 
-; Have to check goodname because some user ids come from http requests.
-; So this is like safe-item.  Don't need a sep fn there though.
-
-; A valid registered user (one in hpasswords*) is auto-given a
-; fresh news profile if they don't have one yet --- this happens
-; for accounts created via app.arc's plain login form, which
-; doesn't fire news.arc's ensure-news-user callback. Without
-; this, (uvar user k) would call NIL as a function and crash
-; the request. Invalid / unknown user ids still return nil.
-;
-; init-user sets (profs* u) and returns u (the username), not the
-; profile, so we read it back from profs* after init.
 (def profile ((t u me))
-  (or (profs* u)
-      (aand (goodname u)
-            (or (and (file-exists (+ profdir* u))
-                     (= (profs* u) (temload 'profile (+ profdir* u))))
-                (when (hpasswords* u)
-                  (init-user u)
-                  (profs* u))))))
+  (profs*|load-prof u))
 
-(def votes ((t u me))
-  (or (votes* u)
-      (aand (file-exists (+ votedir* u))
-            (= (votes* u) (load-table it)))))
-          
-(def init-user (u)
-  (unless (file-exists (+ profdir* u))
-    (or= (votes* u) (table) 
-         (profs* u) (inst 'profile 'id u))
-    (save-votes u)
-    (save-prof u)))
+(def load-prof (u)
+  ; Have to check goodname because some user ids come from http requests.
+  ; So this is like safe-item.  Don't need a sep fn there though.
+  (aand (goodname u)
+        (lookup-uid u)
+        (file-exists (prof-path it))
+        (lets p (temload 'profile it)
+          (= (profs* p!id) p))))
+
+(def save-prof ((t u me))
+  (let uid (user-id u)
+    (ensure-dir (prof-dir uid))
+    (save-table (profile u) (prof-path uid))
+    u))
 
 ; Need this because can create users on the server (for other apps)
 ; without setting up places to store their state as news users.
-; See the admin op in app.arc.  So all calls to login-page from the 
-; news app need to call this in the after-login fn.
 
-(def ensure-news-user ()
-  (profile))
+(def ensure-news-user ((t u me))
+  (when (acct-exists u)
+    (ensure-uid u)
+    (unless (profile u)
+      (init-user u))))
+          
+(def init-user (u)
+  (atomic
+    (unless (profs* u)
+      (ensure-uid u)
+      (or= (votes* u) (table) 
+           (profs* u) (inst 'profile 'id u))
+      (save-votes u)
+      (save-prof u)
+      u)))
 
-(def save-votes ((t u me)) (save-table (votes* u) (+ votedir* u)))
 
-(def save-prof  ((t u me)) (save-table (profs* u) (+ profdir* u)))
+(def votes ((t u me))
+  (votes*|load-votes u))
+
+(def load-votes ((t u me))
+  (aand (lookup-uid u)
+        (file-exists (votes-path it))
+        (= (votes* u) (load-table it))))
+
+(def save-votes ((t u me))
+  (let uid (user-id u)
+    (ensure-dir (votes-dir uid))
+    (save-table (votes* u) (votes-path uid))
+    u))
 
 (mac uvar (u k) `((profile ,u) ',k))
 (mac my (k) `((profile) ,k))
@@ -158,15 +164,115 @@
 (mac karma   ((o u '(me))) `(uvar ,u karma))
 (mac ignored ((o u '(me))) `(uvar ,u ignore))
 
-; Note that users will now only consider currently loaded users.
+(def verify-user (u)
+  (whenlet uid (lookup-uid u)
+    (and (acct-exists u)
+         (file-exists:votes-path uid)
+         (file-exists:prof-path uid)
+         u)))
 
-(def users ((o f idfn)) 
-  (keep f (keys profs*)))
+(def duplicate-user (old new)
+  (atomic
+    (assert (verify-user old)) ; user exists with old name.
+    (assert (~verify-user new)) ; no user data with new name.
+
+    ; load user
+    (profile old)
+    (votes old)
+
+    ; duplicate user data.
+    (= (profs* new) (profs* old)  ; profile
+       (votes* new) (votes* old)) ; votes
+
+    ; if the old user was an admin, make the new user an admin.
+    (when (mem old admins*)
+      (pushnew new admins*)
+      (save-admins))
+
+    ; duplicate uid.
+    (link-uid new (user-id old))
+
+    ; both usernames now point to same uid.
+    (save-uids)
+
+    ; duplicate account data; both usernames now have same pw.
+    (copy-account old new)
+
+    (save-pws)
+
+    new))
+
+; erases user data, but leaves the profile intact.
+
+(def erase-user (u)
+  (atomic
+    (assert (verify-user u))
+    (assert (isnt (uid->user* (user-id u)) u)
+            "@u still owns uid @(user-id u); erasing would orphan it")
+
+    ; load user
+    (profile u)
+    (votes u)
+
+    (logout-user u)
+
+    ; remove the username's data:
+    (wipe (profs* u))       ; profile
+    (wipe (votes* u))       ; votes
+    (wipe (hpasswords* u))  ; password
+    (wipe (dc-usernames*:downcase u)) ; downcased usernames
+    (wipe (user->uid* u))   ; uid
+
+    ; remove from admins list.
+    (when (mem u admins*)
+      (pull u admins*)
+      (save-admins))
+
+    ; now that the username's data is no longer in memory, save the
+    ; uids and passwords.
+    (save-uids)
+    (save-pws)
+
+    u))
+
+; Written such that news still loads if killed at any point.
+
+(def rename-user (old new)
+  (atomic
+    ; first, duplicate the user data.
+    (duplicate-user old new)
+
+    ; now that all data exists for both usernames, rename.
+    (= (uvar new id) new
+       (uid->user* (user-id new)) new)
+    (save-prof new)
+    (save-uids)
+
+    ; wipe the comment cache, so that the rename shows up immediately.
+    (each id (uvar new submitted)
+      (uncache-comment id))
+
+    ; lastly, remove all user data associated with old name.
+    (erase-user old)
+
+    new))
+
+(def loaded-users ((o f idfn))
+  (keys profs* f))
+
+(def loaded-votes ((o f idfn))
+  (keys votes* f))
 
 (def check-key (k (t u me))
   (and u (mem k (uvar u keys))))
 
-(def by (i) i!by)
+(def by (i)
+  (assert (uid->user* i!by) (uid-message i)))
+
+(def uid-message (i)
+  (+ "No such uid @{i!by}"
+     (aif (the story) " on story @{it!id}")
+     " from item @{i!id}"))
 
 (def author (i (t u me)) (is u (by i)))
 
@@ -174,34 +280,60 @@
 
 (def same-ip (i s) (is i!ip s!ip))
 
-(or= stories* nil comments* nil 
-     items* (table) url->story* (table)
-     maxid* 0)
+
+(or= stories* nil comments* nil ; descending ids
+     items* (table) url->story* (table))
+
+(diskvar maxid* (+ newsdir* "max-id") 0)
 
 (= initload* 15000)
 
-; The dir expression yields stories in order of file creation time 
-; (because arc infile truncates), so could just rev the list instead of
-; sorting, but sort anyway.
+(mac w/loading-items body
+  `(w/the loading-items t
+     (w/the loaded-items nil
+       (do1 (do ,@body)
+            (only&insert-items (the loaded-items))))))
 
-; Note that stories* etc only include the initloaded (i.e. recent)
-; ones, plus those created since this server process started.
+(def loading-items () (the loading-items))
 
 ; Could be smarter about preloading by keeping track of popular pages.
 
-(def load-items ()
+(def load-items ((o n initload*))
   (system:list "rm" "-f" (string storydir* "*/*.tmp"))
-  (pr "load items: ") 
-  (with (items (table)
-         ids   (sort > (map int (dir storydir*))))
-    (if ids (= maxid* (car ids)))
-    (noisy-each 100 id (firstn initload* ids)
-      (let i (load-item id)
-        (push i (items i!type))))
-    (= stories*  (rev (merge (compare < !id) items!story items!poll))
-       comments* (rev items!comment))
-    (hook 'initload items))
-  (ensure-topstories))
+  (pr "load items: ")
+  (latest-items idfn nil n 100))
+
+(def merge-item-lists (xs ys . zs)
+  (if zs
+      (apply merge-item-lists (merge-item-lists xs ys) zs)
+      ; (compare < !id) is slightly misleading: it's used to sort items
+      ; with equal ids. The resulting list is in desending order.
+      (dedup-items (merge (compare < !id) (copylist xs) (copylist ys)))))
+
+(def dedup-items (xs)
+  (dedup xs !id))
+
+(def item-buckets ()
+  (aand (dirs storydir*)
+        ; `almost` cuts each trailing "/" leaving a numeric string.
+        (sort > (map int:almost it))))
+
+(def item-ids (bucket)
+  (aand (dir (string storydir* bucket))
+        (sort > (map int it))))
+
+(mac each-item-id (var . body)
+  (w/uniq (bucket id)
+    `(each ,bucket (item-buckets)
+       (each ,var (item-ids ,bucket)
+         ,@body))))
+
+(mac each-item (var . body)
+  (w/uniq id
+    `(w/loading-items
+       (each-item-id ,id
+         (whenlet ,var (item ,id)
+           ,@body)))))
 
 (def ensure-topstories ()
   (aif (errsafe (readfile1 (+ newsdir* "topstories")))
@@ -226,12 +358,47 @@
   `(pull ,i ,var ,same))
 
 (def load-item (id)
-  (when (isa!int id)
-    (let i (temload 'item (+ storydir* id))
+  (when (safe-id id)
+    (let i (temload 'item (item-path id))
       (= (items* id) i)
-      (awhen (and (astory&live i) (check i!url ~blank))
-        (register-url i it))
+      (if (loading-items) (push i (the loaded-items))
+          (metastory i)   (put-item i stories*)
+          (acomment i)    (put-item i comments*))
+      (unless (blank i!url)
+        (awhen (astory&live i)
+          (register-url i i!url)))
       i)))
+
+(def save-item (i)
+  (ensure-dir (item-dir i!id))
+  (save-table i (item-path i!id)))
+
+(def new-item-id ()
+  (do1 (evtil (++ maxid*) ~file-exists:item-path)
+       (todisk maxid*)))
+
+; these must stay constant after deploying news.
+
+(= item-bucket-size* 5000
+   prof-bucket-size* 5000
+   vote-bucket-size* 5000)
+
+(def bucket-id (id size) (trunc:/ id size))
+
+(def item-dir (id)
+  (string storydir* (bucket-id id item-bucket-size*) "/"))
+
+(def prof-dir (uid)
+  (string profdir* (bucket-id uid prof-bucket-size*) "/"))
+
+(def votes-dir (uid)
+  (string votedir* (bucket-id uid vote-bucket-size*) "/"))
+
+(def item-path (id) (and id (string (item-dir id) id)))
+
+(def prof-path (uid) (and uid (string (prof-dir uid) uid)))
+
+(def votes-path (uid) (and uid (string (votes-dir uid) uid)))
 
 ; Note that duplicates are only prevented of items that have at some 
 ; point been loaded. 
@@ -247,9 +414,6 @@
   (if (stemmable-sites* (sitename url))
       (cut url 0 (pos #\? url))
       url))
-
-(def new-item-id ()
-  (evtil (++ maxid*) [~file-exists (+ storydir* _)]))
 
 (def kids (i) (map item i!kids))
 
@@ -284,7 +448,6 @@
 (defplace imported     (fn (i) `(mem 'imported (,i 'keys))))
 
 (def live (i) (no (dead|deleted i)))
-(def save-item (i) (save-table i (+ storydir* i!id)))
 
 (def kill (i how)
   (unless (dead i)
@@ -404,6 +567,27 @@
             (a i)
             (if n (-- n))
             (iter)))))))
+
+(def insert-items (xs)
+  (let items (items-by-type xs)
+    (= stories*  (merge-item-lists stories* items!story items!poll)
+       comments* (merge-item-lists comments* items!comment))
+    (hook 'initload items))
+  xs)
+
+; gives a table whose each key is an item type, like !story or
+; !comment, and whose value is a list of items of that type in
+; descending order.
+
+(def items-by-type (xs)
+  (lets items (table)
+    (each i xs
+      (push i (items i!type)))
+    ; ensure items are in descending id order
+    (zaptable [sort (compare > !id) _] items)))
+
+(def latest-items-by-type (n (o noisy))
+  (items-by-type:latest-items idfn nil n noisy))
 
 ; redefined later
 
