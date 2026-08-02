@@ -2742,8 +2742,7 @@
 
 (def comment-login-warning (parent whence (o text))
   (login-page 'both "You have to be logged in to comment."
-              {do (ensure-news-user)
-                  (newslog 'comment-login)
+              {do (newslog 'comment-login)
                   (addcomment-page parent whence text)}))
 
 (def addcomment-page (parent whence (o text) (o msg))
