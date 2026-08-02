@@ -3648,6 +3648,7 @@ brackets&gt; and it should work.<br><br>")
                "Passwords should be between 8 and 72 characters long. 
                 Please choose another."})
       (do (set-pw user newpw)
+          (save-pws)
           "news")))
 
 (defhook login ()
