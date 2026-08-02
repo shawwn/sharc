@@ -1983,10 +1983,18 @@
 (def deletelink (i whence)
   (when (candelete i)
     (pr bar*)
-    (linkf (if i!deleted "undelete" "delete")
-      (if (candelete i)
-          (del-confirm-page i whence)
-          (prn "You can't delete that.")))))
+    (link "@(if (deleted i) 'un)delete"
+          (delete-url i!id whence))))
+
+(def delete-url (id (o whence arg!goto))
+  (string "delete-confirm?id=" (urlencode:string id)
+          (if whence (string "&goto=" (urlencode whence)))))
+
+(newsop delete-confirm (id goto)
+  (let i (safe-item id)
+    (if (only&candelete i)
+        (del-confirm-page i goto)
+        (prn "You can't delete that."))))
 
 ; Undeleting stories could cause a slight inconsistency. If a story
 ; linking to x gets deleted, another submission can take its place in
@@ -1997,17 +2005,20 @@
 (def del-confirm-page (i whence)
   (minipage "Confirm"
     (tab
-      ; link never used so not testable but think correct
-      (display-item nil i (flink {del-confirm-page i whence}))
+      (display-item nil i (delete-url i!id whence))
       (spacerow 20)
       (tr (td)
-          (td (urform (do (when (candelete i)
-                            (= i!deleted (is arg!b "Yes"))
-                            (save-item i))
-                          whence)
-                 (prn "Do you want this to @(if i!deleted 'stay 'be) deleted?")
-                 (br2)
-                 (but "Yes" "b") (sp) (but "No" "b")))))))
+          (td (item-form "xdelete" i!id whence
+                (prn "Do you want this to @(if (deleted i) 'stay 'be) deleted?")
+                (br2)
+                (but "Yes" "d") (sp) (but "No" "d")))))))
+
+(newsopr xdelete (id goto d)
+  (when (good-auth user id)
+    (whenlet i (safe-item id)
+      (= (deleted i) (is d "Yes"))
+      (save-item i)))
+  (safe-goto goto))
 
 (def logvote (story)
   (newslog 'vote (story 'id) (list (story 'title))))
