@@ -724,7 +724,7 @@
           (~mem ,gx ,place ,@(if args (list gargs)))))))
 
 (mac ++ (place (o i 1))
-  (if (isa!sym place)
+  (if (isa!sym:ssexpand place)
       `(= ,place (+ ,place ,i))
       (w/uniq gi
         (let (binds val setter) (setforms place)
@@ -732,7 +732,7 @@
              (,setter (+ ,val ,gi)))))))
 
 (mac -- (place (o i 1))
-  (if (isa!sym place)
+  (if (isa!sym:ssexpand place)
       `(= ,place (- ,place ,i))
       (w/uniq gi
         (let (binds val setter) (setforms place)
