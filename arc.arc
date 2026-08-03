@@ -346,6 +346,7 @@
 ;  0  *arc-mutex*      atomic (shrinking to just maybe-reload)
 ; 10  users-lock*      profs*, votes*, hpasswords*, uid maps
 ; 20  fnid-lock*       fns*, fnids*, timed-fnids*
+; 25  queue-lock*      enq, deq, etc
 ; 30  scrape-lock*     last-fetch-time*
 ; 40  place-lock*      all setforms operations
 ; 50  output locks     ero, srvlog, scrapelog (one per stream)
@@ -1761,13 +1762,15 @@
       (writec #\newline)))
   (car args))
 
+(or= queue-lock* (make-lock 25 "queue"))
+
+(mac w/queue-lock body
+  `(w/lock queue-lock* ,@body))
+
 (def queue () (list nil nil 0))
 
-; Despite call to atomic, once had some sign this wasn't thread-safe.
-; Keep an eye on it.
-
 (def enq (obj q)
-  (atomic
+  (w/queue-lock
     (++ (q 2))
     (if (no (car q))
         (= (cadr q) (= (car q) (list obj)))
@@ -1776,8 +1779,9 @@
     (car q)))
 
 (def deq (q)
-  (atomic (unless (is (q 2) 0) (-- (q 2)))
-          (pop (car q))))
+  (w/queue-lock
+    (unless (is (q 2) 0) (-- (q 2)))
+    (pop (car q))))
 
 ; Should redef len to do this, and make queues lists annotated queue.
 
@@ -1786,7 +1790,7 @@
 (def qlist (q) (car q))
 
 (def enq-limit (val q (o limit 1000))
-  (atomic
+  (w/queue-lock
      (unless (< (qlen q) limit)
        (deq q))
      (enq val q)))
