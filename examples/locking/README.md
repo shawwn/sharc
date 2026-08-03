@@ -61,11 +61,15 @@ exist:
   `placewiths`. `zap`, `setmem`, and `togglemem` will remain, since
   calling a user function between the read and the write is their whole
   semantics.
-- `atomic-interleaved.arc` goes away only when every access to a given
-  structure takes one common lock, e.g. a `users-lock*` covering
-  `profs*`, `votes*`, `hpasswords*`, and the uid maps. That is Phase 3
-  in the plan. No assert will ever catch this one, which is why the
-  executable test matters.
+- `atomic-interleaved.arc` demonstrates a hazard in the design rather
+  than a bug in the tree, and there is currently **no known instance** of
+  it. An earlier version of this file said `init-user` was vulnerable to
+  `load-prof`'s bare `(= (profs* p!id) p)`; that was wrong, and the file's
+  own header now explains why. It stays because the hazard is real
+  whenever a composite invariant moves onto its own lock: every other
+  writer of that data must take the same lock. Re-run it after each
+  remaining `atomic` conversion. No assert will ever catch this one,
+  which is why the executable test matters.
 
 Toggling `*arc-check-lock-order*` to `nil` in `arc0.lisp` disables the
 assert; the two deadlock files then hang again rather than erroring.
