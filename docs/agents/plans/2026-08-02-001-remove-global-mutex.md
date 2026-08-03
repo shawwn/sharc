@@ -22,6 +22,11 @@
           (arc-call0 f)))))
 ```
 
+(That snippet is the state when this plan was written. Since then the mutex
+has been renamed to `"arc-lock"`, so it is no longer ambiguous with the
+similarly named threads in SBCL's reports, and `atomic-invoke` acquires it
+through `arc-check-lock-level` at level 0. The shape is otherwise unchanged.)
+
 One global mutex, made reentrant per-thread by `*arc-atomic-owner*`. Roughly
 20 `atomic` call sites across `arc.arc`, `srv.arc`, `news.arc`, `app.arc`,
 `scrape.arc`.

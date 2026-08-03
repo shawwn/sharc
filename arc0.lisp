@@ -1553,7 +1553,10 @@ sb-thread mutex with a :name, and anything else prints as itself."
 
 ;;;; ---- atomic-invoke ----
 
-(defvar *arc-mutex* (sb-thread:make-mutex :name "arc"))
+;; Named "arc-lock", not "arc": threads are named "arc" too, so a mutex
+;; called "arc" makes SBCL's own deadlock reports ambiguous (the mutex,
+;; its owner, and the waiting thread would all print as "arc").
+(defvar *arc-mutex* (sb-thread:make-mutex :name "arc-lock"))
 (defvar *arc-atomic-owner* nil)
 
 (defun arc-already-atomic ()
