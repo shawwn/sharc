@@ -1625,7 +1625,7 @@
 (def canvote (i dir (o ignore-voted))
   (and (me)
        (news-type&live i)
-       (or ignore-voted (~voted i!id))
+       (or ignore-voted (~voted i))
        (or (is dir 'up)
            (and (acomment i)
                 (> (karma) downvote-threshold*)
