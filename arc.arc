@@ -490,13 +490,27 @@
 (mac placewiths (binds . body)
   `(w/place-lock (withs ,binds ,@body)))
 
+; Evaluate the place's subforms and the new value OUTSIDE place-lock*,
+; and hold the lock only across the store.  Plain = performs no read of
+; the place (note `prev`, the getter, is unused below), so there is no
+; read-modify-write window to protect, unlike ++ / push / pop / swap /
+; rotate, whose getters must stay inside the lock.
+;
+; This matters because `val` is arbitrary caller code.  Evaluating it
+; under the lock meant any assignment whose value reached another lock
+; below place-lock* in the hierarchy raised a lock-order violation, and
+; any assignment whose value did I/O held place-lock* across it, blocking
+; every other assignment in the image.  scrape.arc's
+; (= (hn-lists* name) (scrape-hn-list name)) did both: it held the lock
+; across a multi-second HTTP fetch and then tried to take scrape-lock*.
+
 (def expand= (place val)
   (if (and (isa!sym place) (~ssyntax place))
       `(assign ,place ,val)
       (let (vars prev setter) (setforms place)
         (w/uniq g
-          `(placewiths ,(+ vars (list g val))
-             (,setter ,g))))))
+          `(withs ,(+ vars (list g val))
+             (w/place-lock (,setter ,g)))))))
 
 (def expand=list (terms)
   `(do ,@(map (fn ((p v)) (expand= p v))  ; [apply expand= _]
