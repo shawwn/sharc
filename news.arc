@@ -10,6 +10,7 @@
 (let port (readenv "PORT" 8080)
   (= this-site*    "HN Simulator"
      site-url*     "http://localhost:@port" ; no trailing slash
+     hn-url*       "https://news.ycombinator.com"
      site-email*   "hn@@ycombinator.lol"
      parent-url*   "/"
      favicon-url*  ""
@@ -1341,7 +1342,7 @@
 
 (def topcolors-label ()
   (pr "A sampler of ")
-  (underlink "topcolors" "https://news.ycombinator.com/item?id=97573")
+  (underlink "topcolors" "@{hn-url*}/item?id=97573")
   (pr " chosen by active users"))
 
 
@@ -2754,11 +2755,11 @@
    "If you haven't already, would you mind reading about HN's
  @(tostring:underlink
     "approach to comments"
-    "https://news.ycombinator.com/newswelcome.html")
+    "@{hn-url*}/newswelcome.html")
  and
  @(tostring:underlink
     "site guidelines"
-    "https://news.ycombinator.com/newsguidelines.html#comments")?")
+    "@{hn-url*}/newsguidelines.html#comments")?")
 
 ; Comment forms last for 30 min (- cache time)
 
