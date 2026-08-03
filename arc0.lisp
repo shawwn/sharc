@@ -1493,17 +1493,79 @@ straight to gcell-ref; this remains for callers holding only a symbol."
 
 (xdef sleep (n) (sleep n) nil)
 
+;;;; ---- lock ordering ----
+
+;;; Locks are assigned integer levels and must be acquired in strictly
+;;; increasing order; re-entering a lock already held is always allowed.
+;;; This turns a potential deadlock into a loud, deterministic error at
+;;; the moment of the offending acquisition, usually in a single thread,
+;;; rather than an intermittent hang under load.  See
+;;; docs/agents/plans/2026-08-02-001-remove-global-mutex.md, principle 3.
+
+;;; lock priorities:
+;;;
+;;;  0  *arc-mutex*      atomic (shrinking to just maybe-reload)
+;;; 10  users-lock*      profs*, votes*, hpasswords*, uid maps
+;;; 20  fnid-lock*       fns*, fnids*, timed-fnids*
+;;; 30  scrape-lock*     last-fetch-time*
+;;; 40  place-lock*      all setforms operations
+;;; 50  output locks     ero, srvlog, scrapelog (one per stream)
+;;; 99  table locks      implicit, leaf
+
+(defvar *arc-lock-levels* nil
+    "Stack of (level . lock) for locks held by this thread, innermost first.
+     Per-thread by virtue of always being LET-bound, never SETF'd.")
+
+(defvar *arc-check-lock-order* t)
+
+(defvar *arc-lock-level-table* (make-hash-table :test #'eq :synchronized t))
+
+(defun arc-lock-level (lock)
+  (or (gethash lock *arc-lock-level-table*) 99))  ; unregistered = leaf
+
+(xdef set-lock-level (lock n) (setf (gethash lock *arc-lock-level-table*) n))
+
+(defun arc-check-lock-level (level lock name)
+  (when *arc-check-lock-order*
+    (let ((top (car *arc-lock-levels*)))
+      (when (and top
+                 ;; re-entering a lock we already hold anywhere is safe
+                 (not (find lock *arc-lock-levels* :key #'cdr))
+                 (<= level (car top)))
+        (error "Lock order violation: acquiring ~A (level ~D) while holding level ~D~%  held: ~S"
+               name level (car top) *arc-lock-levels*)))))
+
 ;;;; ---- atomic-invoke ----
 
 (defvar *arc-mutex* (sb-thread:make-mutex :name "arc"))
 (defvar *arc-atomic-owner* nil)
 
+(defun arc-already-atomic ()
+  (eq sb-thread:*current-thread* *arc-atomic-owner*))
+
 (xdef atomic-invoke (f)
-  (if (eq sb-thread:*current-thread* *arc-atomic-owner*)
+  (if (arc-already-atomic)
       (arc-call0 f)
-      (sb-thread:with-mutex (*arc-mutex*)
-        (let ((*arc-atomic-owner* sb-thread:*current-thread*))
-          (arc-call0 f)))))
+      (progn
+        (arc-check-lock-level 0 *arc-mutex* "*arc-mutex*")
+        (let ((*arc-lock-levels* (cons (cons 0 *arc-mutex*) *arc-lock-levels*)))
+          (sb-thread:with-mutex (*arc-mutex*)
+            (let ((*arc-atomic-owner* sb-thread:*current-thread*))
+              (arc-call0 f)))))))
+
+;;;; ---- call-w/locked-table ----
+
+;;; NB: with-locked-hash-table gives no protection against weak-entry
+;;; culling, which the GC performs outside this mutex.  Do not use this
+;;; to build a check-then-act sequence over a weak table.  See
+;;; docs/agents/plans/2026-08-02-002-weak-tables-and-synchronized.md.
+
+(xdef call-w/locked-table (table thunk)
+  (let ((level (arc-lock-level table)))
+    (arc-check-lock-level level table "table lock")
+    (let ((*arc-lock-levels* (cons (cons level table) *arc-lock-levels*)))
+      (sb-ext:with-locked-hash-table (table)
+        (arc-call0 thunk)))))
 
 ;;;; ============================================================
 ;;;; System calls

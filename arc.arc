@@ -341,6 +341,28 @@
 (mac atwiths args
   `(atomic (withs ,@args)))
 
+; lock priorities:
+;
+;  0  *arc-mutex*      atomic (shrinking to just maybe-reload)
+; 10  users-lock*      profs*, votes*, hpasswords*, uid maps
+; 20  fnid-lock*       fns*, fnids*, timed-fnids*
+; 30  scrape-lock*     last-fetch-time*
+; 40  place-lock*      all setforms operations
+; 50  output locks     ero, srvlog, scrapelog (one per stream)
+; 99  table locks      implicit, leaf
+
+(def make-lock ((o priority 99) (o name nil))
+  (lets lock (table)
+    (sref lock 'lock    'type)
+    (sref lock name     'name)
+    (sref lock priority 'priority)
+    (set-lock-level lock priority)))
+
+(mac w/lock (tbl . body)
+  `(call-w/lock ,tbl {do ,@body}))
+
+(def call-w/lock (x thunk)
+  (call-w/locked-table (lockable x) thunk))
 
 ; setforms returns (vars get set) for a place based on car of an expr
 ;  vars is a list of gensyms alternating with expressions whose vals they
@@ -452,12 +474,24 @@
        (err "Can't invert " (cons f args))
        (cons f args)))
 
+(unless (bound 'place-lock*)
+  (assign place-lock* (make-lock 40 "place")))
+
+(def lockable (tbl)
+  (check tbl isa!table (err "Not a lockable table: @tbl")))
+
+(mac w/place-lock body
+  `(w/lock place-lock* ,@body))
+
+(mac placewiths (binds . body)
+  `(w/place-lock (withs ,binds ,@body)))
+
 (def expand= (place val)
   (if (and (isa!sym place) (~ssyntax place))
       `(assign ,place ,val)
       (let (vars prev setter) (setforms place)
         (w/uniq g
-          `(atwith ,(+ vars (list g val))
+          `(placewiths ,(+ vars (list g val))
              (,setter ,g))))))
 
 (def expand=list (terms)
@@ -608,25 +642,25 @@
   (w/uniq gx
     (let (binds val setter) (setforms place)
       `(let ,gx ,x
-         (atwiths ,binds
+         (placewiths ,binds
            (,setter (cons ,gx ,val)))))))
 
 (mac swap (place1 place2)
   (w/uniq (g1 g2)
     (with ((binds1 val1 setter1) (setforms place1)
            (binds2 val2 setter2) (setforms place2))
-      `(atwiths ,(+ binds1 (list g1 val1)
-                    binds2 (list g2 val2))
+      `(placewiths ,(+ binds1 (list g1 val1)
+                       binds2 (list g2 val2))
          (,setter1 ,g2)
          (,setter2 ,g1)))))
 
 (mac rotate places
   (with (vars (map [uniq 'arg] places)
          forms (map setforms places))
-    `(atwiths ,(mappend (fn (g (binds val setter))
-                          (+ binds (list g val)))
-                        vars
-                        forms)
+    `(placewiths ,(mappend (fn (g (binds val setter))
+                             (+ binds (list g val)))
+                           vars
+                           forms)
        ,@(map (fn (g (binds val setter))
                 (list setter g))
               (+ (cdr vars) (list (car vars)))
@@ -635,7 +669,7 @@
 (mac pop (place)
   (w/uniq g
     (let (binds val setter) (setforms place)
-      `(atwiths ,(+ binds (list g val))
+      `(placewiths ,(+ binds (list g val))
          (do1 (car ,g) 
               (,setter (cdr ,g)))))))
 
@@ -647,7 +681,7 @@
 (mac setmem (test x place . args)
   (w/uniq (gt gx)
     (let (binds val setter) (setforms place)
-      `(atwiths ,(+ (list gt test gx x) binds)
+      `(placewiths ,(+ (list gt test gx x) binds)
          (,setter (if ,gt
                       (adjoin ,gx ,val ,@args)
                       (rem ,gx ,val ,@args)))))))
@@ -666,7 +700,7 @@
 
 (mac togglemem (x place . args)
   (w/uniq (gx gargs)
-    `(atwith (,gx ,x ,@(if args `(,gargs ,@args)))
+    `(placewiths (,gx ,x ,@(if args `(,gargs ,@args)))
        (= (mem ,gx ,place ,@(if args (list gargs)))
           (~mem ,gx ,place ,@(if args (list gargs)))))))
 
@@ -675,7 +709,7 @@
       `(= ,place (+ ,place ,i))
       (w/uniq gi
         (let (binds val setter) (setforms place)
-          `(atwiths ,(+ binds (list gi i))
+          `(placewiths ,(+ binds (list gi i))
              (,setter (+ ,val ,gi)))))))
 
 (mac -- (place (o i 1))
@@ -683,7 +717,7 @@
       `(= ,place (- ,place ,i))
       (w/uniq gi
         (let (binds val setter) (setforms place)
-          `(atwiths ,(+ binds (list gi i))
+          `(placewiths ,(+ binds (list gi i))
              (,setter (- ,val ,gi)))))))
 
 ; E.g. (++ x) equiv to (zap + x 1)
@@ -697,7 +731,7 @@
                       (+ (map car seqs)
                          (apply self (map cdr seqs))))))
     (let (binds val setter) (setforms place)
-      `(atwiths ,(+ binds (list gop op) (mix gargs args))
+      `(placewiths ,(+ binds (list gop op) (mix gargs args))
          (,setter (,gop ,val ,@gargs))))))
 
 (def zaptable (f h)
@@ -727,7 +761,7 @@
            `(or (and (bound ',place) ,place)
                 (= ,place ,expr))))
     `(do ,@(pair (map1 ssexpand args)
-                 (fn (place expr) `(atomic ,(or1 place expr)))))))
+                 (fn (place expr) `(placewiths () ,(or1 place expr)))))))
 
 ; Can't simply mod pr to print strings represented as lists of chars,
 ; because empty string will get printed as nil.  Would need to rep strings
@@ -927,6 +961,9 @@
    `(w/outstring ,gv
       (w/stdout ,gv ,@body)
       (inside ,gv))))
+
+(mac assert (expr (o msg "Assertion failed"))
+  `(or ,expr (err (string ,msg ": " (tostring:pr ',expr)))))
 
 (mac fromstring (str . body)
   (w/uniq gv
@@ -1910,9 +1947,6 @@
       0
       (/ (count test xs) (len xs))))
 
-(mac assert (expr (o msg "Assertion failed"))
-  `(or ,expr (err (string ,msg ": " (tostring:pr ',expr)))))
-
 (def readenv (name (o default))
   (aif (saferead:getenv name)
        (unless (in it 0 'false) it)
@@ -1952,7 +1986,7 @@
 
 (def thread-locals ((o th (current-thread)))
   (or (thread-locals* th)
-      (atomic (or= (thread-locals* th) (table)))))
+      (or= (thread-locals* th) (table))))
 
 (def thread-local (k) ((thread-locals) k))
 
