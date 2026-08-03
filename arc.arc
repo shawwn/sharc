@@ -81,7 +81,8 @@
 (def only (x . args) x) ; (only&pr maybe-nil)
 
 (def as (kind)
-  (fn (x . args) (apply coerce x kind args)))
+  (fn (x . args)
+    (apply coerce x kind args)))
 
 (def map0 (f xs)
   (if (no xs)
