@@ -23,7 +23,19 @@
 (w/lock place-lock* (= (h 'd) 4))
 (prn "w/lock + inner =: " (h 'd))
 
-; the same table locked twice
-(w/lock h (w/lock h (prn "same-table nested w/lock: ok")))
+; the same lock acquired twice, nested.  Must use a real lock: lockable
+; rejects a plain data table, so (w/lock h ...) would error "Not a lock".
+(= mylock (make-lock 50 "example"))
+(w/lock mylock (w/lock mylock (prn "same-lock nested w/lock: ok")))
+
+; a complex = inside a dedicated lock.  The lock's level must be LOWER
+; than place-lock*'s 40, because locks are acquired in increasing order:
+; outer (10) then place-lock* (40) is legal, the reverse is not.  This is
+; the intended use of w/lock, and the reason grouping mutations under a
+; dedicated lock works while doing it under a data table's own lock does
+; not.
+(= outer (make-lock 10 "example-outer"))
+(w/lock outer (= (h 'e) 5))
+(prn "assignment under an outer lock: " (h 'e))
 
 (prn "ALL OK")

@@ -1525,15 +1525,31 @@ straight to gcell-ref; this remains for callers holding only a symbol."
 
 (xdef set-lock-level (lock n) (setf (gethash lock *arc-lock-level-table*) n))
 
-(defun arc-check-lock-level (level lock name)
+(defun lock-repr (lock)
+  "A readable name for LOCK.  Diagnostics only, so it never errors: a lock
+made by make-lock carries its name under 'name, *arc-mutex* is an
+sb-thread mutex with a :name, and anything else prints as itself."
+  (cond ((hash-table-p lock)           (or (gethash (arc-sym "name") lock)
+                                           "unnamed"))
+        ((typep lock 'sb-thread:mutex) (sb-thread:mutex-name lock))
+        (t                             lock)))
+
+(defun held-locks-repr ()
+  "The current thread's held locks as (name level), innermost first."
+  (mapcar (lambda (e) (list (lock-repr (cdr e)) (car e)))
+          *arc-lock-levels*))
+
+(defun arc-check-lock-level (level lock)
   (when *arc-check-lock-order*
     (let ((top (car *arc-lock-levels*)))
       (when (and top
                  ;; re-entering a lock we already hold anywhere is safe
                  (not (find lock *arc-lock-levels* :key #'cdr))
                  (<= level (car top)))
-        (error "Lock order violation: acquiring ~A (level ~D) while holding level ~D~%  held: ~S"
-               name level (car top) *arc-lock-levels*)))))
+        (error "Lock order violation: acquiring ~A (level ~D) while holding ~A (level ~D)~%  held: ~A"
+               (lock-repr lock) level
+               (lock-repr (cdr top)) (car top)
+               (held-locks-repr))))))
 
 ;;;; ---- atomic-invoke ----
 
@@ -1547,7 +1563,7 @@ straight to gcell-ref; this remains for callers holding only a symbol."
   (if (arc-already-atomic)
       (arc-call0 f)
       (progn
-        (arc-check-lock-level 0 *arc-mutex* "*arc-mutex*")
+        (arc-check-lock-level 0 *arc-mutex*)
         (let ((*arc-lock-levels* (cons (cons 0 *arc-mutex*) *arc-lock-levels*)))
           (sb-thread:with-mutex (*arc-mutex*)
             (let ((*arc-atomic-owner* sb-thread:*current-thread*))
@@ -1562,7 +1578,7 @@ straight to gcell-ref; this remains for callers holding only a symbol."
 
 (xdef call-w/locked-table (table thunk)
   (let ((level (arc-lock-level table)))
-    (arc-check-lock-level level table "table lock")
+    (arc-check-lock-level level table)
     (let ((*arc-lock-levels* (cons (cons level table) *arc-lock-levels*)))
       (sb-ext:with-locked-hash-table (table)
         (arc-call0 thunk)))))

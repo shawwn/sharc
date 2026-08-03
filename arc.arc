@@ -358,6 +358,12 @@
     (sref lock priority 'priority)
     (set-lock-level lock priority)))
 
+(def alock (x)
+  (and (isa!table x) (is x!type 'lock)))
+
+(def lockable (l)
+  (check l alock (err "Not a lock: @l")))
+
 (mac w/lock (tbl . body)
   `(call-w/lock ,tbl {do ,@body}))
 
@@ -476,9 +482,6 @@
 
 (unless (bound 'place-lock*)
   (assign place-lock* (make-lock 40 "place")))
-
-(def lockable (tbl)
-  (check tbl isa!table (err "Not a lockable table: @tbl")))
 
 (mac w/place-lock body
   `(w/lock place-lock* ,@body))

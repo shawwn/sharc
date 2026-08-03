@@ -38,8 +38,16 @@ order. Re-entering a lock already held is always allowed. See
 | `reentrancy.arc` | nested `=` and nested `w/lock` on one lock do not self-deadlock | **passes** (`ALL OK`) |
 | `lost-updates.arc` | why `call-w/locked-table` must not skip `place-lock*` when it already holds `*arc-mutex*` | **passes** (60000/60000) |
 | `deadlock-place-then-atomic.arc` | `place-lock*` (40) then `*arc-mutex*` (0), because `placewiths` evaluates the value expression under the lock | **lock-order error** |
-| `deadlock-table-then-place.arc` | a table lock (99) then `place-lock*` (40), via `w/lock` on a data table | **lock-order error** |
 | `atomic-interleaved.arc` | an `atomic` block torn by a bare `=`, since the two use different locks | **`*** INTERLEAVED ***`** |
+
+There used to be a `deadlock-table-then-place.arc` here, holding a data
+table's own lock via `w/lock` and then assigning inside the body. It is
+gone because `lockable` now requires a real lock, one built by
+`make-lock` and tagged `'type` `'lock`, so `(w/lock some-data-table ...)`
+fails immediately with `Not a lock` and the scenario is unreachable.
+Passing a dedicated lock instead is fine and is the intended use: a lock
+at level 10 sits *above* `place-lock*` at 40, so assignments inside its
+body are ordered correctly.
 
 ## What "expected to fail" means here
 
@@ -53,8 +61,6 @@ exist:
   `placewiths`. `zap`, `setmem`, and `togglemem` will remain, since
   calling a user function between the read and the write is their whole
   semantics.
-- `deadlock-table-then-place.arc` goes away if `w/lock` stops being
-  exposed for arbitrary tables.
 - `atomic-interleaved.arc` goes away only when every access to a given
   structure takes one common lock, e.g. a `users-lock*` covering
   `profs*`, `votes*`, `hpasswords*`, and the uid maps. That is Phase 3
