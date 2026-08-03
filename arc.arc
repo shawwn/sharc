@@ -1808,9 +1808,9 @@
 
 (def enq-limit (val q (o limit 1000))
   (w/queue-lock
-     (unless (< (qlen q) limit)
-       (deq q))
-     (enq val q)))
+    (unless (< (qlen q) limit)
+      (deq q))
+    (enq val q)))
 
 (def noisy-report (n noisy)
   (when noisy
