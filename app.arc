@@ -47,9 +47,12 @@
      (user->uid* u) uid)
   uid)
 
+(or= maxuid-lock* (make-lock 21 "maxuid"))
+
 (def new-user-id ()
-  (lets uid (evtil (++ maxuid*) ~uid->user*)
-    (todisk maxuid*)))
+  (w/lock maxuid-lock*
+    (lets uid (evtil (++ maxuid*) ~uid->user*)
+      (todisk maxuid*))))
 
 (def ensure-uid ((t u me))
   (atomic

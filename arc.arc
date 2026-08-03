@@ -343,14 +343,14 @@
 
 ; lock priorities:
 ;
-;  0  *arc-mutex*      atomic (shrinking to just maybe-reload)
-; 10  users-lock*      profs*, votes*, hpasswords*, uid maps
-; 20  fnid-lock*       fns*, fnids*, timed-fnids*
-; 25  queue-lock*      enq, deq, etc
-; 30  scrape-lock*     last-fetch-time*
-; 40  place-lock*      all setforms operations
-; 50  output locks     ero, srvlog, scrapelog (one per stream)
-; 99  table locks      implicit, leaf
+;  0    *arc-mutex*      atomic (shrinking to just maybe-reload)
+; 10    users-lock*      profs*, votes*, hpasswords*, uid maps
+; 20    maxid-lock*      incrementing maxid*
+; 25    queue-lock*      enq, deq, etc
+; 30    scrape-lock*     last-fetch-time*
+; 40    place-lock*      all setforms operations
+; 50-59 output locks     ero, srvlog, scrapelog
+; 99    table locks      implicit, leaf
 
 (def make-lock ((o priority 99) (o name nil))
   (lets lock (table)
@@ -1753,8 +1753,10 @@
 (mac w/table (var . body)
   `(lets ,var (table) ,@body))
 
+(or= ero-lock* (make-lock 59 "ero"))
+
 (def ero args
-  (atomic
+  (w/lock ero-lock*
     (w/stdout (stderr) 
       (each a args 
         (write a)

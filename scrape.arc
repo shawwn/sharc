@@ -55,11 +55,13 @@
 (def scrape-verbose ()
   (or scrape-verbose* (main-thread)))
 
+(or= scrapelog-lock* (make-lock 52 "scrapelog"))
+
 (def scrapelog args
-  (if (scrape-verbose) (atomic (apply prn args))))
+  (if (scrape-verbose) (w/lock scrapelog-lock* (apply prn args))))
 
 (def scrape-ero args
-  (if (scrape-verbose) (atomic (apply ero args))))
+  (if (scrape-verbose) (w/lock scrapelog-lock* (apply ero args))))
 
 ; Curl.
 
@@ -531,8 +533,10 @@
     (= last-fetch-time* t0)
     (if (> delay 0) (sleep delay))))
 
+(or= scrape-lock* (make-lock 30 "scrape"))
+
 (def fetch-hn-url (op)
-  (atomic
+  (w/lock scrape-lock*
     (scrape-delay!)
     (curl-get (+ scrape-hn-host* "/" op))))
 
@@ -675,7 +679,7 @@
           (flushout))))))
 
 (def scrape-user-batch! (ids)
-  (atomic
+  (w/lock scrape-lock*
     (= ids (keep scraping-user ids))
     (each id ids (pop-user-to-fetch id)))
   ; build a single shell command that backgrounds one `curl` per id

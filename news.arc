@@ -172,90 +172,87 @@
          u)))
 
 (def duplicate-user (old new)
-  (atomic
-    (assert (verify-user old)) ; user exists with old name.
-    (assert (~verify-user new)) ; no user data with new name.
+  (assert (verify-user old)) ; user exists with old name.
+  (assert (~verify-user new)) ; no user data with new name.
 
-    ; load user
-    (profile old)
-    (votes old)
+  ; load user
+  (profile old)
+  (votes old)
 
-    ; duplicate user data.
-    (= (profs* new) (profs* old)  ; profile
-       (votes* new) (votes* old)) ; votes
+  ; duplicate user data.
+  (= (profs* new) (profs* old)  ; profile
+     (votes* new) (votes* old)) ; votes
 
-    ; if the old user was an admin, make the new user an admin.
-    (when (mem old admins*)
-      (pushnew new admins*)
-      (save-admins))
+  ; if the old user was an admin, make the new user an admin.
+  (when (mem old admins*)
+    (pushnew new admins*)
+    (save-admins))
 
-    ; duplicate uid.
-    (link-uid new (user-id old))
+  ; duplicate uid.
+  (link-uid new (user-id old))
 
-    ; both usernames now point to same uid.
-    (save-uids)
+  ; both usernames now point to same uid.
+  (save-uids)
 
-    ; duplicate account data; both usernames now have same pw.
-    (copy-account old new)
+  ; duplicate account data; both usernames now have same pw.
+  (copy-account old new)
 
-    (save-pws)
+  (save-pws)
 
-    new))
+  new)
 
 ; erases user data, but leaves the profile intact.
 
 (def erase-user (u)
-  (atomic
-    (assert (verify-user u))
-    (assert (isnt (uid->user* (user-id u)) u)
-            "@u still owns uid @(user-id u); erasing would orphan it")
+  (assert (verify-user u))
+  (assert (isnt (uid->user* (user-id u)) u)
+          "@u still owns uid @(user-id u); erasing would orphan it")
 
-    ; load user
-    (profile u)
-    (votes u)
+  ; load user
+  (profile u)
+  (votes u)
 
-    (logout-user u)
+  (logout-user u)
 
-    ; remove the username's data:
-    (wipe (profs* u))       ; profile
-    (wipe (votes* u))       ; votes
-    (wipe (hpasswords* u))  ; password
-    (wipe (dc-usernames*:downcase u)) ; downcased usernames
-    (wipe (user->uid* u))   ; uid
+  ; remove the username's data:
+  (wipe (profs* u))       ; profile
+  (wipe (votes* u))       ; votes
+  (wipe (hpasswords* u))  ; password
+  (wipe (dc-usernames*:downcase u)) ; downcased usernames
+  (wipe (user->uid* u))   ; uid
 
-    ; remove from admins list.
-    (when (mem u admins*)
-      (pull u admins*)
-      (save-admins))
+  ; remove from admins list.
+  (when (mem u admins*)
+    (pull u admins*)
+    (save-admins))
 
-    ; now that the username's data is no longer in memory, save the
-    ; uids and passwords.
-    (save-uids)
-    (save-pws)
+  ; now that the username's data is no longer in memory, save the
+  ; uids and passwords.
+  (save-uids)
+  (save-pws)
 
-    u))
+  u)
 
 ; Written such that news still loads if killed at any point.
 
 (def rename-user (old new)
-  (atomic
-    ; first, duplicate the user data.
-    (duplicate-user old new)
+  ; first, duplicate the user data.
+  (duplicate-user old new)
 
-    ; now that all data exists for both usernames, rename.
-    (= (uvar new id) new
-       (uid->user* (user-id new)) new)
-    (save-prof new)
-    (save-uids)
+  ; now that all data exists for both usernames, rename.
+  (= (uvar new id) new
+     (uid->user* (user-id new)) new)
+  (save-prof new)
+  (save-uids)
 
-    ; wipe the comment cache, so that the rename shows up immediately.
-    (each id (uvar new submitted)
-      (uncache-comment id))
+  ; wipe the comment cache, so that the rename shows up immediately.
+  (each id (uvar new submitted)
+    (uncache-comment id))
 
-    ; lastly, remove all user data associated with old name.
-    (erase-user old)
+  ; lastly, remove all user data associated with old name.
+  (erase-user old)
 
-    new))
+  new)
 
 (def loaded-users ((o f idfn))
   (keys profs* f))
@@ -373,9 +370,12 @@
   (ensure-dir (item-dir i!id))
   (save-table i (item-path i!id)))
 
+(or= maxid-lock* (make-lock 20 "maxid"))
+
 (def new-item-id ()
-  (do1 (evtil (++ maxid*) ~file-exists:item-path)
-       (todisk maxid*)))
+  (w/lock maxid-lock*
+    (do1 (evtil (++ maxid*) ~file-exists:item-path)
+         (todisk maxid*))))
 
 ; these must stay constant after deploying news.
 
@@ -1969,18 +1969,17 @@
       (prt (if (ignored (by i)) "un-") (if nuke "nuke" "blast")))))
 
 (def toggle-blast (i (o nuke))
-  (atomic
-    (if (ignored (by i))
-        (do (wipe (dead i) (ignored (by i)))
-            (awhen (and nuke (sitename i!url))
-              (set-site-ban it nil)))
-        (do (set (dead i))
-            (ignore (by i) (if nuke 'nuke 'blast))
-            (awhen (and nuke (sitename i!url))
-              (set-site-ban it 'ignore))))
-    (if (dead i) (log-kill i))
-    (save-item i)
-    (save-prof (by i))))
+  (if (ignored (by i))
+      (do (wipe (dead i) (ignored (by i)))
+          (awhen (and nuke (sitename i!url))
+            (set-site-ban it nil)))
+      (do (set (dead i))
+          (ignore (by i) (if nuke 'nuke 'blast))
+          (awhen (and nuke (sitename i!url))
+            (set-site-ban it 'ignore))))
+  (if (dead i) (log-kill i))
+  (save-item i)
+  (save-prof (by i)))
 
 (def candelete (i (t user me))
   (or (admin user) (own-changeable-item i user)))
@@ -2447,7 +2446,7 @@
        (flink {newpoll-page title text opts toolong*})
       (len< (paras opts) 2)
        (flink {newpoll-page title text opts fewopts*})
-      (atlet p (create-poll (multisubst scrubrules* title) text opts)
+      (let p (create-poll (multisubst scrubrules* title) text opts)
         (ip-ban-test p)
         (when (ignored) (kill p 'ignored))
         (submit-item p)
@@ -2483,7 +2482,7 @@
 
 (def add-pollopt (p text)
   (unless (blank text)
-    (atlet o (create-pollopt p nil nil text)
+    (let o (create-pollopt p nil nil text)
       (++ p!parts (list o!id))
       (save-item p))))
 
@@ -2792,7 +2791,7 @@
         (flink {msgpage toofast*})
        (find-duplicate-comment parent (normalize-text text))
         (string whence "#" it!id)
-        (atlet c (create-comment parent text)
+        (let c (create-comment parent text)
           (comment-ban-test c text comment-kill* comment-ignore*)
           (if (bad-user) (kill c 'ignored/karma))
           (submit-item c)

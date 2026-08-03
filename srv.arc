@@ -450,14 +450,13 @@ Connection: close"))
 (or= fnkey->fnid* (isotable) fnid->fnkey* (table))
 
 (def forget-fnid (key)
-  (atomic
-    (wipe (fns* key))
-    (wipe (fnids* key))
-    (wipe (timed-fnids* key))
-    (whenlet fnkey (fnid->fnkey* key)
-      (wipe (fnkey->fnid* fnkey))
-      (wipe (fnid->fnkey* key))
-      t)))
+  (wipe (fns* key))
+  (wipe (fnids* key))
+  (wipe (timed-fnids* key))
+  (whenlet fnkey (fnid->fnkey* key)
+    (wipe (fnkey->fnid* fnkey))
+    (wipe (fnid->fnkey* key))
+    t))
 
 ; count on huge (expt 64 22) size of fnid space to avoid clashes
 
@@ -486,29 +485,26 @@ Connection: close"))
       (gen-fnid)))
 
 (def fnid (f (o k))
-  (atlet key (new-fnid k)
+  (lets key (new-fnid k)
     (= (fns* key) f
        (fnids* key) (list (seconds) (get-user)))
-    (wipe (timed-fnids* key))
-    key))
+    (wipe (timed-fnids* key))))
 
 (def timed-fnid (lasts f (o k))
-  (atlet key (new-fnid k)
+  (lets key (new-fnid k)
     (= (fns* key) f
        (timed-fnids* key) (list (seconds) lasts (get-user)))
-    (wipe (fnids* key))
-    key))
+    (wipe (fnids* key))))
 
 ; Within f, it will be bound to the fn's own fnid.  Remember that this is
 ; so low-level that need to generate the newline to separate from the headers
 ; within the body of f.
 
 (mac afnid (f (o k `(scopekey 'afnid ,f)))
-  `(atlet it (new-fnid ,k)
+  `(lets it (new-fnid ,k)
      (= (fns* it) ,f
         (fnids* it) (list (seconds) (get-user)))
-     (wipe (timed-fnids* it))
-     it))
+     (wipe (timed-fnids* it))))
 
 ;(defop test-afnid req
 ;  (tag (a href (url-for (afnid (fn (req) (prn) (pr "my fnid is " it)))))
@@ -537,16 +533,15 @@ Connection: close"))
         (a id)))))
 
 (def harvest-fnids ((o n fnid-harvest-max*))
-  (atomic
+  (when (len> fns* n)
+    (each id (dead-fnids)
+      (forget-fnid id))
     (when (len> fns* n)
-      (each id (dead-fnids)
-        (forget-fnid id))
-      (when (len> fns* n)
-        (withs (n (min n (len fns*))
-                nharvest (trunc (/ n fnid-harvest-ratio*)))
-          (let (kill keep) (split (fnids) nharvest)
-            (each id kill
-              (forget-fnid id))))))))
+      (withs (n (min n (len fns*))
+              nharvest (trunc (/ n fnid-harvest-ratio*)))
+        (let (kill keep) (split (fnids) nharvest)
+          (each id kill
+            (forget-fnid id)))))))
 
 (= fnurl* "/x" rfnurl* "/r" rfnurl2* "/y")
 
@@ -706,9 +701,13 @@ Connection: close"))
         (unique-id)
         (= (unique-ids* id) id))))
 
+(or= log-lock* (make-lock 51 "srvlog"))
+
 (def srvlog (type . args)
   (w/appendfile o (logfile-name type)
-    (w/stdout o (atomic (apply prs (seconds) args) (prn)))))
+    (w/stdout o
+      (w/lock log-lock*
+        (apply prs (seconds) args) (prn)))))
 
 (def logfile-name (type)
   (string logdir* type "-" (memodate)))
