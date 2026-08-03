@@ -2595,7 +2595,7 @@
             (spacerow 10)
             (tr (td)
                 (td (tab (display-pollopts i here)))))
-          (when (and (cansee i) (comments-active i))
+          (when (cansee&comments-active i)
             (spacerow 10)
             (row "" (comment-form i here))))
         (br)
