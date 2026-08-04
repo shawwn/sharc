@@ -1803,7 +1803,7 @@
 
 (def agelink (i)
   (tag (span class "age" title (text-time i!time))
-    (link (text-age:item-age i) (item-url i!id))))
+    (link (text-age:item-age i) (item-or-hn-url i!id))))
 
 (def unvotelink (i (o whence))
   ; hn.js injects the "unvote" link here after a live vote; render it
@@ -1836,7 +1836,7 @@
 (def commentlink (i)
   (when (cansee i)
     (pr bar*)
-    (tag (a href (item-url i!id))
+    (tag (a href (item-or-hn-url i!id))
       (let n (w/loading-items (- (visible-family i) 1))
         (if (> n 0)
             (do (pr (plural n "comment"))
@@ -2519,6 +2519,15 @@
 
 
 ; Individual Item Page (= Comments Page of Stories)
+
+(def viewing-item (id)
+  (and (op "item") (is (string id) arg!id)))
+
+(def item-or-hn-url (id (o anchor))
+  (string (aand (viewing-item&item id)
+                (imported it)
+                "@{hn-url*}/")
+          (item-url id anchor)))
 
 (defmemo item-url (id (o anchor))
   (string (if id "item?id=") id (if anchor "#") anchor))
