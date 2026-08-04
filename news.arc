@@ -571,8 +571,9 @@
 
 (def insert-items (xs)
   (let items (items-by-type xs)
-    (= stories*  (merge-item-lists stories* items!story items!poll)
-       comments* (merge-item-lists comments* items!comment))
+    (w/place-lock
+      (= stories*  (merge-item-lists stories* items!story items!poll)
+         comments* (merge-item-lists comments* items!comment)))
     (hook 'initload items))
   xs)
 
