@@ -126,7 +126,7 @@ the exact bug the lock hierarchy exists to prevent.
 
 ## 2. `insert-items` silently drops concurrent submissions
 
-`news.arc:572`
+**Fixed in `409efb7`.** `news.arc:572`
 
 ```arc
 (= stories*  (merge-item-lists stories* items!story items!poll)
@@ -164,6 +164,21 @@ someone else loads a page containing an uncached comment" is enough.
 
 Fix: this is a real transaction over two globals. It wants a lock, or a
 `zap`-shaped rewrite so the merge happens under `place-lock*`.
+
+The lock is what landed: `w/place-lock` around the two assignments, with
+`(hook 'initload items)` left outside it, since a hook is arbitrary user code
+and would hold the lock across I/O or reach a lower level. The cost is that
+`place-lock*` is now held across two `merge-item-lists` passes over the full
+lists, so every assignment in the image stalls for that span on any request
+that lazily loads an item. If that shows up in latency, the escape hatch is a
+dedicated lock for `stories*`/`comments*`, taken by all four writers
+(`insert-items`, the two `push` sites, `put-item`). Its level has to be below
+40 numerically, like `users-lock*` at 10, so that the assignments inside its
+body can still take `place-lock*` in increasing order.
+
+`examples/locking/insert-items-drop.arc` is the regression test. It exercises
+the real `insert-items` against a real `(push s stories*)`; reverting the fix
+drops about 170 of 200 submissions.
 
 ## 3. Double-load produces two objects for one id
 

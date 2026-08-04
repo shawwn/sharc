@@ -1,9 +1,9 @@
 # Locking examples
 
 Executable demonstrations of the concurrency properties of sharc's lock
-hierarchy. Three of these are regression tests for work that is not
-finished, so two of them are *expected to fail* right now. Read the
-header comment in each file before concluding anything from its output.
+hierarchy. Two of them track work that is not finished and are
+*expected to fail* right now. Read the header comment in each file
+before concluding anything from its output.
 
 Run them from the repo root:
 
@@ -17,6 +17,8 @@ explicitly rather than executing the file directly.)
 
 They use threads and sleeps, so each takes a few seconds. `lost-updates.arc`
 takes the longest (60000 increments across two threads).
+`insert-items-drop.arc` is the only one that loads `news.arc`, since it
+exercises the real `insert-items`.
 
 ## The lock hierarchy
 
@@ -37,6 +39,7 @@ order. Re-entering a lock already held is always allowed. See
 |---|---|---|
 | `reentrancy.arc` | nested `=` and nested `w/lock` on one lock do not self-deadlock | **passes** (`ALL OK`) |
 | `lost-updates.arc` | why `call-w/locked-table` must not skip `place-lock*` when it already holds `*arc-mutex*` | **passes** (60000/60000) |
+| `insert-items-drop.arc` | a `=` whose value expression reads its own place, racing a correctly locked `push` | **passes** (dropped 0 of 200) |
 | `deadlock-place-then-atomic.arc` | `place-lock*` (40) then `*arc-mutex*` (0), because `placewiths` evaluates the value expression under the lock | **lock-order error** |
 | `atomic-interleaved.arc` | an `atomic` block torn by a bare `=`, since the two use different locks | **`*** INTERLEAVED ***`** |
 
