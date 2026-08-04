@@ -721,7 +721,7 @@
   (w/uniq (gx gargs)
     `(placewiths (,gx ,x ,@(if args `(,gargs ,@args)))
        (= (mem ,gx ,place ,@(if args (list gargs)))
-          (~mem ,gx ,place ,@(if args (list gargs)))))))
+         (~mem ,gx ,place ,@(if args (list gargs)))))))
 
 (mac ++ (place (o i 1))
   (if (isa!sym:ssexpand place)
