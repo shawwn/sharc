@@ -347,6 +347,7 @@
 ;  0    *arc-mutex*      atomic
 ; 20    maxid-lock*      incrementing maxid*
 ; 21    maxuid-lock*     incrementing maxuid*
+; 22    save-locks*      saving tables
 ; 25    queue-lock*      enq, deq, etc
 ; 30    scrape-lock*     last-fetch-time*
 ; 40    place-lock*      all setforms operations
@@ -1289,8 +1290,27 @@
     (w/uniq eof
       (drain (read-table i eof) eof))))
 
+(= save-stripes* 64)
+
+(or= save-locks* (table))
+
+(def filename-hash (file)
+  (sum as!int file))
+
+(def save-lock (file)
+  (let key (mod (filename-hash file) save-stripes*)
+    (or (save-locks* key)
+        (or= (save-locks* key)
+             (make-lock 22 "savefile")))))
+
+; A file can't regress to an older snapshot. Writes to the same path
+; are serialized, and each tablist happens inside the critical
+; section, so every write lands a snapshot taken after the previous
+; write finished.
+
 (def save-table (h file)
-  (writefile (tablist h) file))
+  (w/lock (save-lock file)
+    (writefile (tablist h) file)))
 
 (def write-table (h (o o (stdout)))
   (write (tablist h) o))
