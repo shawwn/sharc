@@ -357,15 +357,14 @@
 
 (def load-item (id)
   (when (safe-id id)
-    (let i (temload 'item (item-path id))
+    (lets i (temload 'item (item-path id))
       (= (items* id) i)
       (if (loading-items) (push i (the loaded-items))
           (metastory i)   (put-item i stories*)
           (acomment i)    (put-item i comments*))
       (unless (blank i!url)
         (awhen (astory&live i)
-          (register-url i i!url)))
-      i)))
+          (register-url i i!url))))))
 
 (def save-item (i)
   (ensure-dir (item-dir i!id))
