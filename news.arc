@@ -1100,7 +1100,7 @@
       (tag (td valign 'top)
         (pr "user:"))
       (tag (td timestamp (uvar user created))
-        (userlink user nil (me user))))))
+        (userlink user nil (me))))))
 
 (def resetpw-link ()
   (tostring:underlink "reset password" "resetpw"))
