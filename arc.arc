@@ -2091,8 +2091,10 @@
 ; re-enable redef warning
 
 (def warnset (var)
-  (w/stdout (stderr)
-    (prn "*** redefining " var)))
+  (w/lock ero-lock*
+    (w/stdout (stderr)
+      (prn "*** redefining " var)
+      (flushout))))
 
 ; any logical reason I can't say (push x (if foo y z)) ?
 ;   eval would have to always ret 2 things, the val and where it came from
