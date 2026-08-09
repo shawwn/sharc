@@ -18,8 +18,8 @@
   (serve port))
 
 (or= hpasswords*   (table)
-     cookie->user* (table) user->cookie* (table)
-     uid->user*    (table) user->uid*    (table))
+     cookie->user* (table) user->cookies* (table)
+     uid->user*    (table) user->uid*     (table))
 
 (def load-userinfo ()
   (load-uids)
@@ -99,8 +99,10 @@
 
 
 (def load-cookies ()
-  (= cookie->user* (load-table cookfile*))
-  (each (k v) cookie->user* (= (user->cookie* v) k)))
+  (= cookie->user* (load-table cookfile*)
+     user->cookies* (table))
+  (each (cookie user) cookie->user*
+    (push cookie (user->cookies* user))))
 
 (def load-admins ()
   (= admins* (map string (readfile adminfile*))))
@@ -123,7 +125,7 @@
 
 ; idea: a bidirectional table, so don't need two vars (and sets)
 
-(or= cookie->user* (table) user->cookie* (table) logins* (table))
+(or= cookie->user* (table) user->cookies* (table) logins* (table))
 
 (def user-from-cookie ((t req))
   (aand (alref req!cooks "user")
@@ -158,7 +160,7 @@
 
 (def fake-req ((o args) (t u me))
   (inst 'request 'args (pair (map string args))
-        'ip (ip) 'cooks (aand (user->cookie* u) `(("user" ,it)))))
+        'ip (ip) 'cooks (aand (car:user->cookies* u) `(("user" ,it)))))
 
 (mac when-umatch (user . body)
   `(if (me ,user)
@@ -235,15 +237,20 @@
        (save-cookies)))
 
 (def link-cookie (user (o cookie (new-user-cookie user)))
-  (= (cookie->user* cookie) user
-     (user->cookie* user) cookie))
+  (w/place-lock
+    (= (cookie->user* cookie) user)
+    (push cookie (user->cookies* user)))
+  cookie)
 
 (def new-user-cookie (user)
   (evtil (+ (assert user) "&" (rand-string 32)) ~cookie->user*))
 
 (def logout-user ((t user me))
   (wipe (logins* user))
-  (wipe (cookie->user* (user->cookie* user)) (user->cookie* user))
+  (w/place-lock
+    (each cookie (user->cookies* user)
+      (wipe (cookie->user* cookie)))
+    (wipe (user->cookies* user)))
   (save-cookies))
 
 (def create-acct (user pw)
@@ -404,7 +411,7 @@
   (with (user arg!acct pw arg!pw)
     (unless (me user) (logout-user))
     (aif (good-login user pw (ip))
-         (login it (ip) (user->cookie* it) afterward)
+         (login it (ip) (car:user->cookies* it) afterward)
          (failed-login switch "Bad login." afterward))))
 
 (def create-handler (switch afterward)
@@ -457,7 +464,7 @@
 (def good-login (user pw ip)
   (let record (list (seconds) ip user)
     (if (check-pw user pw)
-        (do (unless (user->cookie* user) (cook-user user))
+        (do (unless (car:user->cookies* user) (cook-user user))
             (enq-limit record good-logins*)
             user)
         (do (enq-limit record bad-logins*)
