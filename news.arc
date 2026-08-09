@@ -619,9 +619,17 @@
 
 (def metastory (i) (and i (in i!type 'story 'poll)))
 
+(or= topstories-dirty* nil)
+
 (def adjust-rank (s (o scorefn frontpage-rank))
   (put-item s ranked-stories* (compare > (memo scorefn)))
-  (save-topstories))
+  (set topstories-dirty*))
+
+(defbg topstories 30
+  (when topstories-dirty*
+    ; clear this first, so a change during the save re-dirties
+    (wipe topstories-dirty*)
+    (save-topstories)))
 
 ; If something rose high then stopped getting votes, its score would
 ; decline but it would stay near the top.  Newly inserted stories would
