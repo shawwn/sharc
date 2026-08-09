@@ -890,27 +890,33 @@ and be honest that it is global". If that is ever revisited, two consequences:
     `should-ban-ip`. Nothing here has to be walked: the derived data is
     dead-items-by-site and items-by-ip, both of which can be maintained at
     `kill` and `register-item` time the way `sitename->items*` already is.
-12. `save-topstories`, the one exclusion from #4's fix that is worth doing; it
-    is reached from `adjust-rank` on every story vote. The `diskvar` writes are
-    the other exclusion and need nothing: `maxid*` and `maxuid*` already save
-    inside their own locks, `ignore-log*` and `hmac-key*` are fixed, and the
-    rest are whole-value replacements from admin forms.
+12. ~~`save-topstories` and the other snapshot-outside-the-lock saves~~: done.
+    `a58b79f` moved `save-topstories` off the per-vote path onto a 30-second
+    bgthread, and `3baca02` locked both it and `save-admins`, which were the
+    last two callers handing a caller-evaluated snapshot to `writefile` or
+    `dispfile`. Note `a58b79f`'s message claims the debounce retired the race
+    because a single writer cannot race itself; that was wrong, there are three
+    writers. The `diskvar` writes need nothing: `maxid*` and `maxuid*` already
+    save inside their own locks, `ignore-log*` and `hmac-key*` are fixed, and
+    the rest are whole-value replacements from admin forms.
 13. An iterative `reinsert-sorted`, if `register-item`'s insertion cost or the
     control-stack ceiling on long lists ever matters. See finding 8 for the
     guard that looks like it would help and does not.
 14. The rest as convenient.
 
-The levels in use are now 10 `submit-lock*`, 11 `vote-lock*`, 20 `maxid-lock*`,
-21 `maxuid-lock*`, 22 `save-locks*`, 23 `ignore-log-lock*`, 24 `fnid-lock*`,
-25 `queue-lock*`, 30 `scrape-lock*`, 40 `place-lock*` and the output locks at
-51, 52 and 59. Free: 1 through 9, 12 through 19, 26 through 29, 31 through 39.
-`arc.arc` is the single table (`1a5b30e`); keep it in sync.
+The levels in use are now 10 `submit-lock*`, 11 `vote-lock*`, 12 `rank-lock*`,
+20 `maxid-lock*`, 21 `maxuid-lock*`, 22 `save-locks*`, 23 `ignore-log-lock*`,
+24 `fnid-lock*`, 25 `queue-lock*`, 30 `scrape-lock*`, 40 `place-lock*` and the
+output locks at 51, 52 and 59. Free: 1 through 9, 13 through 19, 26 through 29,
+31 through 39. `arc.arc` is the single table (`1a5b30e`); keep it in sync.
 
 Two constraints bound almost every choice. Anything that saves, or reaches
 `writefile` by any route, has to stay **below 40**, because `writefile` takes
 `place-lock*` through `tmpname`. Anything reached from a submission has to stay
 **above 10**, since `submit-item` calls `vote-for` from inside `submit-lock*`.
-That is how `vote-lock*` ended up at 11, between the two.
+That is how `vote-lock*` and `rank-lock*` ended up at 11 and 12, between the
+two: `adjust-rank` is reached from `vote-for`, so it has to sit above the vote
+lock as well.
 
 Repros belong in `examples/locking/`, in the style of `lost-updates.arc`. #1's
 is the canonical example of a place form that looks locked and is not, and #4's

@@ -15,8 +15,8 @@ fixing them. The doc was updated after each one, so it is the primary
 reference; this handoff covers what a fresh agent needs that the doc does not
 say.
 
-Roughly thirty commits on `lock-levels`, from `3b62dc0` to `219c3ca`. The
-branch is **61 commits ahead of `main`** and has not been pushed.
+Roughly thirty commits on `lock-levels`, from `3b62dc0` to `3baca02`. The
+branch is **63 commits ahead of `main`** and has not been pushed.
 
 Three new locks, all in `arc.arc`'s table (which `1a5b30e` made the single
 source of truth — keep it in sync):
@@ -39,6 +39,13 @@ to miss in the log:
   capped `/news?p=N`. Now it ranks every story among the 10000 most recent
   items, with a trim in the debounce thread and batched loading at boot
   (`219c3ca`).
+
+Finding 4's class was closed last, in `3baca02`: `save-topstories` and
+`save-admins` were the only two callers still handing a caller-evaluated
+snapshot to `writefile`/`dispfile` rather than going through `save-table`. Note
+`a58b79f`'s message claims debouncing `save-topstories` retired that race
+because a single writer cannot race itself — wrong, there are three writers
+(the bgthread plus two in `scrape.arc`).
 
 ## The one to read first: finding 13, phantom keys
 
@@ -191,7 +198,7 @@ All four pass. `atomic-interleaved.arc` and `deadlock-place-then-atomic.arc` are
 
 ## Current state
 
-Branch `lock-levels`, 61 commits ahead of `main`, unpushed. Working tree clean.
+Branch `lock-levels`, 63 commits ahead of `main`, unpushed.
 
 Open, and none of it is a race:
 
@@ -202,5 +209,11 @@ Open, and none of it is a race:
    `kill` and `register-item` time, the way `sitename->items*` already is.
 2. **An iterative `reinsert-sorted`**, if `register-item`'s insertion cost
    or the control-stack ceiling on long lists ever matters.
-3. **The doc's lock-level list is missing `rank-lock*` at 12** —
-   `arc.arc` has it, the doc does not.
+3. **Front-page rank logging** is in progress and unstaged in `scrape.arc`
+   (`frontlog`, `scrape-topstory-ids`, a `scrape-top` bgthread). It is not
+   ready: `frontlog-loop` computes `t0` before an HTTP fetch and then does
+   `(sleep (- 10 (since t0)))`, which errors on a negative argument. SBCL
+   rejects a negative sleep, so a fetch slower than ten seconds kills the
+   bgthread, and `new-bgthread` only runs at `start-bgthreads` — it will not
+   come back until a restart. `(max 0 ...)` fixes it. The `defbg` interval is
+   also 0, so the loop's only pacing is that internal sleep.
