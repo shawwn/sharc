@@ -574,8 +574,9 @@
     (= ranked-stories* (rank-stories nil 10000 (memo frontpage-rank)))))
 
 (def save-topstories ()
-  (writefile (map !id ranked-stories*)
-             (+ newsdir* "topstories")))
+  (let file (+ newsdir* "topstories")
+    (w/lock (save-lock file)
+      (writefile (map !id ranked-stories*) file))))
  
 (def rank-items (n consider scorefn (o test idfn))
   (bestn n (compare > scorefn) (latest-items test nil consider)))

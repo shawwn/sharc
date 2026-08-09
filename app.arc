@@ -114,8 +114,9 @@
 (def save-cookies () (save-table cookie->user* cookfile*) t)
 
 (def save-admins ()
-  (aand (apply string (intersperse #\newline admins*))
-        (dispfile it adminfile*)))
+  (w/lock (save-lock adminfile*)
+    (aand (apply string (intersperse #\newline admins*))
+          (dispfile it adminfile*))))
 
 ; always reload admins on page refresh after modifying code.
 ;
