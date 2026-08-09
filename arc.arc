@@ -1923,9 +1923,11 @@
   (coerce (+ (asnum x) n) (type x)))
 
 (def range (start end)
-  (if (> start end)
-      nil
-      (cons start (range (inc start) end))))
+  ((afn (start (o acc))
+     (if (> start end)
+         (rev acc)
+         (self (inc start) (cons start acc))))
+   start))
 
 (def mismatch (s1 s2)
   (catch
