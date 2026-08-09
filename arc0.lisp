@@ -1502,15 +1502,7 @@ straight to gcell-ref; this remains for callers holding only a symbol."
 ;;; rather than an intermittent hang under load.  See
 ;;; docs/agents/plans/2026-08-02-001-remove-global-mutex.md, principle 3.
 
-;;; lock priorities:
-;;;
-;;;  0  *arc-mutex*      atomic (shrinking to just maybe-reload)
-;;; 10  users-lock*      profs*, votes*, hpasswords*, uid maps
-;;; 20  fnid-lock*       fns*, fnids*, timed-fnids*
-;;; 30  scrape-lock*     last-fetch-time*
-;;; 40  place-lock*      all setforms operations
-;;; 50  output locks     ero, srvlog, scrapelog (one per stream)
-;;; 99  table locks      implicit, leaf
+;;; lock priorities: see arc.arc
 
 (defvar *arc-lock-levels* nil
     "Stack of (level . lock) for locks held by this thread, innermost first.

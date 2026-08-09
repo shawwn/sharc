@@ -344,13 +344,16 @@
 
 ; lock priorities:
 ;
-;  0    *arc-mutex*      atomic (shrinking to just maybe-reload)
-; 10    users-lock*      profs*, votes*, hpasswords*, uid maps
+;  0    *arc-mutex*      atomic
 ; 20    maxid-lock*      incrementing maxid*
+; 21    maxuid-lock*     incrementing maxuid*
 ; 25    queue-lock*      enq, deq, etc
 ; 30    scrape-lock*     last-fetch-time*
 ; 40    place-lock*      all setforms operations
-; 50-59 output locks     ero, srvlog, scrapelog
+; 5x    output locks     ero, srvlog, scrapelog
+; 51    srvlog
+; 52    scrapelog
+; 59    ero
 ; 99    table locks      implicit, leaf
 
 (def make-lock ((o priority 99) (o name nil))
@@ -366,8 +369,8 @@
 (def lockable (l)
   (check l alock (err "Not a lock: @l")))
 
-(mac w/lock (tbl . body)
-  `(call-w/lock ,tbl {do ,@body}))
+(mac w/lock (x . body)
+  `(call-w/lock ,x {do ,@body}))
 
 (def call-w/lock (x thunk)
   (call-w/locked-table (lockable x) thunk))
