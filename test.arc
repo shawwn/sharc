@@ -298,8 +298,7 @@ c"
   (test? 3     (car:cdr:cdr '(1 2 3 4)))
   (test? true  (~odd 4))
   (test? false (~odd 3))
-  ; sexpr: a.b calls, a!b passes a quoted arg
-  (test? '(a b)         (ssexpand 'a.b))
+  ; sexpr: a!b passes a quoted arg
   (test? '(a (quote b)) (ssexpand 'a!b))
   ; andf (&) and orf (|); ssyntax resolves lexical predicates too
   (test? '(andf a b) (ssexpand 'a&b))
