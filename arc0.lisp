@@ -309,6 +309,10 @@ straight to gcell-ref; this remains for callers holding only a symbol."
 
 (xdef id #'arc-id)
 
+;; Alias id to ident because id is one of the most common names likely
+;; to be shadowed by a param name.
+(xdef ident #'arc-id)
+
 (defun arc-is2 (a b)
    (or (arc-id a b)
        (cond

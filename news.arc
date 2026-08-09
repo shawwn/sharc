@@ -103,7 +103,9 @@
 
 
 (def profile ((t u me))
-  (profs*|load-prof u))
+  (or (profs* u)
+      (whenlet p (load-prof u)
+        (or= (profs* u) p))))
 
 (def load-prof (u)
   ; Have to check goodname because some user ids come from http requests.
@@ -111,8 +113,7 @@
   (aand (goodname u)
         (lookup-uid u)
         (file-exists (prof-path it))
-        (lets p (temload 'profile it)
-          (= (profs* p!id) p))))
+        (temload 'profile it)))
 
 (def save-prof ((t u me))
   (let uid (user-id u)
@@ -141,12 +142,14 @@
 
 
 (def votes ((t u me))
-  (votes*|load-votes u))
+  (or (votes* u)
+      (whenlet v (load-votes u)
+        (or= (votes* u) v))))
 
 (def load-votes ((t u me))
   (aand (lookup-uid u)
         (file-exists (votes-path it))
-        (= (votes* u) (load-table it))))
+        (load-table it)))
 
 (def save-votes ((t u me))
   (let uid (user-id u)
@@ -344,7 +347,11 @@
 (def acomment (i) (is i!type 'comment))
 (def apoll    (i) (is i!type 'poll))
 
-(def item (id) (items*|load-item id))
+(def item (id)
+  (or (items* id)
+      (whenlet i (read-item id)
+        (lets cur (or= (items* id) i)
+          (when (ident cur i) (register-item i))))))
 
 (def sameitem (compare is !id))
 (def compitem (compare >  !time))
@@ -355,16 +362,18 @@
 (mac pull-item (i var (o same 'sameitem))
   `(pull ,i ,var ,same))
 
-(def load-item (id)
-  (when (safe-id id)
-    (lets i (temload 'item (item-path id))
-      (= (items* id) i)
-      (if (loading-items) (push i (the loaded-items))
-          (metastory i)   (put-item i stories*)
-          (acomment i)    (put-item i comments*))
-      (unless (blank i!url)
-        (awhen (astory&live i)
-          (register-url i i!url))))))
+(def read-item (id)
+  (aand (safe-id id)
+        (file-exists (item-path id))
+        (temload 'item it)))
+
+(def register-item (i)
+  (if (loading-items) (push i (the loaded-items))
+      (metastory i)   (put-item i stories*)
+      (acomment i)    (put-item i comments*))
+  (unless (blank i!url)
+    (awhen (astory&live i)
+      (register-url i i!url))))
 
 (def save-item (i)
   (ensure-dir (item-dir i!id))
