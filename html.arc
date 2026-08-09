@@ -39,6 +39,7 @@
         spellcheck        opyesno
         autofocus         opyesno
         autocorrect       oponoff
+        autocomplete      oponoff
         autocapitalize    oponoff)))
 
 (mac attribute (tag opt f)

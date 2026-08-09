@@ -698,8 +698,13 @@
                (color-stripe (main-color))
                (br)
                (center
+                 (tag (a href "https://www.ycombinator.com/apply")
+                   (pr "Consider applying for YC's Fall 2026 batch! "
+                       "<u>Applications</u> are open till July 27.")))
+               (br)
+               (center
                  (or (hook 'longfoot) (footer))
-                 (br2)
+                 (if (admin) (br2))
                  (admin-bar (- (msec) ,gt) ,whence)))))))
 
 (def footer ()
@@ -712,7 +717,13 @@
       (link "Security"    "security.html")
       (link "DMCA"        "dmca.html")
       (link "Apply to YC" "https://www.ycombinator.com/apply/")
-      (link "Contact"     "mailto:@site-email*"))))
+      (link "Contact"     "mailto:@site-email*")))
+  (br2)
+  (tag (form method "get" action "//hn.algolia.com/")
+    (pr "Search: ")
+    (gentag input type 'text name "q" size 17
+            autocorrect 'off spellcheck 'false
+            autocapitalize 'off autocomplete 'off)))
 
 (def gc ((o full t))
   (sb-ext::gc :full full))
