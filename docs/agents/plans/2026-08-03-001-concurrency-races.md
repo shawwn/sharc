@@ -11,9 +11,12 @@ Audited on the `lock-levels` branch at `9b2175a`, after reading
 `main..lock-levels` diff. This is the ranked findings list; the strategy and
 principles live in the remove-global-mutex plan and are not repeated here.
 
-Finding 1 (in part) and the hot-reload design note were fixed in the working tree
-while this doc was being written; they are kept because the reasoning is what
-justifies the fix, and because finding 1 explains the class.
+Finding 1 (in part) was fixed in the working tree while this doc was being
+written; it is kept because the reasoning is what justifies the fix, and
+because it explains the class. Findings 2 and 3 have since been fixed as well,
+and each carries the commit that fixed it. The hot-reload design note has been
+rewritten: what it originally described as the working-tree fix was later
+reversed, and that section now records the state as it stands.
 
 ## Scope note: what is *not* broken
 
@@ -26,7 +29,11 @@ Worth stating up front, because it narrows the search a lot:
   through.
 - **`or=` is a correct atomic get-or-create.** It holds `place-lock*` across
   the check and the initializing expression. Several bugs below are "should
-  have used `or=`".
+  have used `or=`". Note the second half of that sentence is also a cost:
+  because the initializing expression runs under the lock, `or=` is only the
+  right answer when that expression is cheap and takes no other lock. Where it
+  does I/O, load outside the lock and use `or=` only to claim the entry; see
+  finding 3.
 - **`writefile` is atomic at the filesystem level** (`arc.arc:1026`): unique
   tmp name per write, then rename. No torn or corrupt files, ever. Every
   file-related bug below is staleness, never corruption.
@@ -182,7 +189,7 @@ drops about 170 of 200 submissions.
 
 ## 3. Double-load produces two objects for one id
 
-`news.arc:358` and `news.arc:108`
+**Fixed in `30b13b3`.** `news.arc:358` and `news.arc:108`
 
 ```arc
 (def item (id) (items*|load-item id))
@@ -205,8 +212,19 @@ concurrent front-page renders after a restart hit this for every author shown.
 Items are warmer (`initload*` is 15000, loaded before `serve`), so item
 double-load needs concurrent requests for the same *older* item.
 
-Fix: `or=`. It is exactly the idempotent get-or-create these want, and it is
-already correct.
+Fix: `or=`, but not the one-liner it looks like. `(or= (items* id) (load-item
+id))` would hold `place-lock*` across a `temload` plus `put-item`'s insort into
+`stories*`, which is the design note below reintroduced on a hotter path than
+the one it was written about.
+
+What landed in `30b13b3` splits the loader instead. `read-item` does the bare
+`temload` outside any lock; `or=` claims the table entry and nothing else;
+`register-item` (the old `put-item`/`register-url` half) runs only for the
+thread whose object won the claim, tested with `ident`, since `is` is
+isomorphic and two equal items would both look like winners. Losers discard
+their copy and return the winner's, so the object-identity split is closed and
+`place-lock*` is held only across the store. `profile` and `votes` take the
+same shape without the side-effect split.
 
 ## 4. `save-*` snapshots race with each other
 
@@ -334,28 +352,40 @@ re-evaluated toplevel `(= ...)` forms concurrently with in-flight request
 threads, where previously it had blocked every other thread at its first
 assignment.
 
-The working tree changes this to `(w/place-lock ; stop the world ...)`, which
-restores the old property by holding the lock every mutation must pass through.
-That is the right call and matches the plan's "keep a real global lock here and
-be honest that it is global". Two consequences to keep in view:
+`bbdf3fb` went the other way: the `atomic` is dropped and nothing replaces it,
+with a comment recording the exposure: reload runs unsynchronized on the accept
+thread, and requests in flight may observe half-redefined definitions.
+The inner `loaded-files-changed` re-check went with it, correctly:
+`maybe-reload` is called only from `handle-request` (`srv.arc:82`), which is
+the body of the accept loop (`srv.arc:54`), so the re-check was guarding
+against a racer that cannot exist.
 
-- `reload` runs arbitrary code — file I/O, every toplevel form in every loaded
-  file — while holding a level-40 lock. Any lock at level ≤ 40 acquired during
-  a reload is now a hard `Lock order violation` rather than a deadlock. Nothing
-  in the current load path appears to take one, but `atomic` (0), `users-lock*`
-  (10), `maxid-lock*` (20), `queue-lock*` (25) and `scrape-lock*` (30) are all
-  tripwires for anything added to load time later.
-- Because `place-lock*` is what stops the world, the stop is only as complete as
-  the coverage of the RMW macros. Anything that mutates without going through a
-  place form is not stopped: finding 2's `=`, and finding 1's `++` on bare
-  symbols, which still compiles to a bare `assign` today.
+So hot reload is knowingly unsynchronized today, and reload safety rests on
+not reloading under load. The option not taken was `(w/place-lock ; stop the
+world ...)`, which would restore the old property by holding the lock every
+mutation must pass through, matching the plan's "keep a real global lock here
+and be honest that it is global". If that is ever revisited, two consequences:
+
+- `reload` runs arbitrary code (file I/O, every toplevel form in every loaded
+  file), so a level-40 lock would be held across all of it, stalling every
+  assignment in the image for the length of a reload. Any lock at level ≤ 40
+  acquired during a reload would become a hard `Lock order violation` rather
+  than a deadlock. Nothing in the current load path appears to take one, but
+  `atomic` (0), `maxid-lock*` (20), `maxuid-lock*` (21), `queue-lock*` (25) and
+  `scrape-lock*` (30) are all tripwires for anything added to load time later.
+- `place-lock*` could only ever be a partial stop. Anything that mutates
+  without going through a place form is not stopped by it: finding 2's `=`, and
+  finding 1's `++` on bare symbols, which still compiles to a bare `assign`
+  today.
 
 ## Suggested order
 
-1. `insert-items` (#2) — user-visible data loss on a hot path.
-2. `or=` for the double-load sites (#3) — cheap, and it makes every other
-   item-related race less severe by removing object-identity splits.
-3. `fnid-lock*` (#5) — restores something this branch removed.
+1. ~~`insert-items` (#2)~~: done, `409efb7`.
+2. ~~The double-load sites (#3)~~: done, `30b13b3`.
+3. `fnid-lock*` (#5) — restores something this branch removed. Pick a free
+   level by hand: `a608f98` removed the level 20 slot the `arc0.lisp` header
+   used to reserve for it, and 20 and 21 are now `maxid-lock*` and
+   `maxuid-lock*`. 22 through 24 are free.
 4. `atomic-update` for the bare-symbol counters (#1, second half) — the impact
    today is stats-only, so this is not urgent, but it is the last piece needed
    before "every mutation goes through a lock" is actually true.
