@@ -482,7 +482,7 @@
 (def loaded-items (test)
   (accum a (each-loaded-item i (test&a i))))
 
-(def newslog args (apply srvlog 'news (ip) (me) args))
+(def newslog args (apply srvlog 'news (ip) (or (me) "()") args))
 
 
 ; Ranking
