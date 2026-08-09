@@ -1744,9 +1744,9 @@
 
 (def maybe-reload ()
   (when (loaded-files-changed)
-    (atomic
-      (when (loaded-files-changed)
-        (call-reporting reload)))))
+    ; reload runs unsynchronized on the accept thread, and requests in
+    ; flight may observe half-redefined definitions.
+    (call-reporting reload)))
 
 ; True iff the current file is the toplevel script (last .arc file
 ; passed on the sharc command line). Analogous to Python's
