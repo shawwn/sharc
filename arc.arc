@@ -346,6 +346,7 @@
 ;
 ;  0    *arc-mutex*      atomic
 ; 10    submit-lock*     submitting items
+; 11    vote-lock*       voting for items
 ; 20    maxid-lock*      incrementing maxid*
 ; 21    maxuid-lock*     incrementing maxuid*
 ; 22    save-locks*      saving tables
@@ -1303,11 +1304,11 @@
 
 (or= save-locks* (table))
 
-(def filename-hash (file)
-  (sum as!int file))
+(def string-hash (name)
+  (sum as!int name))
 
 (def save-lock (file)
-  (let key (mod (filename-hash file) save-stripes*)
+  (let key (mod (string-hash file) save-stripes*)
     (or (save-locks* key)
         (or= (save-locks* key)
              (make-lock 22 "savefile")))))

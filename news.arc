@@ -18,7 +18,6 @@
      site-color*   (color 170 170 230)
      border-color* (color 170 170 230)))
 
-(or= submit-lock* (make-lock 10 "submit-lock*"))
 
 ; Structures
 
@@ -72,6 +71,19 @@
   parent     nil
   kids       nil
   keys       nil)
+
+
+; Locking
+
+(or= submit-lock* (make-lock 10 "submit-lock*") vote-locks* (table))
+
+(= vote-stripes* 64)
+
+(def vote-lock ((t u me))
+  (let key (mod (string-hash (string u)) vote-stripes*)
+    (or (vote-locks* key)
+        (or= (vote-locks* key)
+             (make-lock 11 "vote")))))
 
 
 ; Load and Save
@@ -2102,65 +2114,67 @@
 ; big enough problem to drag in locking.
 
 (def vote-for (i (o dir 'up))
-  (when (votable i)
-    (withs (ip   (logins* (me))
-            vote (list (seconds) ip (user-id) dir i!score nil)
-            effect (fn (name n) (push (list name n) vote!5) n))
-      (unless (or (and (or (ignored) check-key!novote)
-                       (~author i))
-                  (and (is dir 'down)
-                       (~editor)
-                       (or check-key!nodowns
-                           (> (downvote-ratio) downvote-ratio-limit*)
-                           ; prevention of karma-bombing
-                           (just-downvoted (by i))))
-                  (and (~legit-user)
-                       (~author i)
-                       (find [is _!1 ip] i!votes))
-                  (and (isnt i!type 'pollopt)
-                       (biased-voter i vote)))
-        (++ i!score (effect 'score (case dir up 1 down -1)))
-        ; canvote protects against sockpuppet downvote of comments 
-        (when (and (is dir 'up) (possible-sockpuppet))
-          (++ i!sockvotes (effect 'sockvotes 1)))
-        (metastory&adjust-rank i)
-        (unless (or (author i)
-                    (and (is ip i!ip) (~editor))
-                    (is i!type 'pollopt))
-          (++ (karma (by i)) (effect 'karma (case dir up 1 down -1)))
-          (save-prof (by i)))
-        (uncache-comment i!id))
-      (if (admin) (pushnew 'nokill i!keys))
-      (push vote i!votes)
-      (save-item i)
-      (let pvote (list (seconds) i!id (user-id) (sitename i!url) dir)
-        (push pvote my!votes))
-      (= (voted i) vote)
-      (save-votes)
-      (zap [firstn votewindow* _] my!votes)
-      (save-prof)
-      (push (cons i!id vote) recent-votes*))))
+  (w/lock (vote-lock)
+    (when (votable i)
+      (withs (ip   (logins* (me))
+              vote (list (seconds) ip (user-id) dir i!score nil)
+              effect (fn (name n) (push (list name n) vote!5) n))
+        (unless (or (and (or (ignored) check-key!novote)
+                         (~author i))
+                    (and (is dir 'down)
+                         (~editor)
+                         (or check-key!nodowns
+                             (> (downvote-ratio) downvote-ratio-limit*)
+                             ; prevention of karma-bombing
+                             (just-downvoted (by i))))
+                    (and (~legit-user)
+                         (~author i)
+                         (find [is _!1 ip] i!votes))
+                    (and (isnt i!type 'pollopt)
+                         (biased-voter i vote)))
+          (++ i!score (effect 'score (case dir up 1 down -1)))
+          ; canvote protects against sockpuppet downvote of comments
+          (when (and (is dir 'up) (possible-sockpuppet))
+            (++ i!sockvotes (effect 'sockvotes 1)))
+          (metastory&adjust-rank i)
+          (unless (or (author i)
+                      (and (is ip i!ip) (~editor))
+                      (is i!type 'pollopt))
+            (++ (karma (by i)) (effect 'karma (case dir up 1 down -1)))
+            (save-prof (by i)))
+          (uncache-comment i!id))
+        (if (admin) (pushnew 'nokill i!keys))
+        (push vote i!votes)
+        (save-item i)
+        (let pvote (list (seconds) i!id (user-id) (sitename i!url) dir)
+          (push pvote my!votes))
+        (= (voted i) vote)
+        (save-votes)
+        (zap [firstn votewindow* _] my!votes)
+        (save-prof)
+        (push (cons i!id vote) recent-votes*)))))
 
 ; Inverse of vote-for: undo the current user's vote on i.
 ; hn.js sends how=un.
 
 (def unvote-for (i)
-  (whenlet vote (voted i)
-    (each (name n) (errsafe vote!5) ; legacy votes don't have effects
-      (case name
-        score     (-- i!score n)
-        sockvotes (-- i!sockvotes n)
-        karma     (do (-- (karma (by i)) n)
-                      (save-prof (by i)))
-        (err "Unknown vote-for effect name @name")))
-    (metastory&adjust-rank i)
-    (pull [is _!2 (user-id)] i!votes)
-    (save-item i)
-    (wipe (voted i))
-    (save-votes)
-    (pull [is _!1 i!id] my!votes)
-    (save-prof)
-    (uncache-comment i!id)))
+  (w/lock (vote-lock)
+    (whenlet vote (voted i)
+      (each (name n) (errsafe vote!5) ; legacy votes don't have effects
+        (case name
+          score     (-- i!score n)
+          sockvotes (-- i!sockvotes n)
+          karma     (do (-- (karma (by i)) n)
+                        (save-prof (by i)))
+          (err "Unknown vote-for effect name @name")))
+      (metastory&adjust-rank i)
+      (pull [is _!2 (user-id)] i!votes)
+      (save-item i)
+      (wipe (voted i))
+      (save-votes)
+      (pull [is _!1 i!id] my!votes)
+      (save-prof)
+      (uncache-comment i!id))))
 
 ; redefined later
 
