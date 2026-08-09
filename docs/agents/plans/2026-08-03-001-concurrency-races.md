@@ -6,27 +6,40 @@
 > (multiple concurrent votes for the same item, multiple items submitted at the
 > same time, multiple simultaneous edits, etc)
 
-Audited on the `lock-levels` branch at `9b2175a`, after reading
+Audited on the `lock-levels` branch at `546a6af`, after reading
 `2026-08-02-001-remove-global-mutex.md`, `examples/locking/`, and the
 `main..lock-levels` diff. This is the ranked findings list; the strategy and
 principles live in the remove-global-mutex plan and are not repeated here.
 
-Finding 1 (in part) was fixed in the working tree while this doc was being
-written; it is kept because the reasoning is what justifies the fix, and
-because it explains the class. Findings 2 and 3 have since been fixed as well,
-and each carries the commit that fixed it. The hot-reload design note has been
-rewritten: what it originally described as the working-tree fix was later
-reversed, and that section now records the state as it stands.
+Findings 1 through 4 are fixed and each carries the commit that fixed it. They
+are kept because the reasoning is what justifies the fix, and because each
+explains a class rather than an instance. Findings 5 through 8 are open. The
+hot-reload design note has been rewritten: what it originally described as the
+working-tree fix was later reversed, and that section now records the state as
+it stands.
+
+Four more races were found after the original audit, while fixing these; they
+are in their own section below, and all four are fixed. Two design notes were
+added: `writefile` takes `place-lock*`, which constrains every lock level in
+the tree, and the output locks do not cover what they appear to.
+
+Commit hashes in this doc were rewritten when `lock-levels` was rebased onto
+`main`; they refer to the current history.
 
 ## Scope note: what is *not* broken
 
 Worth stating up front, because it narrows the search a lot:
 
-- **`place-lock*` makes most read-modify-write macros atomic** — `++` and `--`
-  are the exception, see finding 1. `push`, `pop`, `swap`, `rotate`, `zap`,
-  `setmem`, `togglemem`, `pushnew`, `pull` and `insortnew` all evaluate getter
-  and setter under one global lock, with no symbol-place shortcut to escape
-  through.
+- **`place-lock*` makes the read-modify-write macros atomic.** `push`, `pop`,
+  `swap`, `rotate`, `zap`, `setmem`, `togglemem`, `pushnew`, `pull` and
+  `insortnew` all evaluate getter and setter under one global lock, with no
+  symbol-place shortcut to escape through. `++` and `--` were the exception
+  until `96ea700`; they now take the same path for everything but lexicals,
+  which are thread-local. See finding 1.
+- **Plain `=` on a bare symbol is still a bare `assign`.** It takes no lock, so
+  it is atomic against nothing. That is only safe where the value form does not
+  read the place. `todisk` is the trap here, because it expands its value form
+  in place; see the `ignore-log*` entry below.
 - **`or=` is a correct atomic get-or-create.** It holds `place-lock*` across
   the check and the initializing expression. Several bugs below are "should
   have used `or=`". Note the second half of that sentence is also a cost:
@@ -49,10 +62,10 @@ collectively.
 
 ## 1. Lost votes and karma: `++` escaped `place-lock*` on ssyntax places
 
-**Fixed in the working tree for ssyntax places; still open for bare symbols.**
+**Fixed in `8680301` for ssyntax places and `96ea700` for bare symbols.**
 `arc.arc:730`
 
-At `9b2175a`:
+At `546a6af`:
 
 ```arc
 (mac ++ (place (o i 1))
@@ -98,34 +111,37 @@ The fix is `(isa!sym:ssexpand place)` in `++` and `--`: `(ssexpand 'i!score)` is
 `(i 'score)`, not a symbol, so the place takes the `placewiths` path and the
 getter stays inside the lock.
 
-### The bare-symbol half is still open
+### The bare-symbol half, fixed in `96ea700`
 
-The shortcut is still taken for genuine bare-symbol globals, and it is **not**
+The shortcut was still taken for genuine bare-symbol globals, and it was **not**
 safe there either. `expand=` sends a symbol with no ssyntax to
 `(assign place val)`: the store is a single gcell write, but the read in `val`
 is not part of it. Same test, same result:
 
 ```
 (++ requests*) expands to: (= requests* (+ requests* 1))
-bare global: expected 40000 got 27246
+before: expected 40000 got 27246
+after:  expected 40000 got 40000
 ```
 
-There is no place form to hang a lock on here, which is why the plan calls for
-`atomic-update` — a CAS loop — in phase 2 rather than a lock. Live sites:
+This doc originally called for `atomic-update`, a CAS loop, on the grounds that
+there is no place form to hang a lock on. That was wrong: routing bare symbols
+through `placewiths` gives them the same lock as every other place, and the
+level already exists. What `96ea700` kept the shortcut for is genuine lexicals,
+which are thread-local and need no lock, and where the lock would cost about
+4.5x and turn every `(++ n)` inside a lock above 40 into a hard lock order
+violation.
 
-| site | impact |
-|---|---|
-| `srv.arc:92` `(++ requests*)` | undercounted request total |
-| `news.arc:2901` `(++ comments-printed*)` | undercounted stat |
-| `news.arc:2919` `(++ cc-hits*)` | undercounted cache-hit stat |
-| `app.arc:54` `(++ maxuid*)` | safe — inside `maxuid-lock*` |
-| `news.arc:378` `(++ maxid*)` | safe — inside `maxid-lock*` |
+The exposure before the fix was stats-only, because the two counters that would
+have been catastrophic to lose (the id allocators at `app.arc:54` and
+`news.arc:378`) were already inside `maxuid-lock*` and `maxid-lock*`.
 
-So the exposure today is stats-only, because the two counters that would be
-catastrophic to lose (the id allocators) are the two already covered by their
-own locks. That is worth knowing but not worth relying on: the next bare-symbol
-counter someone adds will be silently racy, and nothing in the lock hierarchy
-will catch it, because no lock is involved.
+What this does **not** cover: `=` on a bare symbol still compiles to a bare
+`assign`, so `++` is atomic against another `++` but not against a plain
+`(= requests* 0)`. Every live bare-symbol `++` site is a counter that is only
+ever incremented, so that gap is currently unreachable — but it is the same gap
+that made `ignore-log*` a real lost update, and there the value form did read
+the place.
 
 Both halves are worth a regression test in `examples/locking/`, in the shape of
 `lost-updates.arc`: they reproduce deterministically, and the ssyntax half is
@@ -133,7 +149,7 @@ the exact bug the lock hierarchy exists to prevent.
 
 ## 2. `insert-items` silently drops concurrent submissions
 
-**Fixed in `409efb7`.** `news.arc:572`
+**Fixed in `e56c93d`.** `news.arc:572`
 
 ```arc
 (= stories*  (merge-item-lists stories* items!story items!poll)
@@ -189,7 +205,7 @@ drops about 170 of 200 submissions.
 
 ## 3. Double-load produces two objects for one id
 
-**Fixed in `30b13b3`.** `news.arc:358` and `news.arc:108`
+**Fixed in `e3360fa`.** `news.arc:358` and `news.arc:108`
 
 ```arc
 (def item (id) (items*|load-item id))
@@ -217,7 +233,7 @@ id))` would hold `place-lock*` across a `temload` plus `put-item`'s insort into
 `stories*`, which is the design note below reintroduced on a hotter path than
 the one it was written about.
 
-What landed in `30b13b3` splits the loader instead. `read-item` does the bare
+What landed in `e3360fa` splits the loader instead. `read-item` does the bare
 `temload` outside any lock; `or=` claims the table entry and nothing else;
 `register-item` (the old `put-item`/`register-url` half) runs only for the
 thread whose object won the claim, tested with `ident`, since `is` is
@@ -228,9 +244,10 @@ same shape without the side-effect split.
 
 ## 4. `save-*` snapshots race with each other
 
-`save-item`, `save-prof`, `save-pws`, `save-cookies`, `save-uids`
+**Fixed in `e221ed8`.** `save-item`, `save-prof`, `save-pws`, `save-cookies`,
+`save-uids`
 
-`writefile` is atomic, so nothing corrupts. But `(tablist h)` is read at an
+`writefile` is atomic, so nothing corrupts. But `(tablist h)` was read at an
 unordered point relative to the `mvfile`: A snapshots, B mutates and writes, A
 writes its older snapshot. In-memory state stays correct; the *file* loses the
 update, so the loss only surfaces on the next restart.
@@ -241,10 +258,29 @@ Concrete cases under normal load:
 - two simultaneous logins can lose a cookie from `cooks` (that user is silently
   logged out at next restart)
 - two votes on one item can persist the lower score
+- two comments on one story can lose a kid from the parent's file, which orphans
+  the comment: the item file exists but nothing links to it, so it never renders
+  in the thread again
 
-Fix: per-file write serialization, or per-domain locks covering
-mutate-then-save as a unit. Principle 6 (idempotence and ordering beat locking)
-applies: a lost race here costs only redone work if the operation is replayable.
+That last one self-repairs while the server keeps running, because the next
+save of that parent rewrites the file with everything. It only becomes durable
+when the racing save is the last one for that item before a restart.
+
+The fix is a striped lock in `save-table`, not in `writefile`: `writefile`'s
+`val` argument is evaluated by the caller, so the snapshot has already happened
+by the time it is entered. The property it buys is that **a file can no longer
+regress to an older snapshot** — writes to one path are serialized and each
+`tablist` runs inside the critical section.
+
+Two things it does not cover, both of which call `writefile` directly with the
+snapshot as an argument:
+
+- `save-topstories` (`news.arc:555`) has the identical shape and is untouched.
+- Every `diskvar` saves through `writefile`, not `save-table`. Of the thirteen
+  `todisk` sites, only `ignore-log*` also read its own place; see below.
+
+It also does not make mutate-then-save atomic. Where the in-memory value is
+already wrong, the lock faithfully persists the wrong value.
 
 ## 5. fnid harvesting lost its atomicity on this branch
 
@@ -323,6 +359,115 @@ None of these has a lock spanning the check and the act:
   list is documented to keep (`news.arc:282`) when two submissions interleave.
   `put-item` would preserve it.
 
+## Found after the original audit
+
+These turned up while fixing findings 1 through 4. All four are fixed.
+
+### 9. A session cookie that logout could never revoke
+
+**Fixed in `44925fc`.** `app.arc:248` (`logout-user`), `app.arc:464`
+(`good-login`)
+
+`logout-user` wiped only the cookie `user->cookie*` happened to index. But
+`good-login` minted under a check-then-act, so two logins for a user with no
+cookie could both mint one: `cookie->user*` then mapped both while
+`user->cookie*` kept whichever landed last. The browser holding the other one
+stayed authenticated through every subsequent logout, because nothing pointed
+at that cookie any more to wipe it.
+
+`user->cookies*` now holds every cookie for a user and logout sweeps the list.
+Note this **defuses** the race rather than closing it: `good-login` still
+check-then-acts, and two threads can still both mint. The difference is that
+both land in the list and both get revoked. The common case is still one cookie
+per user, because a second login reuses the existing one through that `unless`.
+
+The window needed a user with no cookie in the table, which means a fresh
+account or one that had just logged out, reached by a double-submitted login
+form or two devices at once.
+
+### 10. `ignore-log*` lost an entry to `todisk`'s bare-symbol `=`
+
+**Fixed in `46ad384`.** `news.arc:2366`
+
+```arc
+(todisk ignore-log* (cons (list user actor cause) ignore-log*))
+```
+
+`todisk` expands its value form in place, so this became a bare-symbol `=`
+whose value form reads the symbol it writes. Two admins ignoring users at the
+same moment kept one entry and dropped the other. The write raced too, and
+`ignore-log*` is a `diskvar`, so finding 4's fix does not reach it.
+
+One lock at level 23 over the whole form covers both halves. `push` alone would
+have handled the read-modify-write but left the file able to regress.
+
+This was the only `todisk` site whose value form reads its own place.
+
+### 11. `auth-key` minted two hmac keys on a first-boot race
+
+**Fixed in `2fadade`.** `app.arc:322`
+
+A check-then-act on a bare global: two threads both see `hmac-key*` nil, both
+mint, one wins the assignment, and whichever already returned the loser's key
+signs tokens against a key that no longer verifies. Four threads racing it
+computed the value four times; `or=` computes it once.
+
+The lock-free `(or hmac-key* ...)` in front of the `or=` is load-bearing for a
+different reason: `auth-for` runs once per vote, hide and fave link, so a plain
+`or=` would take `place-lock*` dozens of times per front-page render to read a
+value that never changes after boot.
+
+The window is first boot only, before the `hmac-key` file exists.
+
+### 12. `srvlog` interleaved two records onto one line
+
+**Fixed in `e525f72`,** and only observable after `2f39dcc`.
+
+`disp` force-outputs and `writec` does not (`arc0.lisp:613` and `535`), so
+`prn` wrote the record body through to the file under `log-lock*` but left the
+trailing newline in the stream buffer. `w/appendfile` closes outside the lock,
+so that newline flushed after the lock was released, and two threads could land
+both bodies on one line:
+
+```
+1786256474 ddd 1 2 31786256474 bbb
+```
+
+Four threads, 400 records, ten trials: 11 damaged lines before, 0 after adding
+`flushout` inside the lock.
+
+None of it was observable earlier, because `outfile` compared its mode argument
+against the string `"append"` while `w/appendfile` passes the symbol, so every
+open truncated and the file never held more than one record. `2f39dcc` fixed
+the mode test. The evidence is still on disk: of the 42 files in `arc/logs/`,
+the 40 written before the fix are one line each, one line per day, and the two
+written after it are growing normally.
+
+## Design note: `writefile` takes `place-lock*`
+
+This constrains every lock level in the tree and is not obvious from reading
+`writefile`. Its unique temp name comes from `rand-string`, and `rand-elts`
+takes `place-lock*` at 40:
+
+```
+(arc-check-lock-level 40 ...)
+(RAND-ELTS 16 "0123456789abc...")
+(RAND-STRING 16)
+(TMPNAME ".../ignore-log")
+(WRITEFILE ...)
+```
+
+So **no lock at or above 40 can wrap a `writefile`**, which rules out all three
+output locks (51 srvlog, 52 scrapelog, 59 ero) for anything that saves. Two
+attempts hit this before it was understood: wrapping `srvlog`'s `w/appendfile`
+in `log-lock*`, and wrapping `log-ignore` in the same lock. Both killed every
+logging thread with a hard `Lock order violation` rather than misbehaving
+quietly, which is the hierarchy working.
+
+It also fixes the window for the save lock at both ends: above 21, because
+`ensure-uid` holds `maxuid-lock*` across `save-uids`, and below 40 for the
+reason above. That leaves 22 through 39.
+
 ## Design note: `place-lock*` is still a world lock, held across I/O
 
 `expand=` hoists binds and value out of the lock, but `++`, `--`, `push`,
@@ -346,13 +491,13 @@ to stay inside.
 
 ## Design note: hot reload
 
-At `9b2175a`, `maybe-reload` (`arc.arc:1749`) still took level-0 `atomic`, which
+At `546a6af`, `maybe-reload` (`arc.arc:1749`) still took level-0 `atomic`, which
 no longer excluded anything, because `=` no longer takes it. A reload
 re-evaluated toplevel `(= ...)` forms concurrently with in-flight request
 threads, where previously it had blocked every other thread at its first
 assignment.
 
-`bbdf3fb` went the other way: the `atomic` is dropped and nothing replaces it,
+`3f88137` went the other way: the `atomic` is dropped and nothing replaces it,
 with a comment recording the exposure: reload runs unsynchronized on the accept
 thread, and requests in flight may observe half-redefined definitions.
 The inner `loaded-files-changed` re-check went with it, correctly:
@@ -374,26 +519,31 @@ and be honest that it is global". If that is ever revisited, two consequences:
   `atomic` (0), `maxid-lock*` (20), `maxuid-lock*` (21), `queue-lock*` (25) and
   `scrape-lock*` (30) are all tripwires for anything added to load time later.
 - `place-lock*` could only ever be a partial stop. Anything that mutates
-  without going through a place form is not stopped by it: finding 2's `=`, and
-  finding 1's `++` on bare symbols, which still compiles to a bare `assign`
-  today.
+  without going through a place form is not stopped by it. `++` on bare symbols
+  now routes through `placewiths` as of `96ea700`, but plain `=` on a bare
+  symbol still compiles to a bare `assign`.
 
 ## Suggested order
 
-1. ~~`insert-items` (#2)~~: done, `409efb7`.
-2. ~~The double-load sites (#3)~~: done, `30b13b3`.
-3. `fnid-lock*` (#5) — restores something this branch removed. Pick a free
-   level by hand: `a608f98` removed the level 20 slot the `arc0.lisp` header
-   used to reserve for it, and 20 and 21 are now `maxid-lock*` and
-   `maxuid-lock*`. 22 through 24 are free.
-4. `atomic-update` for the bare-symbol counters (#1, second half) — the impact
-   today is stats-only, so this is not urgent, but it is the last piece needed
-   before "every mutation goes through a lock" is actually true.
-5. The rest as convenient.
+1. ~~`insert-items` (#2)~~: done, `e56c93d`.
+2. ~~The double-load sites (#3)~~: done, `e3360fa`.
+3. ~~The bare-symbol half of `++` (#1)~~: done, `96ea700`, with a lock rather
+   than the `atomic-update` this doc originally called for.
+4. ~~The `save-*` snapshot races (#4)~~: done, `e221ed8`.
+5. `fnid-lock*` (#5) — restores something this branch removed, and the only
+   original finding with a named fix. `1a5b30e` removed the level 20 slot the
+   `arc0.lisp` header used to reserve for it, and 20 through 23 are now
+   `maxid-lock*`, `maxuid-lock*`, `save-locks*` and `ignore-log-lock*`. 24 is
+   free, and so is everything from 26 to 29 and 31 to 39. Anything that saves
+   has to stay below 40; see the `writefile` design note.
+6. Comment cache staleness (#6) — the longest-lived symptom on the list, up to
+   a day of a stale body, and the hardest to diagnose from a user report.
+7. Check-then-act on votes and comments (#7) — the one with user-visible
+   permanent effects (inflated score that `unvote-for` cannot undo).
+8. `save-topstories` and the `diskvar` writes, the two exclusions from #4's fix.
+9. The rest as convenient.
 
-Repros for #1, #2 and #3 belong in `examples/locking/`, in the style of
-`lost-updates.arc`. #1 in particular is worth landing as a permanent regression
-test now that half of it is fixed: it reproduces deterministically, and it is
-the canonical example of a place form that looks locked and is not. A version
-covering both halves would also fail today, which makes it a useful marker for
-when #1 is finished.
+Repros belong in `examples/locking/`, in the style of `lost-updates.arc`. #1's
+is the canonical example of a place form that looks locked and is not, and #4's
+needs the losing interleaving forced (snapshot first, write last), because in a
+tight loop the next save repairs the file and the race hides.
