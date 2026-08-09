@@ -82,7 +82,7 @@
   (if autoreload* (maybe-reload))
   (if breaksrv
       (handle-request-1 s)
-      (errsafe (handle-request-1 s))))
+      (call-reporting {handle-request-1 s})))
 
 (def handle-request-1 (s)
   (let (i o ip) (socket-accept s)
