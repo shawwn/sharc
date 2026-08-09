@@ -511,6 +511,50 @@ c"
     (togglemem 0 s >) ; some > 0 => remove elts > 0
     (test? nil s)))
 
+(define-test rev-onto
+  (test? '(1 2 3 4 5) (rev-onto '(3 2 1) '(4 5)))
+  (test? '(4 5)       (rev-onto nil '(4 5)))
+  (test? '(1 2 3)     (rev-onto '(3 2 1) nil))
+  (test? nil          (rev-onto nil nil))
+  ; the tail is shared, not copied
+  (with (tail '(4 5))
+    (test? true (id (cddr (rev-onto '(2 1) tail)) tail))))
+
+(define-test insert-sorted
+  ; descending list, insert at front / middle / end
+  (test? '(10 9 7 3 1) (insert-sorted > 10 '(9 7 3 1)))
+  (test? '(9 7 5 3 1)  (insert-sorted > 5  '(9 7 3 1)))
+  (test? '(9 7 3 1 0)  (insert-sorted > 0  '(9 7 3 1)))
+  (test? '(1)          (insert-sorted > 1  nil))
+  ; an equal elt goes after the ones already there, since > is false on equals
+  (test? '(9 9 7)      (insert-sorted > 9  '(9 7)))
+  ; ascending list with the matching test
+  (test? '(1 3 5 7 9)  (insert-sorted < 5  '(1 3 7 9)))
+  ; inserting at the front allocates one cell and shares the whole tail --
+  ; this is what keeps add-item flat regardless of how long the list is
+  (with (seq '(9 7 3 1))
+    (test? true (id (cdr (insert-sorted > 10 seq)) seq))))
+
+(define-test reinsert-sorted
+  ; with no duplicate present it behaves like insert-sorted
+  (test? '(9 7 5 3 1) (reinsert-sorted > 5 '(9 7 3 1)))
+  (test? '(1)         (reinsert-sorted > 1 nil))
+  ; a duplicate is dropped whether it sits before or after the new position,
+  ; which is the whole difference from insert-sorted
+  (test? '(9 7 5 3)   (reinsert-sorted > 5 '(9 7 5 3)))
+  (test? '(5 3 1)     (reinsert-sorted > 5 '(5 3 1)))
+  (test? '(9 7 5)     (reinsert-sorted > 5 '(9 7 5)))
+  ; every duplicate goes, not just the first
+  (test? '(9 5 3)     (reinsert-sorted > 5 '(9 5 3 5)))
+  ; `same` decides what counts as a duplicate, independently of `test`.
+  ; This is the put-item shape: reinsert an item whose sort key changed.
+  (with (x (inst 'item 'id 1 'score 9) stale (inst 'item 'id 1 'score 2)
+         y (inst 'item 'id 2 'score 5))
+    (test? '((1 9) (2 5))
+           (map [list _!id _!score]
+                (reinsert-sorted (compare > !score) x (list y stale)
+                                 (fn (a b) (is a!id b!id)))))))
+
 (define-test fn-names
   ; A fn compiles to a named lambda whose arc name shows up in SBCL
   ; backtraces; sb-kernel::%fun-name reads it back.  Names combine with

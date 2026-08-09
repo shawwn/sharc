@@ -1144,28 +1144,30 @@
 (def least (f seq)
   (most f seq <))
 
+(def rev-onto (xs onto)
+  (if (no xs) onto (rev-onto (cdr xs) (cons (car xs) onto))))
+
 ; Insert so that list remains sorted.  Don't really want to expose
 ; these but seem to have to because can't include a fn obj in a 
 ; macroexpansion.
   
 (def insert-sorted (test elt seq)
-  (if (no seq)
-       (list elt) 
-      (test elt (car seq)) 
-       (cons elt seq)
-      (cons (car seq) (insert-sorted test elt (cdr seq)))))
+  ((afn (seq (o acc))
+     (if (no seq)             (rev-onto acc (list elt))
+         (test elt (car seq)) (rev-onto acc (cons elt seq))
+                              (self (cdr seq) (cons (car seq) acc))))
+   seq))
 
 (mac insort (test elt seq)
   `(zap [insert-sorted ,test ,elt _] ,seq))
 
 (def reinsert-sorted (test elt seq (o same id))
-  (if (no seq) 
-       (list elt) 
-      (same elt (car seq))
-       (reinsert-sorted test elt (cdr seq) same)
-      (test elt (car seq)) 
-       (cons elt (rem elt seq same))
-      (cons (car seq) (reinsert-sorted test elt (cdr seq) same))))
+  ((afn (seq (o acc))
+     (if (no seq)             (rev-onto acc (list elt))
+         (same elt (car seq)) (self (cdr seq) acc)
+         (test elt (car seq)) (rev-onto acc (cons elt (rem elt seq same)))
+                              (self (cdr seq) (cons (car seq) acc))))
+   seq))
 
 (mac insortnew (test elt seq . same)
   `(zap [reinsert-sorted ,test ,elt _ ,@same] ,seq))
