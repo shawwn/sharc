@@ -846,9 +846,9 @@
 ; ----- Frontpage ID log -----
 
 (def scrape-topstory-ids ()
-  (map parse-item-id (parse-split:fetch-hn-url "news")))
+  (map parse-submission-id (parse-split:fetch-hn-url "news")))
 
-(def parse-item-id (html)
+(def parse-submission-id (html)
   (awhen (between html "submission\" id=\"" "\"")
     (safe-int (car it))))
 
