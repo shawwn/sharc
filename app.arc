@@ -314,9 +314,8 @@
 
 (def auth-key ()
   (or hmac-key*
-      (do (= hmac-key* (rand-string 64))
-          (todisk hmac-key*)
-          hmac-key*)))
+      (do1 (or= hmac-key* (rand-string 64))
+           (todisk hmac-key*))))
 
 ; The token is bound to the user and the item id, so a token issued for
 ; one story can't be replayed to act on another.  It's the same for hide
