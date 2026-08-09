@@ -347,6 +347,7 @@
 ;  0    *arc-mutex*      atomic
 ; 10    submit-lock*     submitting items
 ; 11    vote-lock*       voting for items
+; 12    rank-lock*       ranked-stories*
 ; 20    maxid-lock*      incrementing maxid*
 ; 21    maxuid-lock*     incrementing maxuid*
 ; 22    save-locks*      saving tables

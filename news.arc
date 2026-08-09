@@ -355,7 +355,7 @@
 
 (def ensure-topstories ()
   (aif (errsafe (readfile1 (+ newsdir* "topstories")))
-       (let items (map item it)
+       (let items (w/loading-items (map item it))
          (w/lock rank-lock*
            (= ranked-stories* items)))
        (do (prn "ranking stories.") 
@@ -571,10 +571,10 @@
 
 (def gen-topstories ()
   (w/lock rank-lock*
-    (= ranked-stories* (rank-stories 180 1000 (memo frontpage-rank)))))
+    (= ranked-stories* (rank-stories nil 10000 (memo frontpage-rank)))))
 
 (def save-topstories ()
-  (writefile (map !id (firstn 180 ranked-stories*))
+  (writefile (map !id ranked-stories*)
              (+ newsdir* "topstories")))
  
 (def rank-items (n consider scorefn (o test idfn))
@@ -634,6 +634,8 @@
   (when topstories-dirty*
     ; clear this first, so a change during the save re-dirties
     (wipe topstories-dirty*)
+    (w/lock rank-lock*
+      (= ranked-stories* (firstn 10000 ranked-stories*)))
     (save-topstories)))
 
 ; If something rose high then stopped getting votes, its score would
