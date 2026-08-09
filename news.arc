@@ -75,9 +75,11 @@
 
 ; Locking
 
-(or= submit-lock* (make-lock 10 "submit-lock*")
-     rank-lock*   (make-lock 12 "rank-lock*")
-     vote-locks*  (table))
+(or= submit-lock*     (make-lock 10 "submit-lock*")
+     rank-lock*       (make-lock 12 "rank-lock*")
+     maxid-lock*      (make-lock 20 "maxid")
+     ignore-log-lock* (make-lock 23 "ignore-log")
+     vote-locks*      (table))
 
 (= vote-stripes* 64)
 
@@ -398,8 +400,6 @@
 (def save-item (i)
   (ensure-dir (item-dir i!id))
   (save-table i (item-path i!id)))
-
-(or= maxid-lock* (make-lock 20 "maxid"))
 
 (def new-item-id ()
   (w/lock maxid-lock*
@@ -2388,8 +2388,6 @@
   (log-ignore user cause actor))
 
 (diskvar ignore-log* (+ newsdir* "ignore-log"))
-
-(or= ignore-log-lock* (make-lock 23 "ignore-log"))
 
 (def log-ignore (user cause (t actor me))
   (w/lock ignore-log-lock*
