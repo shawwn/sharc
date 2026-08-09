@@ -171,9 +171,17 @@ mine — were overturned by measuring them:
   Free: 1-9, 13-19, 26-29, 31-39.
 - **`rank-lock*` correctness rests on every writer taking it**, because a
   bare-symbol `=` takes no lock at all — weaker than the `zap` it replaced.
-  There are five: `ensure-topstories`, `gen-topstories`, `insert-items`, and two
-  in `scrape.arc`. A sixth added without the lock silently reopens finding 2 and
-  nothing will catch it.
+  There are six: `ensure-topstories`, `gen-topstories`, `insert-items`, and
+  three in `scrape.arc` (the import, `scrape-update-frontpage`, and
+  `set-frontpage`). A seventh added without the lock silently reopens finding 2
+  and nothing will catch it — `insert-items-drop.arc` races `insert-items`
+  specifically, so it does not cover an arbitrary writer.
+- **Hoist lock-free work out, keep the read of the place in.** `set-frontpage`
+  had the whole rebuild outside `rank-lock*` and lost 40 of 200 concurrent
+  inserts; moving only the `(map item ids)` and `memtable` out fixed it. This is
+  the same rule that lets `gen-topstories` hoist its `rank-stories` call while
+  `adjust-rank` cannot hoist its `reinsert-sorted`, and it is easy to get
+  backwards because hoisting looks like a pure win.
 - **`ranked-stories*` has no natural bound.** `put-item` inserts any story not
   already in it, `gen-topstories` only runs when the topstories file is missing,
   and `rerank-random` is commented out. The trim in the `topstories` bgthread is
@@ -198,7 +206,7 @@ All four pass. `atomic-interleaved.arc` and `deadlock-place-then-atomic.arc` are
 
 ## Current state
 
-Branch `lock-levels`, 63 commits ahead of `main`, unpushed.
+Branch `lock-levels`, 65 commits ahead of `main`, unpushed. Working tree clean.
 
 Open, and none of it is a race:
 
@@ -209,11 +217,36 @@ Open, and none of it is a race:
    `kill` and `register-item` time, the way `sitename->items*` already is.
 2. **An iterative `reinsert-sorted`**, if `register-item`'s insertion cost
    or the control-stack ceiling on long lists ever matters.
-3. **Front-page rank logging** is in progress and unstaged in `scrape.arc`
-   (`frontlog`, `scrape-topstory-ids`, a `scrape-top` bgthread). It is not
-   ready: `frontlog-loop` computes `t0` before an HTTP fetch and then does
-   `(sleep (- 10 (since t0)))`, which errors on a negative argument. SBCL
-   rejects a negative sleep, so a fetch slower than ten seconds kills the
-   bgthread, and `new-bgthread` only runs at `start-bgthreads` — it will not
-   come back until a restart. `(max 0 ...)` fixes it. The `defbg` interval is
-   also 0, so the loop's only pacing is that internal sleep.
+3. **Generic coverage for `rank-lock*` writers.** `insert-items-drop.arc`
+   races `insert-items` by name, so it caught nothing when `set-frontpage`
+   arrived with the same bug. A repro that races an arbitrary writer of
+   `ranked-stories*` would cover the class.
+
+## Front-page sampling (`bfe572a`)
+
+Landed after the first draft of this handoff, and worth its own note because
+of how it went: five bugs, each one only visible after fixing the previous, and
+four of the five invisible to reading.
+
+`scrape-frontlog` fetches HN's `/news` every ten seconds, logs the ids to
+`newsdir*/front/<date>`, and overlays that order onto `ranked-stories*`.
+`parse-frontlog` reads a day back and divides sample counts by `6.0`, which is
+why the pacing has to be a true ten seconds rather than a `defbg` interval —
+an interval makes the period ten seconds *plus* the work, skewing every
+duration.
+
+The five, in the order they surfaced:
+
+1. `(sleep (- 10 (since t0)))` goes negative when the fetch is slow. SBCL
+   rejects a negative sleep, and `new-bgthread` only runs at
+   `start-bgthreads`, so the thread would stay dead until a restart.
+2. Overlaying by position (`cut` by `(len stories)`) duplicated any story
+   already ranked deeper in the list — the normal case. Nothing downstream
+   dedupes, and it persists through `save-topstories`.
+3. `(mem _!id ids)` per element is 29.6 ms at ten thousand stories against
+   thirty ids; a `memtable` is 1.6. It is held under `rank-lock*`.
+4. Hoisting the rebuild out of the lock lost 40 of 200 concurrent inserts.
+5. A throwing fetch skipped the sleep entirely: **13835 iterations per second**,
+   hammering HN and the output locks. Fixed by putting the sleep in an `after`,
+   which is unwind-protect, so it runs before the error reaches
+   `call-reporting` at the bgthread level.
