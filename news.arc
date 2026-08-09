@@ -745,11 +745,11 @@
          (trtd (vspace 10)
                (color-stripe (main-color))
                (br)
-               (center
-                 (tag (a href "https://www.ycombinator.com/apply")
-                   (pr "Consider applying for YC's Fall 2026 batch! "
-                       "<u>Applications</u> are open till July 27.")))
-               (br)
+               ;(center
+               ;  (tag (a href "https://www.ycombinator.com/apply")
+               ;    (pr "Consider applying for YC's Fall 2026 batch! "
+               ;        "<u>Applications</u> are open till July 27.")))
+               ;(br)
                (center
                  (or (hook 'longfoot) (footer))
                  (if (admin) (br2))
