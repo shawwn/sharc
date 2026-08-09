@@ -297,9 +297,12 @@
   (apply + nil (apply map f args)))
 
 (def firstn (n xs)
-  (if (no n)            xs
-      (and (> n 0) xs)  (cons (car xs) (firstn (- n 1) (cdr xs)))
-                        nil))
+  (if (no n) xs
+    ((afn (n xs (o acc))
+       (if (and (> n 0) xs)
+           (self (- n 1) (cdr xs) (cons (car xs) acc))
+           (rev acc)))
+     n xs)))
 
 (def nthcdr (n xs)
   (if (no n)  xs
@@ -309,10 +312,11 @@
 ; Generalization of pair: (tuples x) = (pair x)
 
 (def tuples (xs (o n 2))
-  (if (no xs)
-      nil
-      (cons (firstn n xs)
-            (tuples (nthcdr n xs) n))))
+  ((afn (xs (o acc))
+     (if (no xs)
+         (rev acc)
+         (self (nthcdr n xs) (cons (firstn n xs) acc))))
+   xs))
 
 ; If ok to do with =, why not with def?  But see if use it.
 
@@ -625,10 +629,10 @@
 (def rem (test seq (o same is))
   (let f (testify test same)
     (if (alist seq)
-        ((afn (s)
-           (if (no s)       nil
-               (f (car s))  (self (cdr s))
-                            (cons (car s) (self (cdr s)))))
+        ((afn (s (o acc))
+           (if (no s)       (rev acc)
+               (f (car s))  (self (cdr s) acc)
+                            (self (cdr s) (cons (car s) acc))))
           seq)
         (coerce (rem test (as!cons seq) same) (type seq)))))
 
@@ -644,11 +648,14 @@
 ;  (rem nil (map f seq)))
 
 (def trues (f xs)
-  (and xs
-      (let fx (f (car xs))
-        (if fx
-            (cons fx (trues f (cdr xs)))
-            (trues f (cdr xs))))))
+  ((afn (xs (o acc))
+     (if (no xs)
+         (rev acc)
+         (let fx (f (car xs))
+           (if fx
+               (self (cdr xs) (cons fx acc))
+               (self (cdr xs) acc)))))
+   xs))
 
 (mac do1 args
   (w/uniq g
@@ -1011,25 +1018,21 @@
 
 ; inconsistency between names of readfile[1] and writefile
 
-(def readfile (name) (w/infile s name (drain (read s))))
+(def readfile (name) (w/infile s name (readall s)))
 
 (def readfile1 (name) (w/infile s name (read s)))
 
-(def readall (src (o eof nil))
-  ((afn (i)
-    (let x (read i eof)
-      (if (is x eof)
-          nil
-          (cons x (self i)))))
-   (if (isa!string src) (instring src) src)))
+(def readall ((o src (stdin)))
+  (with (eof (fn ()) i (if (isa!string src) (instring src) src))
+    (drain (read i eof) eof)))
 
 (def allchars ((o str (stdin)))
-  (tostring (whiler c (readc str nil) no
+  (tostring (whilet c (readc str nil)
               (writec c))))
 
 (def allbytes ((o str (stdin)))
   (let bs nil
-    (whiler b (readb str nil) no
+    (whilet b (readb str nil)
       (push b bs))
     (as!vector (rev bs))))
 
