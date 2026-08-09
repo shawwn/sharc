@@ -24,13 +24,19 @@ which presents as a memory leak rather than as a race. That is the one worth
 reading even if the rest is settled.
 
 Five more races were found after the original audit, while fixing these; they
-are in their own section below. Four are fixed; finding 13 is open and is the
-most serious thing left, because it is the only one that can write fabricated
-data to a file. It also falsifies two of the "what is *not* broken" claims
-below, which are struck rather than deleted so the reasoning that was wrong
-stays visible. Two design notes were added: `writefile` takes `place-lock*`,
-which constrains every lock level in the tree, and the output locks do not
+are in their own section below, and all five are fixed. Finding 13 was the
+serious one, the only entry on this page that could write *fabricated* data to
+a file rather than lose data already there, and it falsifies two of the "what
+is *not* broken" claims below, which are struck rather than deleted so the
+reasoning that was wrong stays visible. Three design notes were added: never
+run arbitrary code under a table's own mutex, `writefile` takes `place-lock*`
+(which constrains every lock level in the tree), and the output locks do not
 cover what they appear to.
+
+Everything still open is in finding 7 and finding 8, plus one scaling problem
+that is not a race at all: `loaded-item-ids` walks and sorts every key of
+`items*`, which does not survive tens of millions of items no matter how the
+walk is implemented.
 
 Commit hashes in this doc were rewritten when `lock-levels` was rebased onto
 `main`; they refer to the current history.
@@ -516,12 +522,12 @@ written after it are growing normally.
 
 ### 13. `maphash` yields keys that were never in the table
 
-**Open.** `arc0.lisp:1666` (`maptable`), `arc.arc:1264` (`keys`),
+**Fixed in `438a7c5`.** `arc0.lisp:1686` (`maptable`), `arc.arc:1264` (`keys`),
 `arc.arc:1276` (`tablist`)
 
-This is the one the scope note above got wrong, and it is the most serious
-thing left on the list, because it is the only one that can put fabricated data
-into a file.
+This is the one the scope note above got wrong, and it was the only finding on
+the list that could put fabricated data into a file rather than losing data
+already there.
 
 `maptable` is a raw `maphash` with no lock. When another thread inserts, the
 table rehashes, and a concurrent walk can visit storage slots mid-move and
@@ -566,20 +572,81 @@ thread inserting into the table being snapshotted. This is the one place where
 the "every file bug is staleness, never corruption" claim in the scope note
 above fails — the file is not stale, it has a row in it that never existed.
 
-Three fixes, in increasing order of coverage:
+### What landed, and the two fixes that were rejected
 
-- Guard on the lookup rather than the key at each consumer, e.g.
-  `[and (profile _) ...]` in `update-avg-user`. Stops the crash, leaves
-  `tablist` and every other consumer exposed. Note guarding on the key itself
-  does not work: `0` is truthy in arc.
-- Walk under `place-lock*` in `keys` and `tablist`. Correct for all consumers,
-  but holds the world lock across a full table walk, which is what the design
-  note below warns about.
-- Give the frequently-mutated tables their own lock, taken by writers and
-  walkers alike, in the shape `fnid-lock*` uses. Most work, least contention.
+`438a7c5` uses **two mechanisms on purpose**, which is the part most likely to
+be "tidied" later by someone who assumes they should match.
 
-The crash is the cheap fix; the `save-table` exposure is the one that deserves
-the real one.
+`tabkeys`, `tabvals` and `tabpairs` snapshot under the table's own mutex, and
+`keys`, `vals` and `tablist` became thin wrappers over them. They want a
+consistent point-in-time view and are cheap to copy. `maptable` instead
+validates on read, re-fetching the value and skipping the entry when it is nil,
+so it neither allocates nor holds a mutex across the walk — which matters
+because `items*` may reach tens of millions of entries, where both a snapshot
+list and a mutex held for its duration are unacceptable.
+
+That validation depends on `sref` remhashing when the value is nil
+(`arc0.lisp:1697`), which is what makes `(gethash k table)` a valid liveness
+test. If a live entry could ever hold nil, `maptable` would silently skip every
+one of them. `maptable`'s contract is now **may skip, may duplicate, never
+fabricates**: a rehash can still cause an entry to be missed or visited twice,
+and no caller cares about either, but a fabricated row mattered a great deal.
+
+It is also *faster*, not a tax. The old `tablist` was
+`(accumulate a (maptable (fn args (a args)) h))`, which paid an arc call and a
+fresh rest-list per entry. Collecting in Lisp instead, over 20000 entries:
+1.37 ms to 0.10 ms for string keys, 1.38 ms to 0.105 ms for integer keys.
+
+Two approaches were tried and rejected, both worth recording:
+
+- **Consumer-side guards** (`[and (profile _) ...]` in `update-avg-user`) stop
+  the crash and leave `tablist` and every other consumer exposed. Note guarding
+  on the key itself does not work at all: `0` is truthy in arc, so the guard has
+  to be on the lookup.
+- **Pushing the test inside the lock**, so `tabkeys` filters while holding the
+  table mutex, looks like a free allocation saving. It runs arbitrary arc code
+  under that mutex, and the real tests take `place-lock*` (`loaded-users`'
+  predicate reaches `profile` and its `or=`) and do disk I/O (`load-prof`'s
+  `temload`). See the design note below for why that is the worst option
+  available.
+
+`examples/locking/phantom-keys.arc` is the regression test. It detects phantoms
+**by type**, not by a failed lookup: a key that fails a lookup may simply have
+been removed after the walk started, which is ordinary staleness. Conflating
+the two overstates the damage by hundreds of thousands, and did so twice while
+this was being investigated. Against the unfixed tree it reports 251770
+phantoms, every one of them `0`.
+
+What this does **not** fix: `loaded-item-ids` is `(sort > (keys items*))`, and
+at tens of millions of items that is unusable however cheap the walk becomes.
+It backs four 300-second `defcache`s plus `should-ban-ip`. That wants an
+incrementally maintained index, in the shape `sitename->items*` and
+`url->story*` already use, not a faster scan.
+
+## Design note: never run arbitrary code under a table's own mutex
+
+Arc tables are `:synchronized` (`arc0.lisp:1657`), so each has an SBCL mutex,
+and `sb-ext:with-locked-hash-table` can hold it across a whole walk. That is the
+obvious way to make `maptable` safe, and it is the worst option available.
+
+`(= (h k) v)` takes `place-lock*` at 40 and **then** the table's mutex, because
+the setform goes through `placewiths` and the store itself is a synchronized
+`setf gethash`. A walk that holds the table mutex and then runs a body which
+takes `place-lock*` acquires the same two locks in the opposite order. The
+bodies here really do that: `loaded-users`' predicate reaches `profile`, whose
+`or=` takes `place-lock*`, and `load-prof`'s `temload` does disk I/O.
+
+What makes this worse than an ordinary ordering bug is that **`arc-check-lock-
+level` cannot see it**. The SBCL table mutex is not in arc's level table, so the
+assert that has caught every other ordering mistake on this branch — the
+`writefile` note below, the `srvlog` and `log-ignore` attempts, the level-24
+`fnid-lock*` choice — is blind here. The failure mode is a hang, not a loud
+`Lock order violation`.
+
+So the rule is: a table mutex may be held across a **copy** and nothing else.
+No arc calls, no I/O, no other lock. `438a7c5` follows it, which is why
+filtering in `keys` and `vals` happens outside the lock even though doing it
+inside would save an intermediate list.
 
 ## Design note: `writefile` takes `place-lock*`
 
@@ -670,21 +737,25 @@ and be honest that it is global". If that is ever revisited, two consequences:
 4. ~~The `save-*` snapshot races (#4)~~: done, `e221ed8`.
 5. ~~`fnid-lock*` (#5)~~: done, `3b62dc0`, at level 24.
 6. ~~Comment cache staleness (#6)~~: done, `88576d8`, with a generation counter.
-7. **Phantom keys from `maphash` (#13)** — now the top of the list. Take the
-   cheap consumer-side guard first to stop the crash, then the real fix for
-   `tablist`, because a `(0 0)` row written into `hpw` or `cooks` is the worst
-   outcome on this page and the only one that fabricates data rather than
-   losing it.
-8. Check-then-act on votes and comments (#7) — the one with user-visible
+7. ~~Phantom keys from `maphash` (#13)~~: done, `438a7c5`, with a snapshot for
+   the list-builders and validate-on-read for `maptable`.
+8. **An index for `items*`** — now the largest open item, and the only one that
+   is a scaling problem rather than a race. `loaded-item-ids` is
+   `(sort > (keys items*))`, backing four 300-second `defcache`s plus
+   `should-ban-ip`. Nothing here has to be walked: the derived data is
+   dead-items-by-site and items-by-ip, both of which can be maintained at
+   `kill` and `register-item` time the way `sitename->items*` already is.
+9. Check-then-act on votes and comments (#7) — the one with user-visible
    permanent effects (inflated score that `unvote-for` cannot undo). The vote
-   claim is four lines; the submit lock is the only remaining item with a real
-   design tradeoff.
-9. `save-topstories`, the one exclusion from #4's fix that is worth doing; it
-   is reached from `adjust-rank` on every story vote. The `diskvar` writes are
-   the other exclusion and need nothing: `maxid*` and `maxuid*` already save
-   inside their own locks, `ignore-log*` and `hmac-key*` are fixed, and the
-   rest are whole-value replacements from admin forms.
-10. The rest as convenient.
+   claim is four lines and wants `id` rather than `is`, because two
+   simultaneous votes build equal lists; the submit lock is the only remaining
+   item with a real design tradeoff.
+10. `save-topstories`, the one exclusion from #4's fix that is worth doing; it
+    is reached from `adjust-rank` on every story vote. The `diskvar` writes are
+    the other exclusion and need nothing: `maxid*` and `maxuid*` already save
+    inside their own locks, `ignore-log*` and `hmac-key*` are fixed, and the
+    rest are whole-value replacements from admin forms.
+11. The rest as convenient.
 
 Levels 20 through 24 are now `maxid-lock*`, `maxuid-lock*`, `save-locks*`,
 `ignore-log-lock*` and `fnid-lock*`. Free: 26 through 29 and 31 through 39.
