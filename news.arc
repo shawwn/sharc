@@ -300,7 +300,7 @@
 
 
 (or= stories* nil comments* nil ; descending time
-     items* (table) url->story* (table))
+     items* (table) item-ids* (table) url->story* (table))
 
 (diskvar maxid* (+ newsdir* "max-id") 0)
 
@@ -318,6 +318,10 @@
 
 (def load-items ((o n initload*))
   (system:list "rm" "-f" (string storydir* "*/*.tmp"))
+  (let buckets (item-buckets)
+    (pr "load @(len buckets) item buckets: ")
+    (noisy-each 1 bucket buckets
+      (or= (item-ids* bucket) (item-ids bucket))))
   (pr "load items: ")
   (latest-items idfn nil n 100))
 
@@ -340,10 +344,13 @@
   (aand (dir (string storydir* bucket))
         (sort > (map int it))))
 
+(def cached-item-ids (bucket)
+  (item-ids* bucket))
+
 (mac each-item-id (var . body)
   (w/uniq (bucket id)
     `(each ,bucket (item-buckets)
-       (each ,var (item-ids ,bucket)
+       (each ,var (cached-item-ids ,bucket)
          ,@body))))
 
 (mac each-item (var . body)
@@ -398,8 +405,11 @@
       (register-url i i!url))))
 
 (def save-item (i)
-  (ensure-dir (item-dir i!id))
-  (save-table i (item-path i!id)))
+  (let exists (file-exists (item-path i!id))
+    (ensure-dir (item-dir i!id))
+    (save-table i (item-path i!id))
+    (unless exists
+      (insortnew > i!id (item-ids* (item-bucket i!id))))))
 
 (def new-item-id ()
   (w/lock maxid-lock*
@@ -783,11 +793,11 @@
         (link "settings" "newsadmin")
         (hook 'admin-bar whence)))))
 
-(defcache item-count 60
-  (len:all-item-ids))
+(def item-count ()
+  (sum len:cached-item-ids (keys item-ids*)))
 
 (def all-item-ids ()
-  (mappend item-ids (item-buckets)))
+  (mappend cached-item-ids (item-buckets)))
 
 (def color-stripe (c)
   (tag (table width "100%" cellspacing 0 cellpadding 1)
