@@ -542,19 +542,15 @@ Connection: close"))
         (a id)))))
 
 (def harvest-fnids ((o n fnid-harvest-max*))
-  (when (len> fns* n)
-    (w/lock fnid-lock*
-      (when (len> fns* n)
-        (each id (dead-fnids)
-          (forget-fnid id)))))
-  (when (len> fns* n)
-    (w/lock fnid-lock*
-      (when (len> fns* n)
-        (withs (n (min n (len fns*))
-                nharvest (trunc (/ n fnid-harvest-ratio*)))
-          (let (kill keep) (split (fnids) nharvest)
-            (each id kill
-              (forget-fnid id))))))))
+  (w/lock-when fnid-lock* (len> fns* n)
+    (each id (dead-fnids)
+      (forget-fnid id)))
+  (w/lock-when fnid-lock* (len> fns* n)
+    (withs (n (min n (len fns*))
+            nharvest (trunc (/ n fnid-harvest-ratio*)))
+      (let (kill keep) (split (fnids) nharvest)
+        (each id kill
+          (forget-fnid id))))))
 
 (= fnurl* "/x" rfnurl* "/r" rfnurl2* "/y")
 
