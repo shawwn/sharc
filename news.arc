@@ -130,14 +130,14 @@
       (init-user u))))
           
 (def init-user (u)
-  (atomic
+  (ensure-uid u)
+  (w/place-lock
     (unless (profs* u)
-      (ensure-uid u)
       (or= (votes* u) (table) 
-           (profs* u) (inst 'profile 'id u))
-      (save-votes u)
-      (save-prof u)
-      u)))
+           (profs* u) (inst 'profile 'id u))))
+  (save-votes u)
+  (save-prof u)
+  u)
 
 
 (def votes ((t u me))
