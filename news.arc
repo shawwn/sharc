@@ -75,7 +75,9 @@
 
 ; Locking
 
-(or= submit-lock* (make-lock 10 "submit-lock*") vote-locks* (table))
+(or= submit-lock* (make-lock 10 "submit-lock*")
+     rank-lock*   (make-lock 12 "rank-lock*")
+     vote-locks*  (table))
 
 (= vote-stripes* 64)
 
@@ -351,7 +353,9 @@
 
 (def ensure-topstories ()
   (aif (errsafe (readfile1 (+ newsdir* "topstories")))
-       (= ranked-stories* (map item it))
+       (let items (map item it)
+         (w/lock rank-lock*
+           (= ranked-stories* items)))
        (do (prn "ranking stories.") 
            (flushout)
            (gen-topstories))))
@@ -370,13 +374,13 @@
 (def compitem (compare >  !time))
 
 (mac put-item (i var (o cmp 'compitem) (o same 'sameitem))
-  `(insortnew ,cmp ,i ,var ,same))
+  `(w/lock rank-lock* (= ,var (reinsert-sorted ,cmp ,i ,var ,same))))
 
 (mac add-item (i var (o cmp 'compitem))
-  `(insort ,cmp ,i ,var))
+  `(w/lock rank-lock* (= ,var (insert-sorted ,cmp ,i ,var))))
 
 (mac pull-item (i var (o same 'sameitem))
-  `(pull ,i ,var ,same))
+  `(w/lock rank-lock* (= ,var (rem ,i ,var ,same))))
 
 (def read-item (id)
   (aand (safe-id id)
@@ -566,7 +570,8 @@
 ; problem if there is massive spam. 
 
 (def gen-topstories ()
-  (= ranked-stories* (rank-stories 180 1000 (memo frontpage-rank))))
+  (w/lock rank-lock*
+    (= ranked-stories* (rank-stories 180 1000 (memo frontpage-rank)))))
 
 (def save-topstories ()
   (writefile (map !id (firstn 180 ranked-stories*))
@@ -595,7 +600,7 @@
 
 (def insert-items (xs)
   (let items (items-by-type xs)
-    (w/place-lock
+    (w/lock rank-lock*
       (= stories*  (merge-item-lists stories* items!story items!poll)
          comments* (merge-item-lists comments* items!comment)))
     (hook 'initload items))

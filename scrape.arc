@@ -916,9 +916,10 @@
     ; then items, walking front.json (page+rank order from the scrape)
     (each tem (import-scraped-items!)
       (push tem!story ranked))
-    (let stories (rev ranked)
-      (= stories* (map [item _!id] stories)
-         ranked-stories* (map [item _!id] stories)))
+    (let stories (map item:!id (rev ranked))
+      (w/lock rank-lock*
+        (= stories*        stories
+           ranked-stories* stories)))
     ;; news's load-items normally populates comments* alongside
     ;; stories*, but it only runs from (nsv) when stories* is nil --
     ;; we've just set stories*, so we have to seed comments*
@@ -1093,7 +1094,9 @@
          ,@body))))
 
 (defscrape scrape-update-frontpage
-  5 (= ranked-stories* (rem nil (map item ids)))
+  5 (let stories (rem nil (map item ids))
+      (w/lock rank-lock*
+        (= ranked-stories* stories)))
     (save-topstories))
 
 (defscrape scrape-new-stories

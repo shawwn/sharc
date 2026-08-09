@@ -9,8 +9,8 @@
 ;
 ; expand= hoists the value expression out of the critical section, which
 ; is right for a plain = (there is no read of the *place*) and wrong
-; here, because the value expression reads the place itself.  A
-; (push s stories*) landing during the merge was correctly locked and
+; here, because the value expression reads the place itself.  An
+; (add-item s stories*) landing during the merge was correctly locked and
 ; still lost: the assignment that followed wrote back a list computed
 ; before the push.
 ;
@@ -34,9 +34,9 @@
 
 (load "news.arc")
 
-(= nseed*   4000)   ; enough that one merge takes real time
-(= npush*    200)
-(= nmerge*   200)
+(= nseed*   4000    ; enough that one merge takes real time
+   npush*    200 
+   nmerge*   200)
 
 ; A plausible stories*: item tables in descending id order.
 (= stories* (map [inst 'item 'id _ 'type 'story]
@@ -57,7 +57,7 @@
 (thread
   (for n 1 npush*
     (let s (inst 'item 'id (+ nseed* n) 'type 'story)
-      (push s stories*)
+      (add-item s stories*)
       (push s!id pushed*))
     (sleep 0.001))
   (= t2done* t))
