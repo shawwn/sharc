@@ -11,11 +11,10 @@ Audited on the `lock-levels` branch at `546a6af`, after reading
 `main..lock-levels` diff. This is the ranked findings list; the strategy and
 principles live in the remove-global-mutex plan and are not repeated here.
 
-Findings 1 through 6 are fixed and each carries the commit that fixed it. They
-are kept because the reasoning is what justifies the fix, and because each
-explains a class rather than an instance. Finding 8 is fixed too (`49fce23`),
-leaving finding 7 as the only one still open. The hot-reload design note has
-been rewritten: what it originally described as the working-tree fix was later
+**Every finding on this page is fixed.** Each carries the commit that fixed it.
+They are kept because the reasoning is what justifies the fix, and because each
+explains a class rather than an instance. The hot-reload design note has been
+rewritten: what it originally described as the working-tree fix was later
 reversed, and that section now records the state as it stands.
 
 Finding 5 grew a second half that the original audit missed entirely: the fnid
@@ -33,9 +32,10 @@ run arbitrary code under a table's own mutex, `writefile` takes `place-lock*`
 (which constrains every lock level in the tree), and the output locks do not
 cover what they appear to.
 
-Everything still open is in finding 7, plus one scaling problem that is not a
-race at all: `loaded-item-ids` walks and sorts every key of `items*`, which does
-not survive tens of millions of items no matter how the walk is implemented.
+What is left is not a race. `loaded-item-ids` walks and sorts every key of
+`items*`, which does not survive tens of millions of items however the walk is
+implemented; it is now the largest open item and it wants an index, not a lock.
+See the suggested order for that and two smaller leftovers.
 
 Commit hashes in this doc were rewritten when `lock-levels` was rebased onto
 `main`; they refer to the current history.
@@ -394,20 +394,80 @@ a fresh deadline.
 
 ## 7. Check-then-act on user actions
 
-None of these has a lock spanning the check and the act:
+**Fixed in `b168e44` (the two submit paths) and `efdbe0e` (voting).**
 
-- **`votable`** (`news.arc:2075`) — a double-click or retried vote applies
-  score, sockvotes and karma twice, and pushes two entries into `i!votes` and
-  `my!votes`. `unvote-for` (`news.arc:2126`) walks one vote's effects, so it
-  undoes only one: the inflation is permanent. hn.js hides the arrow on click
-  (`static/hn.js:35`), so this is mostly guarded client-side, but the server has
-  no protection at all and the vote URL is a plain link.
-- **`find-duplicate-comment`** (`news.arc:2807`) — a double-submitted comment
-  creates two items. The `atlet` that used to wrap the creation was dropped on
-  this branch; it started *after* the dup check so it never closed this hole,
-  but the path is now fully unlocked.
-- **`live-story-w/url`** (`news.arc:2287`) — two users submitting the same URL
-  at once create two stories; `url->story*` ends up pointing at one of them.
+None of these had a lock spanning the check and the act:
+
+- **`votable`** (`news.arc:2108`) — a double-click or retried vote applied
+  score, sockvotes and karma twice, and pushed two entries into `i!votes` and
+  `my!votes`. `unvote-for` walks one vote's effects, so it undoes only one: the
+  inflation was permanent. hn.js hides the arrow on click (`static/hn.js:35`),
+  so this was mostly guarded client-side, but the server had no protection and
+  the vote URL is a plain link.
+- **`find-duplicate-comment`** — a double-submitted comment created two items.
+- **`live-story-w/url`** — two users submitting the same URL at once created
+  two stories; `url->story*` ended up pointing at one of them.
+
+### The submit paths: one lock, held wide
+
+`submit-lock*` at level 10 wraps all three `process-*` handlers. Each has
+exactly one caller and all three are wrapped, so there is no unlocked path to
+the same race.
+
+The span is deliberately wide: wrapping the form handler rather than
+check-plus-create holds the lock across everything a submission does, which is
+half a dozen file writes (`save-item` for the item, `save-item` for the parent
+on comments, `save-site-items`' full `save-table`, then `submit-item`'s
+`vote-for` with its `save-item`, `save-prof`, `save-votes` and `adjust-rank`'s
+`save-topstories`, plus `newslog`). Every submission serializes globally against
+every other, so at roughly ten milliseconds each this caps submissions near a
+hundred per second — far above what this site sees, and it buys a fix that is
+four lines instead of a restructure.
+
+The narrower version stays available if submit latency shows up in `optimes*`:
+hold the lock across the dup check and the in-memory publish only, and release
+before the saves. `28d92fc` made that cheaper by moving the `items*` publish to
+the front of every `create-*`.
+
+### Voting: why the obvious fix is wrong
+
+The tempting fix is to claim `(voted i)` with `or=` at the top of `vote-for`,
+testing the result with `id` rather than `is`. **`id` is genuinely required
+there** — two simultaneous votes build structurally equal lists, so `is` calls
+both racers winners, measured as `id-winners=1` against `is-winners=2` over five
+trials.
+
+But that fix is wrong on its own, and the reason is worth keeping. The effects
+list is built *as `vote-for` runs*, so moving the claim to the front opens a
+window in which `unvote-for` sees a vote whose `vote!5` is still empty,
+subtracts nothing, wipes it, and lets `vote-for` go on to apply the score and
+karma. Orphaned effects with no record left to undo them, which is worse than
+the double vote. Today's ordering, with `(= (voted i) vote)` last, means an
+unvote arriving mid-vote finds nil and does nothing.
+
+So `efdbe0e` leaves both bodies untouched and wraps them in a striped
+`vote-lock*` at level 11, which makes the pair atomic in all three directions
+at once: two votes, two unvotes, and a vote racing an unvote. `unvote-for` had
+the mirror race — two concurrent unvotes both read the same vote and both
+subtract, driving the score *below* where it started.
+
+```
+without the lock: score=2 votes=2   (5 of 5 trials)
+with the lock:    score=1 votes=1   (5 of 5)
+```
+
+Per-user is the right grain because the contested state is `(voted i)`, which is
+`((votes* (me)) i!id)` — keyed by user first. Two different users voting one
+item share only `i!score`, `i!votes` and the author's karma, each an
+individually atomic place operation, with `save-item` already serialized per
+file by `save-locks*`. There is no composite invariant across users.
+
+That grain is also why this is cheap where `submit-lock*` is not: a user
+contends only with themselves, so the lock is uncontended in normal operation
+and bites exactly when the race would have occurred. Unrelated voters collide
+only on a stripe hash collision, about one in sixty-four. Votes are the hottest
+write on the site, so a single global lock here would have cost far more than
+the one on submissions.
 
 ## 8. Minor
 
@@ -820,16 +880,10 @@ and be honest that it is global". If that is ever revisited, two consequences:
 8. ~~The queue drops and the submit-time ordering (#8)~~: done, `49fce23`, with
    `add-item` rather than the `put-item` this doc originally called for.
 9. ~~The create-side twin of the double-load (#14)~~: done, `28d92fc`.
-10. **Check-then-act on votes and comments (#7)** — the last actual race, and
-    the one with user-visible permanent effects, since `unvote-for` walks a
-    single vote's effect list and cannot undo a doubled score. The vote claim is
-    four lines: `or=` on `(voted i)`, tested with `id` rather than `is`, because
-    two simultaneous votes build structurally equal lists and `is` would tell
-    both racers they won. The duplicate comment and duplicate URL halves share a
-    `submit-lock*` and are the only remaining item with a real design tradeoff:
-    holding it across `create-comment`'s `save-item` calls, or splitting publish
-    from persist. `28d92fc` made the second cheaper, since publishing to `items*`
-    is now the first thing each `create-*` does.
+10. ~~Check-then-act on votes and comments (#7)~~: done, `b168e44` for the two
+    submit paths and `efdbe0e` for voting. The vote half did **not** turn out to
+    be the four-line `or=` claim this list used to describe; see finding 7 for
+    why that fix is wrong on its own.
 11. **An index for `items*`** — the largest open item, and the only one that is
     a scaling problem rather than a race. `loaded-item-ids` is
     `(sort > (keys items*))`, backing four 300-second `defcache`s plus
@@ -846,10 +900,17 @@ and be honest that it is global". If that is ever revisited, two consequences:
     guard that looks like it would help and does not.
 14. The rest as convenient.
 
-Levels 20 through 24 are now `maxid-lock*`, `maxuid-lock*`, `save-locks*`,
-`ignore-log-lock*` and `fnid-lock*`. Free: 26 through 29 and 31 through 39.
-Anything that saves, or that reaches `writefile` by any route, has to stay
-below 40; see the `writefile` design note.
+The levels in use are now 10 `submit-lock*`, 11 `vote-lock*`, 20 `maxid-lock*`,
+21 `maxuid-lock*`, 22 `save-locks*`, 23 `ignore-log-lock*`, 24 `fnid-lock*`,
+25 `queue-lock*`, 30 `scrape-lock*`, 40 `place-lock*` and the output locks at
+51, 52 and 59. Free: 1 through 9, 12 through 19, 26 through 29, 31 through 39.
+`arc.arc` is the single table (`1a5b30e`); keep it in sync.
+
+Two constraints bound almost every choice. Anything that saves, or reaches
+`writefile` by any route, has to stay **below 40**, because `writefile` takes
+`place-lock*` through `tmpname`. Anything reached from a submission has to stay
+**above 10**, since `submit-item` calls `vote-for` from inside `submit-lock*`.
+That is how `vote-lock*` ended up at 11, between the two.
 
 Repros belong in `examples/locking/`, in the style of `lost-updates.arc`. #1's
 is the canonical example of a place form that looks locked and is not, and #4's
