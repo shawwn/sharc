@@ -151,6 +151,47 @@
   (test? '(#\a #\b #\c #\d #\e) (range #\a #\e))
   (test? nil          (range #\e #\a)))
 
+(define-test datetime
+  ; anchors, in UTC.  1786278896 cross-checks against `date -u`.
+  (test? 0          (datetime 1970 1 1))
+  (test? 946684800  (datetime 2000 1 1))
+  (test? 1786278896 (datetime 2026 8 9 12 34 56))
+  ; hour/minute/second default to midnight
+  (test? true (is (datetime 2026 8 9) (datetime 2026 8 9 0 0 0)))
+  ; before the epoch is negative
+  (test? -1 (datetime 1969 12 31 23 59 59))
+  ; tz follows CL's convention: hours WEST of UTC, which is the opposite
+  ; sign from an ISO "+05:30" offset.  A positive tz means the wall clock
+  ; is behind UTC, so the instant it names is later.
+  (test? 18000  (- (datetime 2026 8 9 12 0 0 5)  (datetime 2026 8 9 12 0 0)))
+  (test? -18000 (- (datetime 2026 8 9 12 0 0 -5) (datetime 2026 8 9 12 0 0)))
+  ; fractional zones are rationals, e.g. -11/2 is UTC+5:30
+  (test? -19800 (- (datetime 2026 8 9 12 0 0 -11/2) (datetime 2026 8 9 12 0 0)))
+  ; --- inherited CL behavior, pinned because it surprises ---
+  ; a two-digit year is a rolling window, NOT a literal year: 70 is 2070
+  (test? 3155760000 (datetime 70 1 1))
+  ; the day is not range-checked against the month; Feb 30 rolls into March
+  (test? '(0 0 0 2 3 2026) (timedate (datetime 2026 2 30)))
+  ; but an out-of-range month, or a year before CL's 1900 epoch, errors
+  (test? nil (errsafe (datetime 2026 13 1)))
+  (test? nil (errsafe (datetime 1899 1 1))))
+
+(define-test timedate
+  ; returns (sec min hr day mon yr) -- the reverse of datetime's arg order
+  (test? '(0 0 0 1 1 1970)    (timedate 0))
+  (test? '(56 34 12 9 8 2026) (timedate 1786278896))
+  ; defaults to UTC when no tz is given
+  (test? '(0 0 12 9 8 2026)   (timedate 1786276800))
+  ; same tz convention as datetime: +5 is UTC-5, so the clock reads earlier
+  (test? '(0 0 7 9 8 2026)    (timedate 1786276800 5))
+  (test? '(0 0 17 9 8 2026)   (timedate 1786276800 -5))
+  ; no argument means now; just check the shape, not the value
+  (test? 6 (len (timedate)))
+  ; round trip, which needs an explicit rebind because the orders differ
+  (with (u 1786278896)
+    (let (s mi h d mo y) (timedate u)
+      (test? u (datetime y mo d h mi s)))))
+
 (define-test precedence
   (test? -3 (- (+ 1 2)))
   (test? 10 (- 12 (+ 1 1)))

@@ -1847,10 +1847,15 @@ sb-thread mutex with a :name, and anything else prints as itself."
 
 (xdef timedate (&rest args)
   (let* ((unix (if args (car args) (- (get-universal-time) +cl-to-unix+)))
+         (tz   (or (if args (arc-car? (cdr args))) 0))
          (ut   (+ unix +cl-to-unix+))
-         (d    (multiple-value-list (decode-universal-time ut 0))))
+         (d    (multiple-value-list (decode-universal-time ut tz))))
     ;; sec min hr day mon yr ...
     (list (first d) (second d) (third d) (fourth d) (fifth d) (sixth d))))
+
+;; the inverse of timedate: calendar components in UTC -> in a given zone
+(xdef datetime (year month day &optional (hour 0) (minute 0) (second 0) (tz 0))
+  (- (encode-universal-time second minute hour day month year tz) +cl-to-unix+))
 
 (xdef sin  #'sin)
 (xdef cos  #'cos)
