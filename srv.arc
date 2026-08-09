@@ -707,7 +707,8 @@ Connection: close"))
   (w/appendfile o (logfile-name type)
     (w/stdout o
       (w/lock log-lock*
-        (apply prs (seconds) args) (prn)))))
+        (apply prs (seconds) args) (prn)
+        (flushout)))))
 
 (def logfile-name (type)
   (string logdir* type "-" (memodate)))
