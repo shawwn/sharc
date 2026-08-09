@@ -11,9 +11,9 @@ Audited on the `lock-levels` branch at `546a6af`, after reading
 `main..lock-levels` diff. This is the ranked findings list; the strategy and
 principles live in the remove-global-mutex plan and are not repeated here.
 
-Findings 1 through 5 are fixed and each carries the commit that fixed it. They
+Findings 1 through 6 are fixed and each carries the commit that fixed it. They
 are kept because the reasoning is what justifies the fix, and because each
-explains a class rather than an instance. Findings 6 through 8 are open. The
+explains a class rather than an instance. Findings 7 and 8 are open. The
 hot-reload design note has been rewritten: what it originally described as the
 working-tree fix was later reversed, and that section now records the state as
 it stands.
@@ -23,11 +23,14 @@ harvester was not just racy, it was silently under-reclaiming under concurrency,
 which presents as a memory leak rather than as a race. That is the one worth
 reading even if the rest is settled.
 
-Four more races were found after the original audit, while fixing these; they
-are in their own section below, and all four are fixed. The last of them covers
-all three output paths, which turned out to share one root cause. Two design
-notes were added: `writefile` takes `place-lock*`, which constrains every lock
-level in the tree, and the output locks do not cover what they appear to.
+Five more races were found after the original audit, while fixing these; they
+are in their own section below. Four are fixed; finding 13 is open and is the
+most serious thing left, because it is the only one that can write fabricated
+data to a file. It also falsifies two of the "what is *not* broken" claims
+below, which are struck rather than deleted so the reasoning that was wrong
+stays visible. Two design notes were added: `writefile` takes `place-lock*`,
+which constrains every lock level in the tree, and the output locks do not
+cover what they appear to.
 
 Commit hashes in this doc were rewritten when `lock-levels` was rebased onto
 `main`; they refer to the current history.
@@ -55,12 +58,15 @@ Worth stating up front, because it narrows the search a lot:
   finding 3.
 - **`writefile` is atomic at the filesystem level** (`arc.arc:1026`): unique
   tmp name per write, then rename. No torn or corrupt files, ever. Every
-  file-related bug below is staleness, never corruption.
-- **Iterating a table while another thread mutates it does not error.**
-  Verified empirically on SBCL: 20 `(len (keys h))` passes against a thread
-  doing continuous insert and remove produced 0 errors. `maptable` uses raw
-  `maphash` (`arc0.lisp:1670`), so a snapshot may be stale, but `save-table`
-  and `dead-fnids` will not blow up.
+  file-related bug below is staleness — with one exception, finding 13, where
+  the snapshot handed to `writefile` contains a row that was never in the
+  table. The file is written perfectly; its contents are fabricated.
+- ~~**Iterating a table while another thread mutates it does not error.**~~
+  **This claim was wrong. See finding 13.** The original test measured only
+  `(len (keys h))` and only looked for errors, so it never checked whether the
+  keys it got back were real. They are not: a concurrent insert can make
+  `maphash` yield keys that were never in the table. "Stale" badly understates
+  it.
 
 Finding 1 aside, the remaining bugs are all **composite invariants**:
 check-then-act, or multi-step updates that are individually locked but not
@@ -354,6 +360,13 @@ Two details of that fix are load-bearing:
 
 ## 6. Stale comment bodies pinned for up to a day
 
+**Fixed in `88576d8`,** with a generation counter bumped by `uncache-comment`
+and sampled before the render, so a store that was invalidated mid-flight
+declines instead of winning. Note the second option this section originally
+offered, storing body and timeout as one value, does **not** fix it: it makes
+the pair consistent, but a stale body with a consistent fresh deadline is
+served exactly as long.
+
 `news.arc:2916`
 
 ```arc
@@ -501,6 +514,73 @@ the mode test. The evidence is still on disk: of the 42 files in `arc/logs/`,
 the 40 written before the fix are one line each, one line per day, and the two
 written after it are growing normally.
 
+### 13. `maphash` yields keys that were never in the table
+
+**Open.** `arc0.lisp:1666` (`maptable`), `arc.arc:1264` (`keys`),
+`arc.arc:1276` (`tablist`)
+
+This is the one the scope note above got wrong, and it is the most serious
+thing left on the list, because it is the only one that can put fabricated data
+into a file.
+
+`maptable` is a raw `maphash` with no lock. When another thread inserts, the
+table rehashes, and a concurrent walk can visit storage slots mid-move and
+yield `0`, which is SBCL's fill value for an unused key slot. `keys` then
+accumulates that `0` as though it were a key. One thread growing a table while
+another walks it:
+
+```
+table size: 2071471
+keys yielded by maphash that then failed lookup: 818801
+samples: (0 0 0)
+```
+
+It surfaced as a crash in the `update-avg` background thread during a scrape,
+which is the pairing that makes it likely: `scrape-hn-stories` inserting into
+`profs*` while `(defbg update-avg 45)` walks it.
+
+```
+rand-user -> loaded-users -> (keys profs* test)
+  test called with _ = 0
+  (uvar 0 submitted) -> ((profile 0) 'submitted)
+  (profile 0) -> nil, because 0 was never in the table
+  (nil 'submitted) -> (elt nil 'submitted)
+  "The value ARC::|submitted| is not of type (UNSIGNED-BYTE 45)"
+```
+
+`(uvar 0 submitted)` and `(uvar nil submitted)` both reproduce that error
+string exactly.
+
+**`tablist` has the same hole, and that is the worse half**, because `tablist`
+is what `save-table` writes:
+
+```
+phantom entries seen by tablist: 412677
+sample entry: (0 0)
+```
+
+So a save racing a concurrent insert can persist a `(0 0)` row into `hpw`,
+`cooks`, `uids`, or a profile file. Note the striped save lock from `e221ed8`
+does **not** help here: it serializes savers against each other, not against a
+thread inserting into the table being snapshotted. This is the one place where
+the "every file bug is staleness, never corruption" claim in the scope note
+above fails — the file is not stale, it has a row in it that never existed.
+
+Three fixes, in increasing order of coverage:
+
+- Guard on the lookup rather than the key at each consumer, e.g.
+  `[and (profile _) ...]` in `update-avg-user`. Stops the crash, leaves
+  `tablist` and every other consumer exposed. Note guarding on the key itself
+  does not work: `0` is truthy in arc.
+- Walk under `place-lock*` in `keys` and `tablist`. Correct for all consumers,
+  but holds the world lock across a full table walk, which is what the design
+  note below warns about.
+- Give the frequently-mutated tables their own lock, taken by writers and
+  walkers alike, in the shape `fnid-lock*` uses. Most work, least contention.
+
+The crash is the cheap fix; the `save-table` exposure is the one that deserves
+the real one.
+
 ## Design note: `writefile` takes `place-lock*`
 
 This constrains every lock level in the tree and is not obvious from reading
@@ -589,12 +669,22 @@ and be honest that it is global". If that is ever revisited, two consequences:
    than the `atomic-update` this doc originally called for.
 4. ~~The `save-*` snapshot races (#4)~~: done, `e221ed8`.
 5. ~~`fnid-lock*` (#5)~~: done, `3b62dc0`, at level 24.
-6. Comment cache staleness (#6) — the longest-lived symptom on the list, up to
-   a day of a stale body, and the hardest to diagnose from a user report.
-7. Check-then-act on votes and comments (#7) — the one with user-visible
-   permanent effects (inflated score that `unvote-for` cannot undo).
-8. `save-topstories` and the `diskvar` writes, the two exclusions from #4's fix.
-9. The rest as convenient.
+6. ~~Comment cache staleness (#6)~~: done, `88576d8`, with a generation counter.
+7. **Phantom keys from `maphash` (#13)** — now the top of the list. Take the
+   cheap consumer-side guard first to stop the crash, then the real fix for
+   `tablist`, because a `(0 0)` row written into `hpw` or `cooks` is the worst
+   outcome on this page and the only one that fabricates data rather than
+   losing it.
+8. Check-then-act on votes and comments (#7) — the one with user-visible
+   permanent effects (inflated score that `unvote-for` cannot undo). The vote
+   claim is four lines; the submit lock is the only remaining item with a real
+   design tradeoff.
+9. `save-topstories`, the one exclusion from #4's fix that is worth doing; it
+   is reached from `adjust-rank` on every story vote. The `diskvar` writes are
+   the other exclusion and need nothing: `maxid*` and `maxuid*` already save
+   inside their own locks, `ignore-log*` and `hmac-key*` are fixed, and the
+   rest are whole-value replacements from admin forms.
+10. The rest as convenient.
 
 Levels 20 through 24 are now `maxid-lock*`, `maxuid-lock*`, `save-locks*`,
 `ignore-log-lock*` and `fnid-lock*`. Free: 26 through 29 and 31 through 39.
