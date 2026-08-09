@@ -55,11 +55,12 @@
       (todisk maxuid*))))
 
 (def ensure-uid ((t u me))
-  (atomic
-    (or (lookup-uid u)
-        (lets uid (new-user-id)
-          (link-uid u uid)
-          (save-uids)))))
+  (or (lookup-uid u)
+      (w/lock maxuid-lock*
+        (or (lookup-uid u)
+            (lets uid (new-user-id)
+              (link-uid u uid)
+              (save-uids))))))
 
 (def users ((o f idfn)) 
   (keys user->uid* f))
