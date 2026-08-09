@@ -1807,7 +1807,8 @@
       (each a args 
         (write a)
         (writec #\space))
-      (writec #\newline)))
+      (writec #\newline)
+      (flushout)))
   (car args))
 
 (or= queue-lock* (make-lock 25 "queue"))
