@@ -2913,13 +2913,18 @@
 ; It might solve the same problem more generally to make html code
 ; more efficient.
 
-(or= comment-cache* (table) comment-cache-timeout* (table))
+(or= comment-cache* (table) comment-cache-timeout* (table) comment-gen* (table))
 
 (= cc-window* 10000)
 
 (or= comments-printed* 0 cc-hits* 0)
 
 (= comment-caching* t) 
+
+(def uncache-comment (id)
+  (w/place-lock
+    (wipe (comment-cache* id))
+    (++ (comment-gen* id 0))))
 
 ; Cache comments generated for nil user that are over a minute old.
 ; Only try to cache most recent 10k items.  But this window moves,
@@ -2947,13 +2952,12 @@
            (awhen (comment-cache* c!id)
              (++ cc-hits*)
              it))
-      (= (comment-cache-timeout* c!id)
-          (cc-timeout c!time)
-         (comment-cache* c!id)
-          (tostring (gen-comment-body c whence t indent nil nil)))))
-
-(def uncache-comment (id)
-  (wipe (comment-cache* id)))
+      (let gen (comment-gen* c!id 0)
+        (lets body (tostring (gen-comment-body c whence t indent nil nil))
+          (w/place-lock
+            (when (is gen (comment-gen* c!id 0))
+              (= (comment-cache-timeout* c!id) (cc-timeout c!time)
+                 (comment-cache* c!id)         body)))))))
 
 ; Cache for the remainder of the current minute, hour, or day.
 
