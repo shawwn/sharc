@@ -345,6 +345,7 @@
 ; lock priorities:
 ;
 ;  0    *arc-mutex*      atomic
+; 10    submit-lock*     submitting items
 ; 20    maxid-lock*      incrementing maxid*
 ; 21    maxuid-lock*     incrementing maxuid*
 ; 22    save-locks*      saving tables

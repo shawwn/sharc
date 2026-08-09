@@ -18,6 +18,7 @@
      site-color*   (color 170 170 230)
      border-color* (color 170 170 230)))
 
+(or= submit-lock* (make-lock 10 "submit-lock*"))
 
 ; Structures
 
@@ -2203,7 +2204,8 @@
 (def submit-page ((o url "") (o title "") (o text "") (o msg))
   (minipage "Submit"
     (pagemessage msg)
-    (urform (process-story arg!url arg!title arg!text)
+    (urform (w/lock submit-lock*
+              (process-story arg!url arg!title arg!text))
       (tab
         (row "title"  (input "title" title 50))
         (row "url"    (input "url" url 50))
@@ -2454,9 +2456,10 @@
 (def newpoll-page ((o title "Poll: ") (o text "") (o opts "") (o msg))
   (minipage "New Poll"
     (pagemessage msg)
-    (urform (process-poll arg!title
-                          (md-from-form arg!text t)
-                          arg!choices)
+    (urform (w/lock submit-lock*
+              (process-poll arg!title
+                            (md-from-form arg!text t)
+                            arg!choices))
       (tab
         (row "title"   (input "title" title 50))
         (row "text"    (textarea "text" 4 50 (only&pr text)))
@@ -2801,7 +2804,8 @@
 (def comment-form (parent whence (o text) (t user me))
   (tarform 1800
            (when-umatch/r user
-             (process-comment parent arg!text whence))
+             (w/lock submit-lock*
+               (process-comment parent arg!text whence)))
     (tag (textarea name "text" rows 8 cols 80
                    wrap 'virtual style "vertical-align:bottom")
       (aif text (prn (unmarkdown it))))
