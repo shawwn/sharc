@@ -625,7 +625,7 @@
     ; ensure items are in descending id order
     (zaptable [sort (compare > !id) _] items)))
 
-(def latest-items-by-type (n (o noisy))
+(def latest-items-by-type ((o n) (o noisy))
   (items-by-type:latest-items idfn nil n noisy))
 
 ; redefined later
