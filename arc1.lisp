@@ -74,7 +74,7 @@ or an escaped : that should stay a symbol) from an ordinary token."
      escaped)))
 
 (defun ssyntax-char-p (c)
-  (member c '(#\: #\~ #\& #\| #\. #\!)))
+  (member c '(#\: #\~ #\& #\| #\!)))
 
 (defun cl-package-qualified-p (str)
   "True if STR has the form pkg::name with non-empty pkg and name.
@@ -446,7 +446,7 @@ errors out clearly rather than polluting (often locked) CL packages."
       ((find #\| n) (expand-or sym))
       ((find #\& n) (expand-and sym))
       ((or (find-outside-cl-marker #\: n) (find #\~ n)) (expand-compose sym))
-      ((or (find #\. n) (find #\! n)) (expand-sexpr sym))
+      ((find #\! n) (expand-sexpr sym))
       (t (error "Unknown ssyntax: ~S" sym)))))
 
 (defun expand-and (sym)
@@ -482,7 +482,7 @@ errors out clearly rather than polluting (often locked) CL packages."
           (cons (intern "compose" pkg) elts)))))
 
 (defun expand-sexpr (sym)
-  (build-sexpr (reverse (arc-tokens (lambda (c) (or (eql c #\.) (eql c #\!)))
+  (build-sexpr (reverse (arc-tokens (lambda (c) (eql c #\!))
                                     (sym->chars sym) nil nil t))
                sym))
 
@@ -493,7 +493,7 @@ errors out clearly rather than polluting (often locked) CL packages."
     (t (list (build-sexpr (cddr toks) orig)
              (if (eql (cadr toks) #\!)
                  (list (arc-sym 'quote) (chars->value (car toks)))
-                 (if (or (eql (car toks) #\.) (eql (car toks) #\!))
+                 (if (eql (car toks) #\!)
                      (error "Bad ssyntax: ~S" orig)
                      (chars->value (car toks))))))))
 
