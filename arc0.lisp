@@ -500,7 +500,7 @@ straight to gcell-ref; this remains for callers holding only a symbol."
   (open f :direction :output
           :element-type :default
           :external-format :utf-8
-          :if-exists (if (equal (car args) "append") :append :supersede)
+          :if-exists (if (arc-sym= (car args) "append") :append :supersede)
           :if-does-not-exist :create))
 
 ;; infile-binary and outfile-binary variants aren't needed.
