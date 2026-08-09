@@ -2315,8 +2315,8 @@
                       'url url 'title title
                       'text (only&md-from-form text t)
                       'by (user-id) 'ip (ip))
-    (save-item s)
     (= (items* s!id) s)
+    (save-item s)
     (register-story s)
     (add-item s stories*)))
 
@@ -2487,16 +2487,16 @@
                       'by (user-id) 'ip (ip))
     (= p!parts (map !id (map [create-pollopt p nil nil _]
                              (paras opts))))
-    (save-item p)
     (= (items* p!id) p)
+    (save-item p)
     (add-item p stories*)))
 
 (def create-pollopt (p url title text)
   (lets o (inst 'item 'type 'pollopt 'id (new-item-id)
                       'url url 'title title 'text text 'parent p!id
                       'by (user-id) 'ip (ip))
-    (save-item o)
     (= (items* o!id) o)
+    (save-item o)
     (vote-for o)))
 
 (def add-pollopt-page (p)
@@ -2852,8 +2852,8 @@
   (lets c (inst 'item 'type 'comment 'id (new-item-id)
                       'text (md-from-form text) 'parent parent!id
                       'by (user-id) 'ip (ip))
-    (save-item c)
     (= (items* c!id) c)
+    (save-item c)
     (push c!id parent!kids)
     (save-item parent)
     (add-item c comments*)
