@@ -778,9 +778,9 @@
 (def ranked-op (op)
   (in (sym op) 'news 'best 'active 'classic))
 
-(def scrape-hn-itemlist ((o op "newest") (o n-pages 3)
+(def scrape-hn-itemlist ((o op "newest") (o n-pages 3) (o dedupe t)
                          (o noisy (if (main-thread) 1 nil)))
-  (withs (url op seen (memtable (map !id (hn-lists* (sym url)))))
+  (withs (url op seen (if dedupe (memtable (map !id (hn-lists* (sym url))))))
     (accum a
       (w/noisy iter noisy
         (catch
@@ -790,7 +790,7 @@
                 (whenlet html (fetch-hn-url url)
                   (with (items (parse-listpage html) nseen 0)
                     (each item items
-                      (if (seen item!id)
+                      (if (and dedupe (seen item!id))
                           (++ nseen)
                           (a item)))
                     (if (is nseen (len items))
@@ -843,6 +843,55 @@
   (each name hn-list-names*
     (= (hn-lists* name) (load-hn-list name))))
 
+; ----- Frontpage ID log -----
+
+(def scrape-topstory-ids ()
+  (map parse-item-id (parse-split:fetch-hn-url "news")))
+
+(def parse-item-id (html)
+  (awhen (between html "submission\" id=\"" "\"")
+    (safe-int (car it))))
+
+(def frontlog (ids (o t0 (seconds)))
+  (ensure-dir (string newsdir* "front/"))
+  (w/appendfile o (string newsdir* "front/" (datestring))
+    (w/stdout o
+      (apply prs t0 ids)
+      (prn))))
+
+(def get-hnlist-item (name id)
+  (find [is _!id id] (hn-lists* name)))
+
+(def frontlog-loop ()
+  (let t0 (seconds)
+    (after (whenlet ids (scrape-topstory-ids)
+             (set-frontpage ids)
+             (frontlog ids t0))
+      (sleep (max 0 (- 10 (since t0)))))))
+
+(def set-frontpage (ids)
+  (seen-frontpage ids)
+  (withs (stories (rem nil (map item ids))
+          seen    (memtable (map !id stories)))
+    (w/lock rank-lock*
+      (= ranked-stories* (+ stories (rem [seen _!id] ranked-stories*))))))
+
+(def seen-frontpage (ids)
+  (each i (map [get-hnlist-item 'news _] ids)
+    (when i
+      (or= i!front (seconds)))))
+
+
+(defbg scrape-frontlog 0 (call-reporting frontlog-loop))
+
+(def parse-frontlog ((o day (datestring)))
+  (aand (rem blank (lines (filechars (string newsdir* "front/" day))))
+        (map cdr:readall it)
+        (counts (flat it))
+        (sort (compare > cadr) (tablist it))
+        (map (fn ((id t0))
+               (list id (/ t0 6.0)))
+             it)))
 
 ; ----- Import scraped JSON into News -----
 ;
