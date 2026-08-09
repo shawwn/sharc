@@ -11,12 +11,17 @@ Audited on the `lock-levels` branch at `546a6af`, after reading
 `main..lock-levels` diff. This is the ranked findings list; the strategy and
 principles live in the remove-global-mutex plan and are not repeated here.
 
-Findings 1 through 4 are fixed and each carries the commit that fixed it. They
+Findings 1 through 5 are fixed and each carries the commit that fixed it. They
 are kept because the reasoning is what justifies the fix, and because each
-explains a class rather than an instance. Findings 5 through 8 are open. The
+explains a class rather than an instance. Findings 6 through 8 are open. The
 hot-reload design note has been rewritten: what it originally described as the
 working-tree fix was later reversed, and that section now records the state as
 it stands.
+
+Finding 5 grew a second half that the original audit missed entirely: the fnid
+harvester was not just racy, it was silently under-reclaiming under concurrency,
+which presents as a memory leak rather than as a race. That is the one worth
+reading even if the rest is settled.
 
 Four more races were found after the original audit, while fixing these; they
 are in their own section below, and all four are fixed. Two design notes were
@@ -284,31 +289,67 @@ already wrong, the lock faithfully persists the wrong value.
 
 ## 5. fnid harvesting lost its atomicity on this branch
 
-`srv.arc:452` (`forget-fnid`), `srv.arc:535` (`harvest-fnids`)
+**Fixed in `3b62dc0`.** `srv.arc:457` (`forget-fnid`), `srv.arc:544`
+(`harvest-fnids`)
 
-Both dropped their `atomic` on `lock-levels` and got nothing in its place.
-`forget-fnid` is now a bare five-table wipe across `fns*`, `fnids*`,
+Both dropped their `atomic` in `9db6bf7` and got nothing in its place.
+`forget-fnid` was a bare five-table wipe across `fns*`, `fnids*`,
 `timed-fnids*`, `fnkey->fnid*`, `fnid->fnkey*`.
 
-`new-fnid` (`srv.arc:479`) reuses a cached fnid via `or=` on `fnkey->fnid*`. If
-the harvester wipes `(fns* key)` just after that lookup, the request renders a
-link that is dead the moment it is clicked: "Unknown or expired link" on a page
-that just loaded. Partial-wipe states are also observable — `fnkey->fnid*`
-still pointing at a fnid whose `fns*` entry is already gone.
+`new-fnid` (`srv.arc:485`) reuses a cached fnid via `or=` on `fnkey->fnid*`. If
+the harvester wiped `(fns* key)` just after that lookup, the request rendered a
+link that was dead the moment it was clicked: "Unknown or expired link" on a
+page that just loaded. Partial-wipe states were also observable —
+`fnkey->fnid*` still pointing at a fnid whose `fns*` entry was already gone.
 
 This only fires above `fnid-harvest-max*` (50000 fns), but that is a
 steady-state condition on a busy server, not an edge case.
 
-This is a genuine regression from the mutex removal, and it is the one site on
-the list where the plan already names the fix: a `fnid-lock*` at the level 20
-slot reserved for it in the `arc0.lisp` header comment.
+`fnid-lock*` at 24 now covers `forget-fnid`, and also `fnid`, `timed-fnid` and
+`afnid` across `new-fnid` and the population that follows, so a create cannot
+interleave with a forget. Four concurrent creators against two harvesters leave
+0 dangling index entries.
 
-Pick a free level, though — the two lock-level tables disagree. `arc0.lisp:1510`
-assigns 20 to `fnid-lock*`; `arc.arc:349` assigns 20 to `maxid-lock*`, and also
-lists `queue-lock*` (25) and, in `app.arc:50`, `maxuid-lock*` (21), neither of
-which appears in the `arc0.lisp` list. `examples/locking/README.md` has a third,
-shorter version. Reconciling the three into one table is worth doing before
-adding a fourth lock; the levels are the load-bearing part of the design.
+The level has to be below 40: everything inside does table places and takes
+`place-lock*`. Nothing on this path touches the save lock at 22, so 22 through
+39 were all viable and `1a5b30e` had left 24 free.
+
+### The half the audit missed: the harvester was under-reclaiming
+
+`harvest-fnids` runs at the end of *every* request (`srv.arc:154`), and each
+request is its own thread (`srv.arc:95`). So above the threshold every request
+thread harvests concurrently, and each computed its kill list from the same
+snapshot, picked the same oldest 10%, and forgot the same ids. Forgetting an
+already-forgotten id is idempotent, so a wave of requests reclaimed what a
+single one would:
+
+```
+8 staggered concurrent harvesters: removed 103
+8 sequential harvest calls:        removed 800
+```
+
+The intuition to resist here is that concurrent harvesters *over*-cull. They do
+not; they collide. The failure is that `fns*` grows past `fnid-harvest-max*`
+under exactly the concurrent load the harvester exists to bound, which presents
+as a memory leak rather than as a race.
+
+Computing each kill list inside the lock fixes it, because the next harvester
+through re-derives it against an already-trimmed table: both phases now measure
+800 of 800, and creators running against harvesters converge on the threshold
+instead of drifting above it.
+
+Two details of that fix are load-bearing:
+
+- The two phases take the lock **separately** rather than as one block, so it is
+  released between them and a page render waiting to mint a link is not stalled
+  across both table scans. Each re-checks the threshold under its own lock,
+  since phase 1 can drop `fns*` below it.
+- The unlocked `(len> fns* n)` ahead of each is the cheap path, not redundant.
+  `harvest-fnids` runs per request and `fnid-lock*` is the same lock every
+  render holds while minting links, so testing inside the lock made every
+  below-threshold request pay for it: 46.3 ms per 100k calls against 7.5 ms.
+  That is the shape `save-lock` already uses with its bare read ahead of the
+  `or=`, and `ensure-uid` with its double check.
 
 ## 6. Stale comment bodies pinned for up to a day
 
@@ -530,18 +571,18 @@ and be honest that it is global". If that is ever revisited, two consequences:
 3. ~~The bare-symbol half of `++` (#1)~~: done, `96ea700`, with a lock rather
    than the `atomic-update` this doc originally called for.
 4. ~~The `save-*` snapshot races (#4)~~: done, `e221ed8`.
-5. `fnid-lock*` (#5) — restores something this branch removed, and the only
-   original finding with a named fix. `1a5b30e` removed the level 20 slot the
-   `arc0.lisp` header used to reserve for it, and 20 through 23 are now
-   `maxid-lock*`, `maxuid-lock*`, `save-locks*` and `ignore-log-lock*`. 24 is
-   free, and so is everything from 26 to 29 and 31 to 39. Anything that saves
-   has to stay below 40; see the `writefile` design note.
+5. ~~`fnid-lock*` (#5)~~: done, `3b62dc0`, at level 24.
 6. Comment cache staleness (#6) — the longest-lived symptom on the list, up to
    a day of a stale body, and the hardest to diagnose from a user report.
 7. Check-then-act on votes and comments (#7) — the one with user-visible
    permanent effects (inflated score that `unvote-for` cannot undo).
 8. `save-topstories` and the `diskvar` writes, the two exclusions from #4's fix.
 9. The rest as convenient.
+
+Levels 20 through 24 are now `maxid-lock*`, `maxuid-lock*`, `save-locks*`,
+`ignore-log-lock*` and `fnid-lock*`. Free: 26 through 29 and 31 through 39.
+Anything that saves, or that reaches `writefile` by any route, has to stay
+below 40; see the `writefile` design note.
 
 Repros belong in `examples/locking/`, in the style of `lost-updates.arc`. #1's
 is the canonical example of a place form that looks locked and is not, and #4's
