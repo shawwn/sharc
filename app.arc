@@ -62,8 +62,8 @@
               (link-uid u uid)
               (save-uids))))))
 
-(def users ((o f idfn)) 
-  (keys user->uid* f))
+(def users ((o test idfn))
+  (keys user->uid* test))
 
 (def load-pws ()
   (= hpasswords* (load-table hpwfile*))

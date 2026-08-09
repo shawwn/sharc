@@ -16,7 +16,8 @@ relative interpreter path does not resolve here, so invoke `./sharc`
 explicitly rather than executing the file directly.)
 
 They use threads and sleeps, so each takes a few seconds. `lost-updates.arc`
-takes the longest (60000 increments across two threads).
+takes the longest (60000 increments across two threads), and
+`phantom-keys.arc` allocates the most (it grows a table to 300000 keys).
 `insert-items-drop.arc` is the only one that loads `news.arc`, since it
 exercises the real `insert-items`.
 
@@ -40,6 +41,7 @@ order. Re-entering a lock already held is always allowed. See
 | `reentrancy.arc` | nested `=` and nested `w/lock` on one lock do not self-deadlock | **passes** (`ALL OK`) |
 | `lost-updates.arc` | why `call-w/locked-table` must not skip `place-lock*` when it already holds `*arc-mutex*` | **passes** (60000/60000) |
 | `insert-items-drop.arc` | a `=` whose value expression reads its own place, racing a correctly locked `push` | **passes** (dropped 0 of 200) |
+| `phantom-keys.arc` | `maphash` handing back a key that was never in the table, when a walk overlaps a rehash | **passes** (0 phantoms) |
 | `deadlock-place-then-atomic.arc` | `place-lock*` (40) then `*arc-mutex*` (0), because `placewiths` evaluates the value expression under the lock | **lock-order error** |
 | `atomic-interleaved.arc` | an `atomic` block torn by a bare `=`, since the two use different locks | **`*** INTERLEAVED ***`** |
 

@@ -1262,19 +1262,19 @@
   table)
 
 (def keys (h (o test idfn))
-  (let f (testify test)
-    (accumulate a
-      (each (k v) h (f&a k)))))
+  (if (is test idfn)
+      (tabkeys h)
+      (keep test (tabkeys h))))
 
 (def vals (h (o test idfn))
-  (let f (testify test)
-    (accumulate a
-      (each (k v) h (f&a v)))))
+  (if (is test idfn)
+      (tabvals h)
+      (keep test (tabvals h))))
 
 ; These two should really be done by coerce.  Wrap coerce?
 
 (def tablist (h)
-  (accumulate a (maptable (fn args (a args)) h)))
+  (tabpairs h))
 
 (def listtab (al)
   (lets h (table)

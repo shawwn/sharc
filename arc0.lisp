@@ -1663,8 +1663,32 @@ sb-thread mutex with a :name, and anything else prints as itself."
     (when args (arc-call1 (car args) h))
     h))
 
+(xdef tabkeys (table)
+  (let ((ks nil))
+    (sb-ext:with-locked-hash-table (table)
+      (maphash (lambda (k v) (declare (ignore v)) (push k ks)) table))
+    ks))
+
+(xdef tabvals (table)
+  (let ((vs nil))
+    (sb-ext:with-locked-hash-table (table)
+      (maphash (lambda (k v) (declare (ignore k)) (push v vs)) table))
+    vs))
+
+(xdef tabpairs (table)
+  (let ((kvs nil))
+    (sb-ext:with-locked-hash-table (table)
+      (maphash (lambda (k v)
+                 (push (list k v) kvs))
+               table))
+    kvs))
+
 (xdef maptable (fn table)
-  (maphash (lambda (k v) (arc-call2 fn k v)) table)
+  (maphash (lambda (k v)
+             (let ((v2 (gethash k table)))
+               (unless (null v2) ; see examples/locking/phantom-keys.arc
+                 (arc-call2 fn k v2))))
+           table)
   table)
 
 (xdef sref (obj val idx)
