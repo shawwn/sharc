@@ -282,7 +282,7 @@
 (def same-ip (i s) (is i!ip s!ip))
 
 
-(or= stories* nil comments* nil ; descending ids
+(or= stories* nil comments* nil ; descending time
      items* (table) url->story* (table))
 
 (diskvar maxid* (+ newsdir* "max-id") 0)
@@ -359,6 +359,9 @@
 (mac put-item (i var (o cmp 'compitem) (o same 'sameitem))
   `(insortnew ,cmp ,i ,var ,same))
 
+(mac add-item (i var (o cmp 'compitem))
+  `(insort ,cmp ,i ,var))
+
 (mac pull-item (i var (o same 'sameitem))
   `(pull ,i ,var ,same))
 
@@ -369,8 +372,8 @@
 
 (def register-item (i)
   (if (loading-items) (push i (the loaded-items))
-      (metastory i)   (put-item i stories*)
-      (acomment i)    (put-item i comments*))
+      (metastory i)   (add-item i stories*)
+      (acomment i)    (add-item i comments*))
   (unless (blank i!url)
     (awhen (astory&live i)
       (register-url i i!url))))
@@ -2315,7 +2318,7 @@
     (save-item s)
     (= (items* s!id) s)
     (register-story s)
-    (push s stories*)))
+    (add-item s stories*)))
 
 (def register-story (s (o url s!url) (o site (sitename url)))
   (unless (blank url)
@@ -2486,7 +2489,7 @@
                              (paras opts))))
     (save-item p)
     (= (items* p!id) p)
-    (push p stories*)))
+    (add-item p stories*)))
 
 (def create-pollopt (p url title text)
   (lets o (inst 'item 'type 'pollopt 'id (new-item-id)
@@ -2853,7 +2856,7 @@
     (= (items* c!id) c)
     (push c!id parent!kids)
     (save-item parent)
-    (push c comments*)
+    (add-item c comments*)
     (register-comment c text)))
 
 ; Comment Display

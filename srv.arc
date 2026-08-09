@@ -120,14 +120,12 @@
   (and (> (requests/ip* ip 0) 250)
        (isnt ip "127.0.0.1")
        (let now (seconds)
-         (do1 (if (req-times* ip)
-                  (and (>= (qlen (req-times* ip)) 
-                           (if (throttle-ips* ip) 1 req-limit*))
-                       (let dt (- now (deq (req-times* ip)))
-                         (if (< dt dos-window*) (set (ignore-ips* ip)))
-                         (< dt req-window*)))
-                  (do (= (req-times* ip) (queue))
-                      nil))
+         (or= (req-times* ip) (queue))
+         (do1 (and (>= (qlen (req-times* ip))
+                       (if (throttle-ips* ip) 1 req-limit*))
+                   (let dt (- now (deq (req-times* ip)))
+                     (if (< dt dos-window*) (set (ignore-ips* ip)))
+                     (< dt req-window*)))
               (enq now (req-times* ip))))))
 
 (def handle-request-thread (i o ip)
@@ -208,7 +206,7 @@ Connection: close"))
   ; this is the place to put a/b testing
   ; toggle a flag and push elapsed into one of two lists
   (++ (opcounts* name 0))
-  (unless (optimes* name) (= (optimes* name) (queue)))
+  (or= (optimes* name) (queue))
   (enq-limit elapsed (optimes* name) 1000))
 
 ; For ops that want to add their own headers.  They must thus remember 
