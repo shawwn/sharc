@@ -448,18 +448,21 @@ Connection: close"))
          (scopevals scope)
          ',body))
 
+(or= fnid-lock* (make-lock 24 "fnid-lock*"))
+
 (or= fns* (table) fnids* (table) timed-fnids* (table))
 
 (or= fnkey->fnid* (isotable) fnid->fnkey* (table))
 
 (def forget-fnid (key)
-  (wipe (fns* key))
-  (wipe (fnids* key))
-  (wipe (timed-fnids* key))
-  (whenlet fnkey (fnid->fnkey* key)
-    (wipe (fnkey->fnid* fnkey))
-    (wipe (fnid->fnkey* key))
-    t))
+  (w/lock fnid-lock*
+    (wipe (fns* key))
+    (wipe (fnids* key))
+    (wipe (timed-fnids* key))
+    (whenlet fnkey (fnid->fnkey* key)
+      (wipe (fnkey->fnid* fnkey))
+      (wipe (fnid->fnkey* key))
+      t)))
 
 ; count on huge (expt 64 22) size of fnid space to avoid clashes
 
@@ -488,26 +491,29 @@ Connection: close"))
       (gen-fnid)))
 
 (def fnid (f (o k))
-  (lets key (new-fnid k)
-    (= (fns* key) f
-       (fnids* key) (list (seconds) (get-user)))
-    (wipe (timed-fnids* key))))
+  (w/lock fnid-lock*
+    (lets key (new-fnid k)
+      (= (fns* key) f
+         (fnids* key) (list (seconds) (get-user)))
+      (wipe (timed-fnids* key)))))
 
 (def timed-fnid (lasts f (o k))
-  (lets key (new-fnid k)
-    (= (fns* key) f
-       (timed-fnids* key) (list (seconds) lasts (get-user)))
-    (wipe (fnids* key))))
+  (w/lock fnid-lock*
+    (lets key (new-fnid k)
+      (= (fns* key) f
+         (timed-fnids* key) (list (seconds) lasts (get-user)))
+      (wipe (fnids* key)))))
 
 ; Within f, it will be bound to the fn's own fnid.  Remember that this is
 ; so low-level that need to generate the newline to separate from the headers
 ; within the body of f.
 
 (mac afnid (f (o k `(scopekey 'afnid ,f)))
-  `(lets it (new-fnid ,k)
-     (= (fns* it) ,f
-        (fnids* it) (list (seconds) (get-user)))
-     (wipe (timed-fnids* it))))
+  `(w/lock fnid-lock*
+     (lets it (new-fnid ,k)
+       (= (fns* it) ,f
+          (fnids* it) (list (seconds) (get-user)))
+       (wipe (timed-fnids* it)))))
 
 ;(defop test-afnid req
 ;  (tag (a href (url-for (afnid (fn (req) (prn) (pr "my fnid is " it)))))
@@ -537,14 +543,18 @@ Connection: close"))
 
 (def harvest-fnids ((o n fnid-harvest-max*))
   (when (len> fns* n)
-    (each id (dead-fnids)
-      (forget-fnid id))
-    (when (len> fns* n)
-      (withs (n (min n (len fns*))
-              nharvest (trunc (/ n fnid-harvest-ratio*)))
-        (let (kill keep) (split (fnids) nharvest)
-          (each id kill
-            (forget-fnid id)))))))
+    (w/lock fnid-lock*
+      (when (len> fns* n)
+        (each id (dead-fnids)
+          (forget-fnid id)))))
+  (when (len> fns* n)
+    (w/lock fnid-lock*
+      (when (len> fns* n)
+        (withs (n (min n (len fns*))
+                nharvest (trunc (/ n fnid-harvest-ratio*)))
+          (let (kill keep) (split (fnids) nharvest)
+            (each id kill
+              (forget-fnid id))))))))
 
 (= fnurl* "/x" rfnurl* "/r" rfnurl2* "/y")
 
