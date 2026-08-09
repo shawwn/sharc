@@ -13,18 +13,18 @@ principles live in the remove-global-mutex plan and are not repeated here.
 
 Findings 1 through 6 are fixed and each carries the commit that fixed it. They
 are kept because the reasoning is what justifies the fix, and because each
-explains a class rather than an instance. Findings 7 and 8 are open. The
-hot-reload design note has been rewritten: what it originally described as the
-working-tree fix was later reversed, and that section now records the state as
-it stands.
+explains a class rather than an instance. Finding 8 is fixed too (`49fce23`),
+leaving finding 7 as the only one still open. The hot-reload design note has
+been rewritten: what it originally described as the working-tree fix was later
+reversed, and that section now records the state as it stands.
 
 Finding 5 grew a second half that the original audit missed entirely: the fnid
 harvester was not just racy, it was silently under-reclaiming under concurrency,
 which presents as a memory leak rather than as a race. That is the one worth
 reading even if the rest is settled.
 
-Five more races were found after the original audit, while fixing these; they
-are in their own section below, and all five are fixed. Finding 13 was the
+Six more races were found after the original audit, while fixing these; they
+are in their own section below, and all six are fixed. Finding 13 was the
 serious one, the only entry on this page that could write *fabricated* data to
 a file rather than lose data already there, and it falsifies two of the "what
 is *not* broken" claims below, which are struck rather than deleted so the
@@ -33,10 +33,9 @@ run arbitrary code under a table's own mutex, `writefile` takes `place-lock*`
 (which constrains every lock level in the tree), and the output locks do not
 cover what they appear to.
 
-Everything still open is in finding 7 and finding 8, plus one scaling problem
-that is not a race at all: `loaded-item-ids` walks and sorts every key of
-`items*`, which does not survive tens of millions of items no matter how the
-walk is implemented.
+Everything still open is in finding 7, plus one scaling problem that is not a
+race at all: `loaded-item-ids` walks and sorts every key of `items*`, which does
+not survive tens of millions of items no matter how the walk is implemented.
 
 Commit hashes in this doc were rewritten when `lock-levels` was rebased onto
 `main`; they refer to the current history.
@@ -412,17 +411,52 @@ None of these has a lock spanning the check and the act:
 
 ## 8. Minor
 
+**Fixed in `49fce23`.**
+
 - `(= (req-times* ip) (queue))` in `abusive-ip` (`srv.arc:119`) and
   `(unless (optimes* name) (= (optimes* name) (queue)))` in `save-optime`
-  (`srv.arc:207`) both drop a queue when two first-requests race. Both should
-  be `or=`.
-- `(push s stories*)` at submit time can invert the descending-time order the
-  list is documented to keep (`news.arc:282`) when two submissions interleave.
-  `put-item` would preserve it.
+  (`srv.arc:207`) both dropped a queue when two first-requests raced. Both are
+  now `or=`. A hundred barrier-synced threads lost up to 82 of 100 enqueues
+  before, 0 after. **The barrier is what makes that a test**: an earlier attempt
+  started the threads without one, reported 200 of 200 on the *unfixed* code,
+  and proved nothing — natural start jitter lets the first thread win before
+  the others check.
+- `(push s stories*)` at submit time could invert the descending-time order the
+  list is documented to keep (`news.arc:282`) when two submissions interleaved.
+
+The second bullet originally said "`put-item` would preserve it." That was
+wrong, and the reason is worth keeping. `put-item` is `insortnew`, whose
+`reinsert-sorted` rebuilds the entire tail through `rem` even when there is no
+duplicate to remove, under `place-lock*`: 11.8 ms per insert into a
+50000-element list against `push`'s 0.008, and it exhausts the control stack
+past 300000. `add-item` (`news.arc:363`) uses `insort` instead, whose
+`insert-sorted` shares the tail rather than re-consing it — 0.018 ms flat, and
+it survives a million.
+
+That is only sound because nothing being inserted at those sites can already be
+present, and **that was not true when the change first landed**. The `create-*`
+functions saved to disk before publishing to `items*`, so a concurrent
+`(item id)` could load a second object for the same id and register it
+independently; `28d92fc` swapped the two lines so `items*` is populated first
+and the claim in `item` can never be won by a competing `read-item`. Only then
+does the dedup become genuinely dead weight.
+
+A guard that does **not** work, recorded so it is not tried again: wrapping the
+`rem` as `(if (some [same elt _] seq) (rem elt seq same) seq)` so the common
+case shares structure. It is a wash on speed, because the `some` scan costs
+about what the re-consing did, and it does not remove the stack ceiling,
+because the walk *to* the insertion point is itself non-tail recursive. Making
+`reinsert-sorted` cheap or stack-safe means rewriting it iteratively.
+
+`insert-sorted` has the same non-tail recursion, so deep insertion into a long
+list still has a control-stack ceiling. That is why `register-item`, which
+inserts lazily loaded items that are old and therefore sort deep, gains only
+about a fifth (19.55 ms to 16.06 ms at 50000) where the `create-*` sites gain
+three orders of magnitude.
 
 ## Found after the original audit
 
-These turned up while fixing findings 1 through 4. All four are fixed.
+These turned up while fixing the findings above. All six are fixed.
 
 ### 9. A session cookie that logout could never revoke
 
@@ -623,6 +657,50 @@ It backs four 300-second `defcache`s plus `should-ban-ip`. That wants an
 incrementally maintained index, in the shape `sitename->items*` and
 `url->story*` already use, not a faster scan.
 
+### 14. Creating an item made a second object for the same id
+
+**Fixed in `28d92fc`.** `news.arc:2313` (`create-story`), `2484` (`create-poll`),
+`2495` (`create-pollopt`), `2851` (`create-comment`)
+
+Finding 3 again, reached from the other end. That one was two threads *loading*
+one id; this is a thread *creating* one while another loads it.
+
+All four `create-*` functions saved to disk before publishing to `items*`:
+
+```arc
+(save-item s)          ; the file exists from here on
+(= (items* s!id) s)    ; but items* is not populated until here
+```
+
+In between, the item exists on disk and not in memory, which is exactly the
+miss path in `item` (`news.arc:348`). A concurrent `(item id)` calls
+`read-item`, gets a **second distinct object** for the same id, wins the `or=`
+claim because the creator has not published yet, and `register-item` inserts
+that object into `stories*` or `comments*`. The creator then overwrites `items*`
+with its own object and inserts that one too. Two objects, one id, both in the
+list, with `items*` naming only one: a vote mutates one while `/newest` renders
+the other.
+
+Reachable with nothing unusual on the client. `new-item-id` increments `maxid*`
+and `todisk`s it *before* the item is published, and `safe-item`
+(`news.arc:436`) will fetch any well-formed id off a request, so a GET for
+`item?id=<maxid*>` landing inside the `save-item` call is enough.
+
+The fix is to swap the two lines. With `items*` populated first, `item`
+short-circuits and never reaches `read-item`. The new window — id allocated,
+`items*` populated, file not yet written — is harmless because `read-item`
+guards on `file-exists` (`e3360fa`), so a request for that id gets a clean nil
+rather than a second copy.
+
+It does invert which failure a crash produces. Before, a crash between the save
+and the publish left the item on disk, invisible until something loaded it
+lazily. Now a crash between the publish and the save loses it, and anything
+that voted on it in the interim refers to an id with no file. The window is one
+`save-item` call either way, and being consistent while running is worth more
+than being durable across a crash inside it.
+
+This is also what makes `add-item` sound at those sites; see finding 8.
+
 ## Design note: never run arbitrary code under a table's own mutex
 
 Arc tables are `:synchronized` (`arc0.lisp:1657`), so each has an SBCL mutex,
@@ -739,23 +817,34 @@ and be honest that it is global". If that is ever revisited, two consequences:
 6. ~~Comment cache staleness (#6)~~: done, `88576d8`, with a generation counter.
 7. ~~Phantom keys from `maphash` (#13)~~: done, `438a7c5`, with a snapshot for
    the list-builders and validate-on-read for `maptable`.
-8. **An index for `items*`** — now the largest open item, and the only one that
-   is a scaling problem rather than a race. `loaded-item-ids` is
-   `(sort > (keys items*))`, backing four 300-second `defcache`s plus
-   `should-ban-ip`. Nothing here has to be walked: the derived data is
-   dead-items-by-site and items-by-ip, both of which can be maintained at
-   `kill` and `register-item` time the way `sitename->items*` already is.
-9. Check-then-act on votes and comments (#7) — the one with user-visible
-   permanent effects (inflated score that `unvote-for` cannot undo). The vote
-   claim is four lines and wants `id` rather than `is`, because two
-   simultaneous votes build equal lists; the submit lock is the only remaining
-   item with a real design tradeoff.
-10. `save-topstories`, the one exclusion from #4's fix that is worth doing; it
+8. ~~The queue drops and the submit-time ordering (#8)~~: done, `49fce23`, with
+   `add-item` rather than the `put-item` this doc originally called for.
+9. ~~The create-side twin of the double-load (#14)~~: done, `28d92fc`.
+10. **Check-then-act on votes and comments (#7)** — the last actual race, and
+    the one with user-visible permanent effects, since `unvote-for` walks a
+    single vote's effect list and cannot undo a doubled score. The vote claim is
+    four lines: `or=` on `(voted i)`, tested with `id` rather than `is`, because
+    two simultaneous votes build structurally equal lists and `is` would tell
+    both racers they won. The duplicate comment and duplicate URL halves share a
+    `submit-lock*` and are the only remaining item with a real design tradeoff:
+    holding it across `create-comment`'s `save-item` calls, or splitting publish
+    from persist. `28d92fc` made the second cheaper, since publishing to `items*`
+    is now the first thing each `create-*` does.
+11. **An index for `items*`** — the largest open item, and the only one that is
+    a scaling problem rather than a race. `loaded-item-ids` is
+    `(sort > (keys items*))`, backing four 300-second `defcache`s plus
+    `should-ban-ip`. Nothing here has to be walked: the derived data is
+    dead-items-by-site and items-by-ip, both of which can be maintained at
+    `kill` and `register-item` time the way `sitename->items*` already is.
+12. `save-topstories`, the one exclusion from #4's fix that is worth doing; it
     is reached from `adjust-rank` on every story vote. The `diskvar` writes are
     the other exclusion and need nothing: `maxid*` and `maxuid*` already save
     inside their own locks, `ignore-log*` and `hmac-key*` are fixed, and the
     rest are whole-value replacements from admin forms.
-11. The rest as convenient.
+13. An iterative `reinsert-sorted`, if `register-item`'s insertion cost or the
+    control-stack ceiling on long lists ever matters. See finding 8 for the
+    guard that looks like it would help and does not.
+14. The rest as convenient.
 
 Levels 20 through 24 are now `maxid-lock*`, `maxuid-lock*`, `save-locks*`,
 `ignore-log-lock*` and `fnid-lock*`. Free: 26 through 29 and 31 through 39.
