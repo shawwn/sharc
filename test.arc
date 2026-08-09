@@ -140,6 +140,17 @@
   (test? 15  (med '(10 20))) ; even pair
   (test? 7   (med '(7)))) ; single element
 
+(define-test range
+  (test? '(1 2 3 4 5) (range 1 5))
+  (test? '(3)         (range 3 3)) ; single element
+  (test? nil          (range 5 1)) ; start past end
+  (test? '(-3 -2 -1 0 1 2) (range -3 2)) ; spans zero
+  (test? '(-5 -4 -3)  (range -5 -3))
+  ; inc coerces back to the type of its argument, so ranges of characters
+  ; work as well as numbers -- easy to lose in a rewrite that assumes ints
+  (test? '(#\a #\b #\c #\d #\e) (range #\a #\e))
+  (test? nil          (range #\e #\a)))
+
 (define-test precedence
   (test? -3 (- (+ 1 2)))
   (test? 10 (- 12 (+ 1 1)))
