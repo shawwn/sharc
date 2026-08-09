@@ -978,19 +978,18 @@
 
 (def story-from-scraped-story (s)
   (lets it (or= (items* s!id) (inst 'item 'id s!id))
-    (= it!by    (get-user-uid s!by s!id))
-    (= it!type  (sym (or s!type it!type "story")))
-    (= it!time  (or s!time  it!time  (seconds)))
-    (= it!text  (or s!text  it!text))
-    (= it!score (or s!score it!score 0))
-    (= it!title (or s!title it!title))
-    (= it!url   s!url)
-    (= it!dead  s!dead)
-    (= it!deleted s!deleted)
-    (unless (blank it!text)
-      (when (posmatch "<a href" it!text)
-        (pushnew 'links it!keys)))
-    (pushnew 'imported it!keys)
+    (= it!by    (get-user-uid s!by s!id)
+       it!type  (sym (or s!type it!type "story"))
+       it!time  (or s!time  it!time  (seconds))
+       it!text  (or s!text  it!text)
+       it!score (or s!score it!score 0)
+       it!title (or s!title it!title)
+       it!url   s!url
+       it!dead  s!dead
+       it!deleted s!deleted
+       (mem 'links it!keys)    (and (~blank it!text)
+                                    (posmatch "<a href" it!text))
+       (mem 'imported it!keys) t)
     (wipe it!kids)
     (scrape-ero:tablist it)))
 
@@ -1034,9 +1033,9 @@
        it!score  (scraped-comment-score c it!score)
        (mem 'flagged it!keys)         c!flagged
        (mem scrape-flagger* it!flags) c!flagged
-       (mem 'collapsed it!keys)       c!collapsed)
-    (wipe it!kids)
-    (pushnew 'imported it!keys)))
+       (mem 'collapsed it!keys)       c!collapsed
+       (mem 'imported it!keys)        t)
+    (wipe it!kids)))
 
 (def scraped-comment-score (c (o curscore))
   (aif c!dead     1
