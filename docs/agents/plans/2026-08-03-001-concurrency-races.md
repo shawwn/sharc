@@ -24,9 +24,10 @@ which presents as a memory leak rather than as a race. That is the one worth
 reading even if the rest is settled.
 
 Four more races were found after the original audit, while fixing these; they
-are in their own section below, and all four are fixed. Two design notes were
-added: `writefile` takes `place-lock*`, which constrains every lock level in
-the tree, and the output locks do not cover what they appear to.
+are in their own section below, and all four are fixed. The last of them covers
+all three output paths, which turned out to share one root cause. Two design
+notes were added: `writefile` takes `place-lock*`, which constrains every lock
+level in the tree, and the output locks do not cover what they appear to.
 
 Commit hashes in this doc were rewritten when `lock-levels` was rebased onto
 `main`; they refer to the current history.
@@ -460,15 +461,31 @@ value that never changes after boot.
 
 The window is first boot only, before the `hmac-key` file exists.
 
-### 12. `srvlog` interleaved two records onto one line
+### 12. The output paths left their trailing newline outside the lock
 
-**Fixed in `e525f72`,** and only observable after `2f39dcc`.
+**Fixed in `91fc2cd` (`warnset`), `e525f72` (`srvlog`) and `e440fd4` (`ero`).**
+The `srvlog` half was only observable after `2f39dcc`.
 
-`disp` force-outputs and `writec` does not (`arc0.lisp:613` and `535`), so
-`prn` wrote the record body through to the file under `log-lock*` but left the
-trailing newline in the stream buffer. `w/appendfile` closes outside the lock,
-so that newline flushed after the lock was released, and two threads could land
-both bodies on one line:
+All three share one root cause, so they are one finding rather than three.
+`disp` force-outputs and `writec` does not (`arc0.lisp:613` and `535`), so a
+`prn` writes its body through under the lock and leaves the trailing newline in
+the stream buffer, to be flushed at some unordered later point. The fix in each
+case is `flushout` as the last form inside the lock, not moving the lock.
+
+They differ in how exposed each was:
+
+- **`srvlog`** was the real bug. `w/appendfile` opens before the lock and closes
+  after releasing it, so the newline flushed outside the lock entirely and two
+  threads could land both bodies on one line.
+- **`warnset`** wrote to stderr with no lock at all, so "*** redefining x"
+  lines could interleave.
+- **`ero`** was the least exposed: a single shared stderr rather than a stream
+  it opens itself, and the newline was at least inside the lock. That made it
+  correct by accident rather than by construction, since it depended on stderr's
+  buffering instead of on a flush. Four threads, 100 records each: 400 lines, 0
+  with more than one record on them.
+
+The `srvlog` failure, verbatim:
 
 ```
 1786256474 ddd 1 2 31786256474 bbb
