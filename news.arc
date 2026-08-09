@@ -2357,8 +2357,11 @@
 
 (diskvar ignore-log* (+ newsdir* "ignore-log"))
 
+(or= ignore-log-lock* (make-lock 23 "ignore-log"))
+
 (def log-ignore (user cause (t actor me))
-  (todisk ignore-log* (cons (list user actor cause) ignore-log*)))
+  (w/lock ignore-log-lock*
+    (todisk ignore-log* (cons (list user actor cause) ignore-log*))))
 
 ; Kill means stuff with this substring gets killed. Ignore is stronger,
 ; means that user will be auto-ignored.  Eventually this info should

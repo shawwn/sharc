@@ -348,6 +348,7 @@
 ; 20    maxid-lock*      incrementing maxid*
 ; 21    maxuid-lock*     incrementing maxuid*
 ; 22    save-locks*      saving tables
+; 23    ignore-log-lock* ignore log
 ; 25    queue-lock*      enq, deq, etc
 ; 30    scrape-lock*     last-fetch-time*
 ; 40    place-lock*      all setforms operations
