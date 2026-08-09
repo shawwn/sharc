@@ -217,15 +217,18 @@ Connection: close"))
 (mac defop-raw (name parms . body)
   (w/uniq t1
     (set (ignored-scopeids* t1)) ; need to ignore t1 because (msec) is unique
-    `(= (srvops* ',name) 
-        (fn ,parms 
-          (let ,t1 (msec)
-            (do1 (do ,@body)
-                 (save-optime ',name (- (msec) ,t1))))))))
+    (let fname (sym:string 'defop- name)
+      `(do (def ,fname ,parms
+             (let ,t1 (msec)
+               (do1 (do ,@body)
+                    (save-optime ',name (- (msec) ,t1)))))
+           (= (srvops* ',name) ,fname)))))
 
 (mac defopr-raw (name parms . body)
-  `(= (redirector* ',name) t
-      (srvops* ',name)     (fn ,parms ,@body)))
+  (let fname (sym:string 'defopr- name)
+    `(do (def ,fname ,parms ,@body)
+         (= (redirector* ',name) t
+            (srvops* ',name)     ,fname))))
 
 ; body has access to the request via (the req). Use arg!key to
 ; pull request args, (the me) for the logged-in user, (the ip)
@@ -716,7 +719,7 @@ Connection: close"))
 (defcache memodate 60
   (datestring))
 
-(defop || (pr "It's alive."))
+; (defop || (pr "It's alive."))
 
 (defop topips
   (when (admin)
