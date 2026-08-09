@@ -752,7 +752,6 @@
                ;(br)
                (center
                  (or (hook 'longfoot) (footer))
-                 (if (admin) (br2))
                  (admin-bar (- (msec) ,gt) ,whence)))))))
 
 (def footer ()
@@ -782,6 +781,7 @@
 
 (def admin-bar (elapsed whence)
   (when (or (admin) arg!perf)
+    (br2)
     (w/bars
       (pr (num:len fns*) " fnids")
       (pr "loaded " (num:len items*) " of " (num:item-count) " items")
