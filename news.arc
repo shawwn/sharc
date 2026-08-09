@@ -414,19 +414,16 @@
 
 (def bucket-id (id size) (trunc:/ id size))
 
-(def item-dir (id)
-  (string storydir* (bucket-id id item-bucket-size*) "/"))
+(def item-bucket  (id) (bucket-id  id item-bucket-size*))
+(def prof-bucket (uid) (bucket-id uid prof-bucket-size*))
+(def vote-bucket (uid) (bucket-id uid vote-bucket-size*))
 
-(def prof-dir (uid)
-  (string profdir* (bucket-id uid prof-bucket-size*) "/"))
-
-(def votes-dir (uid)
-  (string votedir* (bucket-id uid vote-bucket-size*) "/"))
+(def item-dir  (id)  (string storydir* (item-bucket id) "/"))
+(def prof-dir  (uid) (string profdir* (prof-bucket uid) "/"))
+(def votes-dir (uid) (string votedir* (vote-bucket uid) "/"))
 
 (def item-path (id) (and id (string (item-dir id) id)))
-
 (def prof-path (uid) (and uid (string (prof-dir uid) uid)))
-
 (def votes-path (uid) (and uid (string (votes-dir uid) uid)))
 
 ; Note that duplicates are only prevented of items that have at some 
