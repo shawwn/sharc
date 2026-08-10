@@ -1221,8 +1221,8 @@
 (def listpage (t1 items label title (o url label) (o number t) (o moreurl) (o perpage perpage*))
   (hook 'listpage)
   (longpage t1 nil label title url
+    (aif (the listpage-body) (it))
     (when items
-      (aif (the listpage-body) (it))
       (display-items items label title url number moreurl perpage))))
 
 (def paginated (display items label title (o url label) (o number t) (o moreurl) (o perpage perpage*))
