@@ -962,6 +962,39 @@
        (< 0 m 13)
        (< 0 d 32)))
 
+; https://lispcookbook.github.io/cl-cookbook/dates_and_times.html
+
+(def today ()
+  (local-time::today))
+
+(def parse-ymd (ymd)
+  (local-time::parse-timestring ymd))
+
+(def format-ymd ((o ts (today)))
+  (local-time::format-timestring
+    nil ts :format '(:year "-" (:month 2) "-" (:day 2))))
+
+(def format-mdy ((o ts (today)))
+  (local-time::format-timestring
+    nil ts :format '(:long-month " " :day ", " :year)))
+
+(def add-ymd (y m d (o ts (today)))
+  (local-time::adjust-timestamp
+    ts
+    (local-time::offset :year y)
+    (local-time::offset :month m)
+    (local-time::offset :day d)))
+
+(def english-list xs
+  (whenlet ys (rem blank xs)
+    (tostring
+      (case (len ys)
+        0 nil
+        1 (pr ys!0 ".")
+        2 (pr ys!0 " or " ys!1 ".")
+          (do (apply pr (intersperse ", " (almost ys)))
+              (pr ", or " (last ys) "."))))))
+
 (mac defopl (name . body)
   `(defop ,name
      (if (me)

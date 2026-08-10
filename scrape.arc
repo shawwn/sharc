@@ -852,13 +852,6 @@
   (awhen (between html "submission\" id=\"" "\"")
     (safe-int (car it))))
 
-(def frontlog (ids (o t0 (seconds)))
-  (ensure-dir (string newsdir* "front/"))
-  (w/appendfile o (string newsdir* "front/" (datestring))
-    (w/stdout o
-      (apply prs t0 ids)
-      (prn))))
-
 (def get-hnlist-item (name id)
   (find [is _!id id] (hn-lists* name)))
 
@@ -883,15 +876,6 @@
 
 
 (defbg scrape-frontlog 0 (call-reporting frontlog-loop))
-
-(def parse-frontlog ((o day (datestring)))
-  (aand (rem blank (lines (filechars (string newsdir* "front/" day))))
-        (map cdr:readall it)
-        (counts (flat it))
-        (sort (compare > cadr) (tablist it))
-        (map (fn ((id t0))
-               (list id (/ t0 6.0)))
-             it)))
 
 ; ----- Import scraped JSON into News -----
 ;

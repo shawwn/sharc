@@ -3762,6 +3762,80 @@ brackets&gt; and it should work.<br><br>")
           (save-pws)
           "news")))
 
+
+(newsop front (day) (front-page day))
+
+(def front-page (day)
+  (withs (ts    (safe-ymd day)
+          ymd   (format-ymd ts)
+          items (front-for-day ymd))
+    (w/the listpage-body {front-page-menu ts}
+      (listpage (msec) items ymd "@ymd front"
+                (pageurl "front?day=@ymd") t
+                [pageurl "front?day=@ymd" (+ (curpage) 1)]))))
+
+(def front-page-menu (ts)
+  (tag (div style (margin left 36px top 6px bottom 14px))
+    (pr "Stories from " (format-mdy ts) " (UTC)")
+    (tag (div style (margin top 9px))
+      (awhen (english-list
+               (tostring:datelink "day"   (add-ymd  0  0 -1 ts))
+               (tostring:datelink "month" (add-ymd  0 -1  0 ts))
+               (tostring:datelink "year"  (add-ymd -1  0  0 ts)))
+        (pr "Go back a " it))
+      (awhen (english-list
+               (tostring:datelink "day"   (add-ymd  0  0  1 ts))
+               (tostring:datelink "month" (add-ymd  0  1  0 ts))
+               (tostring:datelink "year"  (add-ymd  1  0  0 ts)))
+        (pr " Go forward a " it)))))
+
+(def datelink (name ts)
+  (when (valid-ymd ts)
+    (spanclass hnmore
+      (link name (+ "front?day=" (format-ymd ts))))))
+
+(def valid-ymd (ts)
+  (local-time::timestamp<= ts (today)))
+
+(def safe-ymd (ymd)
+  (or (errsafe (parse-ymd ymd))
+      (add-ymd 0 0 -1 (today))))
+
+(def difference (xs ys)
+  (accum a
+    (each x xs
+      (unless (mem x ys)
+        (a x)))))
+
+(def prior-day (ymd)
+  (format-ymd (add-ymd 0 0 -1 (parse-ymd ymd))))
+
+(def front-for-day (ymd)
+  (aand (difference (front-on-day ymd)
+                    (front-on-day (prior-day ymd)))
+        (rem nil (map item it))))
+
+(def front-on-day (ymd)
+  (map car (parse-frontlog ymd)))
+
+(def parse-frontlog ((o ymd (datestring)))
+  (aand (file-exists (string frontdir* ymd))
+        (rem blank (lines:filechars it))
+        (map cdr:readall it)
+        (counts (flat it))
+        (sort (compare > cadr) (tablist it))
+        (map (fn ((id t0))
+               (list id (/ t0 6.0)))
+             it)))
+
+(def frontlog (ids (o t0 (seconds)))
+  (ensure-dir frontdir*)
+  (w/appendfile o (string frontdir* (datestring))
+    (w/stdout o
+      (apply prs t0 ids)
+      (prn))))
+
+
 (defhook login ()
   (ensure-news-user)
   (newslog 'top-login))
