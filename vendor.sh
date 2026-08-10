@@ -20,6 +20,7 @@ mkdir -p lib
   vendor global-vars      https://github.com/lmj/global-vars           master
   vendor trivial-features https://github.com/trivial-features/trivial-features master
   vendor trivial-garbage  https://github.com/trivial-garbage/trivial-garbage master
+  vendor local-time       https://github.com/sharplispers/local-time   master
 } > lib/MANIFEST
 
 if find lib -type f -print0 | xargs -0 git check-ignore -q; then
