@@ -95,7 +95,8 @@
 (= newsdir*  (string arcdir* "news/")
    storydir* (string arcdir* "news/story/")
    profdir*  (string arcdir* "news/profile/")
-   votedir*  (string arcdir* "news/vote/"))
+   votedir*  (string arcdir* "news/vote/")
+   frontdir* (string arcdir* "news/front/"))
 
 (or= votes* (table) profs* (table))
 
@@ -106,7 +107,8 @@
   (serve port))
 
 (def load-news ()
-  (map ensure-dir (list arcdir* newsdir* storydir* votedir* profdir*))
+  (map0 ensure-dir (list arcdir* newsdir* storydir*
+                         votedir* profdir* frontdir*))
   (load-userinfo)
   (unless stories*
     (load-items)
