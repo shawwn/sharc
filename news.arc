@@ -1668,8 +1668,8 @@
           class (if (me) (string 'clicky (if (voted i) " nosee")))
           href  (vote-url i dir whence))
     (if (is dir 'up)
-        (out (tag (div class "votearrow"           title "upvote")))
-        (out (tag (div class "votearrow rotate180" title "downvote"))))))
+        (pr (com (tostring (tag (div class "votearrow"           title "upvote")))))
+        (pr (com (tostring (tag (div class "votearrow rotate180" title "downvote"))))))))
 
 ; hn.js reads id/how/auth/goto from the vote link's href.
 

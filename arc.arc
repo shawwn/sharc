@@ -1985,8 +1985,6 @@
 (mac defhook (name . rest)
   `(= (hooks* ',name) (fn ,@rest)))
   
-(mac out (expr) `(pr ,(tostring (eval expr))))
-
 ; if renamed this would be more natural for (map [_ user] pagefns*)
 
 (def get (index) [_ index])
