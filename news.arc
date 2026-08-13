@@ -858,7 +858,7 @@
       (tag (img src logo-url* width 18 height 18
                 style "border:1px #@(hexrep border-color*) solid; display:block;")))))
 
-(or= toplabels* '(nil "welcome" "new" "threads" "comments" "lists" "*"))
+(or= toplabels* '(nil "welcome" "new" "threads" "past" "comments" "lists" "*"))
 
 ; redefined later
 
@@ -869,6 +869,7 @@
     (if (noob) (toplink "welcome" welcome-url* label))
     (toplink "new" "newest" label)
     (if (me) (toplink "threads" (threads-url) label))
+    (toplink "past" "front" label)
     (toplink "comments" "newcomments" label)
     (toplink "lists" "lists" label)
     (hook 'toprow label)
