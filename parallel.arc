@@ -9,8 +9,7 @@
                                    (each x batch
                                      (done (f x))))
                            (push th threads)))
-                       (until (all dead-thread threads)
-                         (sleep 0))
+                       (map0 join-thread threads)
                        (noisy-flush noisy))
               (each th threads
                 (stop-thread th))))))))

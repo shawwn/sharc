@@ -114,11 +114,12 @@
       (rev! acc)
       (map1 f (cdr xs) (cons (f (car xs)) acc))))
 
-(def pair (xs (o f list))
-  (if (no xs)       nil
-      (no (cdr xs)) (cons (f (car xs)) nil)
-                    (cons (f (car xs) (cadr xs))
-                          (pair (cddr xs) f))))
+(def pair (xs (o f list) (o acc))
+  (if (no xs)       (rev! acc)
+      (no (cdr xs)) (rev! (cons (f (car xs)) acc))
+                    (pair (cddr xs) f
+                          (cons (f (car xs) (cadr xs))
+                                acc))))
 
 (mac and args
   (if (cdr args)
