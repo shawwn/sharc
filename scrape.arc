@@ -1112,7 +1112,7 @@
         (when u!about   (= p!about   u!about))))))
 
 
-(= scrape-hn* t scrape-delay* 0.5)
+(= scrape-hn* t scrape-delay* 0.001)
 
 ; The call-reporting here is not redundant with run-bgthread's, despite
 ; looking it: that one keeps the *thread* alive, this one keeps the
