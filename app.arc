@@ -968,7 +968,11 @@
   (local-time::today))
 
 (def parse-ymd (ymd)
-  (local-time::parse-timestring ymd))
+  (let xs (tokens ymd)
+    (case (len xs)
+      1 (local-time::parse-timestring ymd)
+      2 (local-time::parse-timestring (+ xs!0 "T" xs!1 ":00Z"))
+      3 (err "Don't know how to parse @ymd"))))
 
 (def format-ymd ((o ts (today)))
   (local-time::format-timestring
@@ -977,6 +981,11 @@
 (def format-mdy ((o ts (today)))
   (local-time::format-timestring
     nil ts :format '(:long-month " " :day ", " :year)))
+
+(def format-time ((o ts (local-time::now)))
+  (local-time::format-timestring
+    nil ts :format '(:year "-" (:month 2) "-" (:day 2) "T"
+                           (:hour 2) ":" (:min 2) ":" (:sec 2) "Z")))
 
 (def add-ymd (y m d (o ts (today)))
   (local-time::adjust-timestamp
