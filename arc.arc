@@ -243,7 +243,7 @@
 
 (def all (test seq (o same is))
   (~some (complement (testify test same)) seq))
-       
+
 (def mem (test seq (o same is))
   (let f (testify test same)
     (reclist f:car&idfn seq)))
@@ -350,7 +350,7 @@
 ;
 ;  0    *arc-mutex*      atomic
 ; 10    submit-lock*     submitting items
-; 11    vote-lock*       voting for items
+; 11    vote-locks*      voting for items
 ; 12    rank-lock*       ranked-stories*
 ; 20    maxid-lock*      incrementing maxid*
 ; 21    maxuid-lock*     incrementing maxuid*
@@ -361,9 +361,9 @@
 ; 30    scrape-lock*     last-fetch-time*
 ; 40    place-lock*      all setforms operations
 ; 5x    output locks     ero, srvlog, scrapelog
-; 51    srvlog
-; 52    scrapelog
-; 59    ero
+; 51    log-lock*        srvlog
+; 52    scrapelog-lock*  scrapelog
+; 59    ero-lock*        ero
 ; 99    table locks      implicit, leaf
 
 (def make-lock ((o priority 99) (o name nil))
