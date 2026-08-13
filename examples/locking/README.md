@@ -18,8 +18,13 @@ explicitly rather than executing the file directly.)
 They use threads and sleeps, so each takes a few seconds. `lost-updates.arc`
 takes the longest (60000 increments across two threads), and
 `phantom-keys.arc` allocates the most (it grows a table to 300000 keys).
-`insert-items-drop.arc` is the only one that loads `news.arc`, since it
-exercises the real `insert-items`.
+`insert-items-drop.arc` and `comment-import-convoy.arc` load `news.arc`,
+since they exercise the real `insert-items` and `put-item`.
+
+`lockdump.arc` is not a test. It is a read-only diagnostic to load from a
+repl attached to a wedged image: `(lockdump)` reports which locks are
+held, by whom, and who is waiting; `(bt <bgthread-id>)` backtraces one
+thread. Nothing in it acquires a lock.
 
 ## The lock hierarchy
 
@@ -44,6 +49,7 @@ order. Re-entering a lock already held is always allowed. See
 | `phantom-keys.arc` | `maphash` handing back a key that was never in the table, when a walk overlaps a rehash | **passes** (0 phantoms) |
 | `deadlock-place-then-atomic.arc` | `place-lock*` (40) then `*arc-mutex*` (0), because `placewiths` evaluates the value expression under the lock | **lock-order error** |
 | `atomic-interleaved.arc` | an `atomic` block torn by a bare `=`, since the two use different locks | **`*** INTERLEAVED ***`** |
+| `comment-import-convoy.arc` | `put-item` once per comment oversubscribes `rank-lock*`, blocking every other importer without any cycle | **`CONVOY REPRODUCED`** |
 
 There used to be a `deadlock-table-then-place.arc` here, holding a data
 table's own lock via `w/lock` and then assigning inside the body. It is
@@ -53,6 +59,22 @@ fails immediately with `Not a lock` and the scenario is unreachable.
 Passing a dedicated lock instead is fine and is the intended use: a lock
 at level 10 sits *above* `place-lock*` at 40, so assignments inside its
 body are ordered correctly.
+
+## `comment-import-convoy.arc`
+
+This one reproduces an **open** bug rather than guarding a fixed one, so
+it prints `CONVOY REPRODUCED` today and should stop once
+`import-scraped-comments` batches its inserts. It is also the only file
+here about a hazard that no assert can catch: there is no cycle, no
+lock-order violation, and SBCL's own `thread-deadlock` detection stays
+quiet, because nothing is deadlocked. The lock is simply oversubscribed,
+and permanent blocking on a queue that never drains is indistinguishable
+from a hang from outside.
+
+Worth noting when reading its output: the *holder* rotates between the
+three workers, while the other two are blocked in ~99% of samples. A
+single `lockdump` from a live image names whichever thread happened to
+hold the lock at that instant, which is not the thread to go fix.
 
 ## What "expected to fail" means here
 
