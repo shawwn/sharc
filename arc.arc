@@ -311,11 +311,11 @@
 
 (def firstn (n xs)
   (if (no n) xs
-    ((afn (n xs (o acc))
+    ((afn (n xs acc)
        (if (and (> n 0) xs)
            (self (- n 1) (cdr xs) (cons (car xs) acc))
-           (rev acc)))
-     n xs)))
+           (rev! acc)))
+     n xs nil)))
 
 (def nthcdr (n xs)
   (if (no n)  xs
@@ -325,11 +325,11 @@
 ; Generalization of pair: (tuples x) = (pair x)
 
 (def tuples (xs (o n 2))
-  ((afn (xs (o acc))
+  ((afn (xs acc)
      (if (no xs)
-         (rev acc)
+         (rev! acc)
          (self (nthcdr n xs) (cons (firstn n xs) acc))))
-   xs))
+   xs nil))
 
 ; If ok to do with =, why not with def?  But see if use it.
 
@@ -642,11 +642,11 @@
 (def rem (test seq (o same is))
   (let f (testify test same)
     (if (alist seq)
-        ((afn (s (o acc))
-           (if (no s)       (rev acc)
+        ((afn (s acc)
+           (if (no s)       (rev! acc)
                (f (car s))  (self (cdr s) acc)
                             (self (cdr s) (cons (car s) acc))))
-          seq)
+          seq nil)
         (coerce (rem test (as!cons seq) same) (type seq)))))
 
 ; Seems like keep doesn't need to testify-- would be better to
@@ -661,14 +661,14 @@
 ;  (rem nil (map f seq)))
 
 (def trues (f xs)
-  ((afn (xs (o acc))
+  ((afn (xs acc)
      (if (no xs)
-         (rev acc)
+         (rev! acc)
          (let fx (f (car xs))
            (if fx
                (self (cdr xs) (cons fx acc))
                (self (cdr xs) acc)))))
-   xs))
+   xs nil))
 
 (mac do1 args
   (w/uniq g
@@ -798,7 +798,7 @@
     (each f body
       (if (caris f 'def)
           (push (cadr f) names)))
-    `(with ,(mappend [list _ nil] (rev names))
+    `(with ,(mappend [list _ nil] (rev! names))
        ,@body)))
 
 (mac or= args
@@ -890,7 +890,7 @@
            (if (is ,gres ,eof)
                (= ,gdone t)
                (push ,gres ,gacc))))
-       (rev ,gacc))))
+       (rev! ,gacc))))
 
 ; For the common C idiom while x = snarfdata != stopval.
 ; Rename this if use it often.
@@ -1047,7 +1047,7 @@
   (let bs nil
     (whilet b (readb str nil)
       (push b bs))
-    (as!vector (rev bs))))
+    (as!vector (rev! bs))))
 
 (def filechars (name)
   (w/infile s name (allchars s)))
@@ -1094,7 +1094,7 @@
   (w/uniq ga
     `(let ,ga nil     
        (repeat ,n (push ,expr ,ga))
-       (rev ,ga))))
+       (rev! ,ga))))
 
 ; will freeze unless expr can generate n unique values
 
@@ -1724,7 +1724,7 @@
       (unless (h:key x)
         (push x acc)
         (set (h:key x))))
-    (rev acc)))
+    (rev! acc)))
 
 (def single (x) (and (acons x) (no (cdr x))))
 
@@ -1938,7 +1938,7 @@
 (def range (start end)
   ((afn (start (o acc))
      (if (> start end)
-         (rev acc)
+         (rev! acc)
          (self (inc start) (cons start acc))))
    start))
 
