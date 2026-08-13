@@ -757,11 +757,35 @@ Connection: close"))
 
 ; Background Threads
 
-(or= bgthreads* (table) pending-bgthreads* nil)
+(or= bgthreads* (table) pending-bgthreads* nil bgticks* (table))
+
+; Heartbeat, so a thread that is merely between passes can be told from
+; one wedged inside its body.  A live thread reports 'run while f is
+; executing and 'idle while sleeping, so the age of the tick reads as
+; either "stuck here this long" or "this long since the last pass".
+;
+; Written with sref rather than (= (bgticks* id) ...) deliberately:
+; assignment to a compound place goes through placewiths and takes
+; place-lock*, and a heartbeat that can block on a contended lock would
+; go silent exactly when it is the thing you need to read.  sref touches
+; only the table's own leaf lock.
+
+(def bgtick (id state runs)
+  (sref bgticks* (list state (seconds) runs) id))
 
 (def new-bgthread (id f sec)
   (aif (bgthreads* id) (stop-thread it))
-  (= (bgthreads* id) (start-thread {while t (sleep sec) (f)})))
+  (= (bgthreads* id) (start-thread {run-bgthread id f sec})))
+
+(def run-bgthread (id f sec)
+  (let runs 0
+    (bgtick id 'idle runs)
+    (while t
+      (sleep sec)
+      (bgtick id 'run runs)
+      (call-reporting f)
+      (= runs (+ runs 1))
+      (bgtick id 'idle runs))))
 
 (def start-bgthreads ()
   (map [apply new-bgthread _] pending-bgthreads*))
@@ -769,7 +793,8 @@ Connection: close"))
 (def stop-bgthreads ()
   (each id (keys bgthreads*)
     (stop-thread (bgthreads* id))
-    (wipe (bgthreads* id))))
+    (wipe (bgthreads* id))
+    (wipe (bgticks* id))))
 
 (def restart-bgthreads ()
   (stop-bgthreads)

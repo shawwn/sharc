@@ -875,7 +875,7 @@
       (or= i!front (seconds)))))
 
 
-(defbg scrape-frontlog 0 (call-reporting frontlog-loop))
+(defbg scrape-frontlog 0 (frontlog-loop))
 
 ; ----- Import scraped JSON into News -----
 ;
@@ -1113,6 +1113,14 @@
 
 
 (= scrape-hn* t scrape-delay* 0.5)
+
+; The call-reporting here is not redundant with run-bgthread's, despite
+; looking it: that one keeps the *thread* alive, this one keeps the
+; *pass* going.  Without it one bad id unwinds the whole each and
+; abandons every remaining story in the pass, which for
+; scrape-remaining-stories is (cut ids 90).  A reliably-throwing id (see
+; get-user-uid's assert) would then truncate at the same point every
+; time, and nothing after it would ever be scraped.
 
 (def scrape-hn-stories ((o ids (shuffle (fetch-topstories))))
   (each id ids
