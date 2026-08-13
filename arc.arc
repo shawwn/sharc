@@ -89,12 +89,30 @@
       nil
       (do (f (car xs)) (map0 f (cdr xs)))))
 
+(def rev (xs (o acc))
+  (if (no xs)
+      acc
+      (rev (cdr xs) (cons (car xs) acc))))
+
+; roughly 3x faster than rev
+
+(def rev! (xs (o self))
+  (assign self (fn (prev tail)
+                 (if (no tail)
+                     prev
+                     ((fn (next)
+                        (if (id next xs) (err "circular list"))
+                        (scdr tail prev)
+                        (self tail next))
+                      (cdr tail)))))
+  (self nil xs))
+
 ; Maybe later make this internal.  Useful to let xs be a fn?
 
-(def map1 (f xs)
+(def map1 (f xs (o acc))
   (if (no xs) 
-      nil
-      (cons (f (car xs)) (map1 f (cdr xs)))))
+      (rev! acc)
+      (map1 f (cdr xs) (cons (f (car xs)) acc))))
 
 (def pair (xs (o f list))
   (if (no xs)       nil
@@ -166,13 +184,6 @@
 (mac complement (f)
   (let g (uniq 'g)
     `(fn ,g (no (apply ,f ,g)))))
-
-(def rev (xs) 
-  ((afn (xs acc)
-     (if (no xs)
-         acc
-         (self (cdr xs) (cons (car xs) acc))))
-   xs nil))
 
 (def isnt (x y) (no (is x y)))
 
