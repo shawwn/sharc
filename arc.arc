@@ -296,12 +296,13 @@
           0))
       (no (cdr seqs)) 
        (map1 f (car seqs))
-      ((afn (seqs)
+      ((afn (seqs acc)
         (if (some no seqs)  
-            nil
-            (cons (apply f (map1 car seqs))
-                  (self (map1 cdr seqs)))))
-       seqs)))
+            (rev! acc)
+            (self (map1 cdr seqs)
+                  (cons (apply f (map1 car seqs))
+                        acc))))
+       seqs nil)))
 
 (def zip args (apply map list args))
 
