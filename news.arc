@@ -1630,7 +1630,7 @@
   (when (and (deleted i) (admin))
     (pr " [deleted] ")))
 
-(= downvote-threshold* 0 downvote-time* 1440)
+(= downvote-threshold* 0 downvote-time* (* 1 day*))
 
 (= votewid* 14)
       
@@ -1649,7 +1649,7 @@
          (do (votelink i whence 'up)
              (if (and downtoo
                       (or (admin)
-                          (< (item-age i) downvote-time*))
+                          (< (item-age i) (/ downvote-time* min*)))
                       (canvote i 'down t))
                  (votelink i whence 'down)
                  ; don't understand why needed, but is, or a new
@@ -1919,7 +1919,7 @@
   (only&avg (map [or (uvar _ avg) 1] 
                  (rem admin (dedup (map by (keep live (family i))))))))
 
-(= user-changetime* 120 editor-changetime* 1440)
+(= user-changetime* (* 2 hour*) editor-changetime* (* 1 day*))
 
 (or= everchange* (table) noedit* (table))
 
@@ -1927,7 +1927,7 @@
   (or (admin user)
       (and (~noedit* i!type)
            (editor user)
-           (< (item-age i) editor-changetime*))
+           (< (item-age i) (/ editor-changetime* min*)))
       (own-changeable-item i user)))
 
 (def own-changeable-item (i (t user me))
@@ -1935,7 +1935,7 @@
        (~mem 'locked i!keys)
        (~deleted i)
        (or (everchange* i!type)
-           (< (item-age i) user-changetime*))))
+           (< (item-age i) (/ user-changetime* min*)))))
 
 (def editlink (i)
   (when (canedit i)
@@ -2105,12 +2105,13 @@
              (err "Bad month number"))
       (tostring (pr M " " D ", " Y)))))
 
-(def text-age (a)
-  (tostring
-    (if (>= a 525600) (pr "on " (text-date:since (* a 60)))
-        (>= a 1440)   (pr (plural (trunc (/ a 1440)) "day")    " ago")
-        (>= a   60)   (pr (plural (trunc (/ a 60))   "hour")   " ago")
-                      (pr (plural (trunc a)          "minute") " ago"))))
+(def text-age (mins)
+  (let secs (* min* mins)
+    (tostring
+      (if (>= secs year*) (pr "on " (text-date:since secs))
+          (>= secs day*)  (pr (plural (trunc:/ secs day*)  "day")    " ago")
+          (>= secs hour*) (pr (plural (trunc:/ secs hour*) "hour")   " ago")
+                          (pr (plural (trunc:/ secs min*)  "minute") " ago")))))
 
 
 ; Voting
@@ -2318,17 +2319,17 @@
 
 (def recent-spam (site)
   (and (caris (banned-sites* site) 'ignore)
-       (recent-items [is (sitename _!url) site] 720)))
+       (recent-items [is (sitename _!url) site] (* 12 hour*))))
 
-(def recent-items (test minutes)
-  (let cutoff (- (seconds) (* 60 minutes))
+(def recent-items (test secs)
+  (let cutoff (- (seconds) secs)
     (latest-items test [< _!time cutoff])))
 
 ; Turn this on when spam becomes a problem.
 
 (= enforce-oversubmit* nil)
 
-; New user can't submit more than 2 stories in a 2 hour period.
+; New user can't submit more than 2 stories in a 3 hour period.
 ; Give overeager users the key toofast to make limit permanent.
 
 (def oversubmitting (kind (o url))
@@ -2337,7 +2338,7 @@
            (ignored)
            (< (user-age) new-age-threshold*)
            (< (karma) new-karma-threshold*))
-       (len> (recent-items [or (author _) (is _!ip (ip))] 180)
+       (len> (recent-items [or (author _) (is _!ip (ip))] (* 3 hour*))
              (if (is kind 'story)
                  (if (bad-user) 0 1)
                  (if (bad-user) 1 10)))))
@@ -2691,14 +2692,14 @@
 ; By default the ability to comment on an item is turned off after 
 ; 14 days, but this can be overriden with commentable key.
 
-(= commentable-threshold* (* 60 24 14))
+(= commentable-threshold* (* 14 day*))
 
 (def comments-active (i)
   ;(or (admin)
       (and (~announcement i)
            (live&commentable i)
            (live:superparent i)
-           (or (< (item-age i) commentable-threshold*)
+           (or (< (item-age i) (/ commentable-threshold* min*))
                (mem 'commentable i!keys))))
 
 
@@ -2845,7 +2846,7 @@
 ; Comment forms last for 30 min (- cache time)
 
 (def comment-form (parent whence (o text) (t user me))
-  (tarform 1800
+  (tarform (* 1/2 hour*)
            (when-umatch/r user
              (w/lock submit-lock*
                (process-comment parent arg!text whence)))
@@ -2995,7 +2996,7 @@
        (nor (admin) (editor) (author c))
        (~collapsed c) ; per-user state; don't bake into the shared cache
        ;(< (- maxid* c!id) cc-window*)
-       (> (since c!time) 60))) ; was 3600
+       (> (since c!time) (* 1 min*)))) ; was (* 1 hour*)
 
 (def cached-comment-body (c whence indent)
   (or (and (> (or (comment-cache-timeout* c!id) 0) (seconds))
@@ -3013,9 +3014,9 @@
 
 (def cc-timeout (t0)
   (let age (since t0)
-    (+ t0 (if (< age  3600) (cc-time age    60)
-              (< age 86400) (cc-time age  3600)
-                            (cc-time age 86400)))))
+    (+ t0 (if (< age hour*) (cc-time age min*)
+              (< age day*)  (cc-time age hour*)
+                            (cc-time age day*)))))
 
 (def cc-time (age secs) (* (+ (trunc:/ age secs) 1) secs))
 
@@ -3353,13 +3354,13 @@
          (text-age:user-age u))
   (spacerow 5))
 
-(defcache userlist 45
+(defcache userlist (* 45 sec*)
   (sort (compare > lookup-uid) (users)))
 
 
 (= update-avg-threshold* 0)  ; redefined later
 
-(defbg update-avg 45
+(defbg update-avg (* 45 sec*)
   (unless (or (empty profs*) (no stories*))
     (only&update-avg (update-avg-user))))
 
@@ -3393,7 +3394,7 @@
 
 (newsop active () (active-page))
 
-(newscache active-page () 600
+(newscache active-page () (* 10 min*)
   (listpage (msec) (actives) "active" "Active Threads"
             (pageurl "active") t
             [pageurl "active" (+ (curpage) 1)]))
@@ -3412,7 +3413,7 @@
 
 (newsop newcomments () (newcomments-page))
 
-(newscache newcomments-page () 60
+(newscache newcomments-page () (* 1 min*)
   (listpage (msec) (visible (firstn maxend* comments*))
             "comments" "New Comments"
             (pageurl "newcomments") nil
@@ -3445,12 +3446,12 @@ brackets&gt; and it should work.<br><br>")
       (let now (seconds)
         (unless (uvar user firstview)
           (reset-procrast user))
-        (or (when (< (/ (- now (uvar user firstview)) 60)
+        (or (when (< (/ (- now (uvar user firstview)) min*)
                      (uvar user maxvisit))
               (= (uvar user lastview) now)
               (save-prof user)
               t)
-            (when (> (/ (- now (uvar user lastview)) 60)
+            (when (> (/ (- now (uvar user lastview)) min*)
                      (uvar user minaway))
               (reset-procrast user)
               t)))))
@@ -3565,7 +3566,7 @@ brackets&gt; and it should work.<br><br>")
                   (userlink u nil)
                   (pr " "))))))))
 
-(defcache killedsites 300
+(defcache killedsites (* 5 min*)
   (let bads (table [each-loaded-item i
                      (awhen (and (dead i) (sitename i!url))
                        (push i (_ it)))])
@@ -3579,7 +3580,7 @@ brackets&gt; and it should work.<br><br>")
                     acc))))
       acc)))
 
-(defcache banned-site-items 300
+(defcache banned-site-items (* 5 min*)
   (table [each-loaded-item i
            (awhen (and (dead i) (check (sitename i!url) banned-sites*))
              (push i (_ it)))]))
@@ -3611,7 +3612,7 @@ brackets&gt; and it should work.<br><br>")
                   (userlink u nil) 
                   (pr " "))))))))
 
-(defcache badips 300
+(defcache badips (* 5 min*)
   (with (bads (table) goods (table))
     (each-loaded-item s
       (if (dead&commentable s)
@@ -3698,7 +3699,7 @@ brackets&gt; and it should work.<br><br>")
       (each c (topcolors)
         (tr (td (pr "#" c)) (tdcolor (hex>color c) (hspace 30)))))))
 
-(defcache topcolors 90
+(defcache topcolors (* 90 sec*)
   (dedup (map downcase (trues [uvar _ topcolor] (users)))))
 
 ; Forgot page
