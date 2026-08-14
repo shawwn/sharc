@@ -213,6 +213,35 @@
     `(let ,g ,x
        (or ,@(map1 (fn (c) `(is ,g ,c)) choices)))))
 
+(def accumulator ((o l))
+  (fn xs
+    (if (cdr xs) (assign l (cons xs l))
+        xs       (assign l (cons (car xs) l))
+                 l)))
+
+(mac accumulate (accfn . body)
+  `(let ,accfn (accumulator)
+     ,@body
+     (,accfn)))
+
+(mac accum (accfn . body)
+  `(rev! (accumulate ,accfn ,@body)))
+
+(mac point (name . body)
+  (w/uniq (k val)
+    `(ccc (fn (,k)
+            (let ,name (fn ((o ,val)) (,k ,val))
+              ,@body)))))
+
+(mac catch body
+  `(point throw ,@body))
+
+(mac w/break body
+  `(let out (accumulator)
+     (point break
+       ,@body
+       (rev! (out)))))
+
 (def iso args (apply is args)) ; kept for backwards compatibility
 
 (mac when (test . body)
@@ -552,45 +581,50 @@
 (mac = args
   (expand=list args))
 
-(mac loop (start test update . body)
-  (w/uniq (gfn gparm)
-    `(do ,start
-         ((rfn ,gfn (,gparm) 
-            (if ,gparm
-                (do ,@body ,update (,gfn ,test))))
-          ,test))))
+(mac loop (var init update test . body)
+  (w/uniq v
+    `(w/break
+       ((rfn ,v (,var)
+          (when ,test ,@body (,v ,update)))
+        ,init))))
 
-(mac for (v init max . body)
+(mac for (var init max . body)
   (w/uniq (gi gm)
-    `(with (,v nil ,gi ,init ,gm (+ ,max 1))
-       (loop (assign ,v ,gi) (< ,v ,gm) (assign ,v (+ ,v 1))
+    `(withs (,gi ,init ,gm (+ ,max 1))
+       (loop ,var ,gi (+ ,var 1) (< ,var ,gm)
          ,@body))))
 
-(mac down (v init min . body)
+(mac down (var init min . body)
   (w/uniq (gi gm)
-    `(with (,v nil ,gi ,init ,gm (- ,min 1))
-       (loop (assign ,v ,gi) (> ,v ,gm) (assign ,v (- ,v 1))
+    `(withs (,gi ,init ,gm (- ,min 1))
+       (loop ,var ,gi (- ,var 1) (> ,var ,gm)
          ,@body))))
 
 (mac repeat (n . body)
   `(for ,(uniq 'i) 1 ,n ,@body))
 
-; could bind index instead of gensym
+(mac forlen (var s . body)
+  `(for ,var 0 (edge ,s) ,@body))
+
+(mac on (var s . body)
+  (if (is var 'index)
+      (err "Can't use index as first arg to on.")
+      `(let index 0
+         (each ,var ,s
+           ,@body
+           (assign index (+ index 1))))))
 
 (mac each (var expr . body)
-  (w/uniq (gseq gf gv)
-    `(let ,gseq ,expr
-       (if (alist ,gseq)
-            ((rfn ,gf (,gv)
-               (when (acons ,gv)
-                 (let ,var (car ,gv) ,@body)
-                 (,gf (cdr ,gv))))
-             ,gseq)
-           (isa!table ,gseq)
-            (maptable (fn ,var ,@body)
-                      ,gseq)
-            (for ,gv 0 (edge ,gseq)
-              (let ,var (,gseq ,gv) ,@body))))))
+  `(w/break
+     (across ,expr (fn (,var) ,@body))))
+
+(def across (l f)
+  (if (alist l)
+       (map0 f l)
+      (isa!table l)
+       (maptable (fn args (f args)) l)
+       (forlen i l
+         (f (l i)))))
 
 (def mapv (f seq)
   (if (isa!table seq)
@@ -871,15 +905,6 @@
        (car args)
       `(let it ,(car args) (and it (aand ,@(cdr args))))))
 
-(mac accumulate (accfn . body)
-  (w/uniq gacc
-    `(withs (,gacc nil ,accfn [= ,gacc (cons _ ,gacc)])
-       ,@body
-       ,gacc)))
-
-(mac accum (accfn . body)
-  `(rev (accumulate ,accfn ,@body)))
-
 ; Repeatedly evaluates its body till it returns nil, then returns vals.
 
 (mac drain (expr (o eof nil))
@@ -1118,18 +1143,6 @@
 (def rand-string (n)
   (let c "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
     (as!string (rand-elts n c))))
-
-(mac forlen (var s . body)
-  `(for ,var 0 (edge ,s) ,@body))
-
-(mac on (var s . body)
-  (if (is var 'index)
-      (err "Can't use index as first arg to on.")
-      (w/uniq gs
-        `(let ,gs ,s
-           (forlen index ,gs
-             (let ,var (,gs index)
-               ,@body))))))
 
 (def best (f seq)
   (if (no seq)
@@ -1901,15 +1914,6 @@
   `(w/noisy-loop ,n
      (each ,var ,val
        ,@body)))
-
-(mac point (name . body)
-  (w/uniq (k val)
-    `(ccc (fn (,k)
-            (let ,name (fn ((o ,val)) (,k ,val))
-              ,@body)))))
-
-(mac catch body
-  `(point throw ,@body))
 
 (def downcase (x)
   (case (type x)
