@@ -434,12 +434,11 @@ Connection: close"))
 ; closed; in practice the quoted body plus op/user/args distinguish
 ; them.  If it ever bites, bail to a fresh gen-fnid instead.
 (def scopevals (scope)
-  (accum a
-    (each (id getx setx) scope
-      (let val (getx)
-        (unless (ignored-scopeids* id)
-          (when (valid-scopeval val)
-            (a (list id (scrub-scopeval val)))))))))
+  (each (id getx setx) scope
+    (let val (getx)
+      (unless (ignored-scopeids* id)
+        (when (valid-scopeval val)
+          (out id (scrub-scopeval val)))))))
 
 (mac scopekey (name . body)
   `(list ,name
