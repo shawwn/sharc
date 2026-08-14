@@ -524,7 +524,7 @@
 ; Votes divided by the age in hours to the gravityth power.
 ; Would be interesting to scale gravity in a slider.
 
-(= gravity* 1.8 timebase* 120 front-threshold* 1 
+(= gravity* 1.8 timebase* (* 2 hour*) front-threshold* 1
    nourl-factor* .4 lightweight-factor* .3)
 
 (def frontpage-rank (s (o scorefn realscore) (o gravity gravity*))
@@ -545,7 +545,8 @@
   (if (> score 0) (expt score .8) score))
 
 (def news-score-div (age (o gravity gravity*))
-  (expt (/ (+ age timebase*) 60) gravity))
+  (let secs (+ (* age min*) timebase*)
+    (expt (/ secs hour*) gravity)))
 
 (def frontpage-penalty (s)
   (if (~in s!type 'story 'poll) .5
