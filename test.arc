@@ -1337,6 +1337,38 @@ c"
     (test? 'b (case (f) 0 'a 1 'b 'c)))
   (test? 'b ((fn () (case 2 0 (do) 1 'a 2 'b)))))
 
+(define-test while
+  (let i 0
+    (while (< i 5)
+      (if (= i 3) (break) (++ i)))
+    (test? 3 i)
+    (while (< i 10)
+      (++ i))
+    (test? 10 i)
+    (let a (while (< i 15) (++ i))
+      (test? nil a)
+      (test? 15 i))
+    (let b
+        (while (< i 20)
+          (if (= i 19)
+              (break)
+            (++ i)))
+      (test? nil b)
+      (test? 19 i))))
+
+(define-test for
+  (let l ()
+    (for i 0 4
+      (push i l))
+    (test? '(0 1 2 3 4) (rev! l)))
+  (test? '(0 1) (let l () (for i 0 1 (push i l)) (rev! l)))
+  ;(with (n 0 l '(a b c d e))
+  ;  (for i 0 (edge l)
+  ;    (++ n i)
+  ;    (= l '(a b c)))
+  ;  (test? 3 n))
+  )
+
 (define-test or=
   ;; sets a global that's currently nil
   (= or=g1* nil)
