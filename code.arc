@@ -27,9 +27,8 @@
 (def common-tokens ((o files loaded-files*))
   (let counts (tokcount files)
     (sort (compare > cadr)
-          (accum a
-            (each (k v) counts
-              (unless (nonop k) (a (list k v))))))))
+          (each (k v) counts
+            (unless (nonop k) (out k v))))))
 
 (def nonop (x)
   (in x 'quote 'unquote 'quasiquote 'unquote-splicing))
@@ -44,10 +43,9 @@
 (def space-eaters ((o files loaded-files*))
   (let counts (tokcount files)
     (sort (compare > last)
-          (accum a
-            (each (k v) counts
-              (when (and (isa!sym k) (bound k))
-                (a (list k v (* (len (string k)) v)))))))))
+          (each (k v) counts
+            (when (and (isa!sym k) (bound k))
+              (out k v (* (len (string k)) v)))))))
 
 ;(top40:space-eaters)
 
