@@ -58,10 +58,9 @@
   ; parse a jar file into a list of cookies.  a missing file gives nil,
   ; matching `curl -b` with no jar rather than erroring.
   (when (file-exists file)
-    (accum a
-      (each line (lines (filechars file))
-        (whenlet c (parse-jar-line line)
-          (a c))))))
+    (each line (lines (filechars file))
+      (whenlet c (parse-jar-line line)
+        (out c)))))
 
 (def cookie-domain-match (c host)
   ; host-only cookies must match exactly; one carrying the
