@@ -73,7 +73,7 @@
 ; to handle it. also arrange to kill that thread if it
 ; has not completed in threadlife* seconds.
 
-(= threadlife* 60)
+(= threadlife* (* 1 min*))
 
 (or= requests* 0  requests/ip* (table)
      throttle-ips* (table)  ignore-ips* (table)  spurned* (table))
@@ -112,21 +112,24 @@
 ; To adjust this while running, adjust the req-window* time, not 
 ; req-limit*, because algorithm doesn't enforce decreases in the latter.
 
-(= req-limit* 30 req-window* 10 dos-window* 2)
+(= req-limit* 30 req-window* (* 10 sec*) dos-window* (* 2 sec*))
 
 (or= req-times* (table))
 
 (def abusive-ip (ip)
   (and (> (requests/ip* ip 0) 250)
        (isnt ip "127.0.0.1")
-       (let now (seconds)
-         (or= (req-times* ip) (queue))
-         (do1 (and (>= (qlen (req-times* ip))
-                       (if (throttle-ips* ip) 1 req-limit*))
-                   (let dt (- now (deq (req-times* ip)))
-                     (if (< dt dos-window*) (set (ignore-ips* ip)))
-                     (< dt req-window*)))
-              (enq now (req-times* ip))))))
+       (limit-ip ip)))
+
+(def limit-ip (ip)
+  (let now (seconds)
+    (or= (req-times* ip) (queue))
+    (do1 (and (>= (qlen (req-times* ip))
+                  (if (throttle-ips* ip) 1 req-limit*))
+              (let dt (- now (deq (req-times* ip)))
+                (if (< dt dos-window*) (set (ignore-ips* ip)))
+                (< dt req-window*)))
+         (enq now (req-times* ip)))))
 
 (def handle-request-thread (i o ip)
   (with (nls 0 lines nil line nil responded nil t0 (msec))
@@ -719,7 +722,7 @@ Connection: close"))
 (def logfile-name (type)
   (string logdir* type "-" (memodate)))
 
-(defcache memodate 60
+(defcache memodate (* 1 min*)
   (datestring))
 
 ; (defop || (pr "It's alive."))
