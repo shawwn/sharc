@@ -247,12 +247,15 @@
 (mac unless (test . body)
   `(if (no ,test) (do ,@body)))
 
-(mac while (test . body)
-  (w/uniq (gf gp)
+(mac whilet (var test . body)
+  (w/uniq gf
     `(w/break
-       ((rfn ,gf (,gp)
-          (when ,gp ,@body (,gf ,test)))
+       ((rfn ,gf (,var)
+          (when ,var ,@body (,gf ,test)))
         ,test))))
+
+(mac while (test . body)
+  `(whilet ,(uniq 'while) ,test ,@body))
 
 (def empty (seq) 
   (or (no seq) 
@@ -658,13 +661,6 @@
   (apply - (len xs) i n))
 
 (def almost (xs) (cut xs 0 (edge xs)))
-      
-(mac whilet (var test . body)
-  (w/uniq (gf gp)
-    `((rfn ,gf (,gp)
-        (let ,var ,gp
-          (when ,var ,@body (,gf ,test))))
-      ,test)))
 
 (def last (xs)
   (if (cdr xs)
