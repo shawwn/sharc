@@ -161,7 +161,7 @@
      (assign ,name (fn ,parms ,@body))))
 
 (mac afn (parms . body)
-  `(rfn self ,params ,@body))
+  `(rfn self ,parms ,@body))
 
 ; Ac expands x:y:z into (compose x y z), ~x into (complement x)
 
