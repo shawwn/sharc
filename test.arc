@@ -1471,7 +1471,7 @@ c"
   (= (the test-tl) 'main)
   (with (done (sb-thread::make-semaphore)
          child-saw nil)
-    (thread
+    (named-thread 'thread-local-isolation
       (= (the test-tl) 'child)
       (= child-saw (the test-tl))
       (sb-thread::signal-semaphore done))
