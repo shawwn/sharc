@@ -1587,7 +1587,7 @@
   (w/infile i file (temread tem i)))
 
 (def temloadall (tem file)
-  (map (fn (pairs) (templatize tem pairs))       
+  (map (fn (pairs) (templatize tem pairs))
        (w/infile in file (readall in))))
 
 (def serialize (x)
