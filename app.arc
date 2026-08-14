@@ -11,8 +11,6 @@
    cookfile*   (string arcdir* "cooks")
    uidfile*    (string arcdir* "uids"))
 
-(diskvar maxuid* (+ arcdir* "max-uid") 0)
-
 (def asv ((o port (readenv "PORT" 8080)))
   (load-userinfo)
   (serve port))
@@ -21,12 +19,41 @@
      cookie->user* (table) user->cookies* (table)
      uid->user*    (table) user->uid*     (table))
 
+(mac w/creating-users body
+  `(after (w/the creating-users t
+            ,@body)
+     (save-uids)
+     (save-pws)))
+
+(def creating-users () (the creating-users))
+
 (def load-userinfo ()
+  (load-admins)
   (load-uids)
   (load-pws)
   (load-cookies)
-  (load-admins)
   t)
+
+
+(def admin ((t u me)) (if (only&mem u admins*) u))
+
+(def load-admins ()
+  (= admins* (map string (readfile adminfile*))))
+
+(def save-admins ()
+  (w/lock (save-lock adminfile*)
+    (aand (apply string (intersperse #\newline admins*))
+          (dispfile it adminfile*))))
+
+; always reload admins on page refresh after modifying code.
+;
+; Ultimately have some way to reload non-arc files.
+
+(load-admins)
+
+
+(def users ((o test idfn))
+  (keys user->uid* test))
 
 (def load-uids ()
   (= user->uid* (load-table uidfile*))
@@ -49,54 +76,95 @@
 
 (or= maxuid-lock* (make-lock 21 "maxuid"))
 
+(def ensure-uid ((t u me))
+  (w/lock-or maxuid-lock*
+    (lookup-uid u)
+    (lets uid (new-user-id)
+      (link-uid u uid)
+      (save-uids))))
+
+(diskvar maxuid* (+ arcdir* "max-uid") 0)
+
 (def new-user-id ()
   (w/lock maxuid-lock*
     (lets uid (evtil (++ maxuid*) ~uid->user*)
       (todisk maxuid*))))
 
-(def ensure-uid ((t u me))
-  (or (lookup-uid u)
-      (w/lock maxuid-lock*
-        (or (lookup-uid u)
-            (lets uid (new-user-id)
-              (link-uid u uid)
-              (save-uids))))))
 
-(def users ((o test idfn))
-  (keys user->uid* test))
+(def acct-exists ((t u me)) (if (only&hpasswords* u) u))
 
 (def load-pws ()
   (= hpasswords* (load-table hpwfile*))
   (register-accts)
   t)
 
+(or= dc-usernames* (table))
+
 (def register-accts ()
   (= dc-usernames* (table [each (k v) hpasswords*
                             (set (_:downcase k))])))
 
-(def fake-username ()
-  (evtil (memorable-name) ~lookup-uid))
+(def register-acct (user)
+  (set (dc-usernames* (downcase user)))
+  user)
 
-(def fake-usernames (n)
-  (n-dedup n (fake-username)))
+(def username-conflicts (user)
+  (dc-usernames*:downcase user))
 
-(mac w/creating-users body
-  `(after (w/the creating-users t
-            ,@body)
-     (save-uids)
-     (save-pws)))
+(def save-pws ()
+  (unless (creating-users)
+    (save-table hpasswords* hpwfile*) t))
 
-(def creating-users () (the creating-users))
+(def create-acct (user pw)
+  (set-pw user pw)
+  user)
 
-(def create-users (n pw (o init))
-  (lets names (fake-usernames n)
-    (let hpw (bhash pw)
-      (w/creating-users
-        (noisy-each 1000 u names
-          (ensure-uid u)
-          (set-hpw u hpw)
-          (if init (unless (init u) (ero "Failed to init @u"))))))))
+(def set-pw (user pw)
+  (awhen (only&bhash pw)
+    (set-hpw user it)
+    user))
 
+(def set-hpw (user hpw)
+  (when hpw
+    (ensure-uid user)
+    (= (hpasswords* user) hpw)
+    (register-acct user)
+    (save-pws)
+    user))
+
+(def check-pw (user pw)
+  (aand (hpasswords* user) (bcheckpw pw it)))
+
+; bcrypt password hashing (cost 10, matching HN's $2b$10$ format).
+
+(def bhash (pw)
+  (bcrypt::hashpw pw 10))
+
+(def bcheckpw (pw hash)
+  (bcrypt::checkpw pw hash))
+
+; ----- per-IP account-creation tracking -----
+;
+; In-memory ip -> list of unix-second creation times.  Resets on
+; restart, which at worst grants one extra captcha-free signup window
+; per IP after a bounce; fine for an abuse speed bump.
+
+(or= acct-creations* (table))
+
+(def note-acct-creation ((t ip) (o t0 (seconds)))
+  ; record a creation and prune entries older than the look-back window.
+  (= (acct-creations* ip)
+     (cons t0 (keep [> _ (- t0 day*)]
+                    (acct-creations* ip)))))
+
+(def recent-acct-creations ((t ip) (o window day*))
+  (let now (seconds)
+    (len (keep [> _ (- now window)] (acct-creations* ip)))))
+
+
+; idea: a bidirectional table, so don't need two vars (and sets)
+
+(or= cookie->user* (table) user->cookies* (table) logins* (table))
 
 (def load-cookies ()
   (= cookie->user* (load-table cookfile*)
@@ -104,29 +172,7 @@
   (each (cookie user) cookie->user*
     (push cookie (user->cookies* user))))
 
-(def load-admins ()
-  (= admins* (map string (readfile adminfile*))))
-
-(def save-pws ()
-  (unless (creating-users)
-    (save-table hpasswords* hpwfile*) t))
-
 (def save-cookies () (save-table cookie->user* cookfile*) t)
-
-(def save-admins ()
-  (w/lock (save-lock adminfile*)
-    (aand (apply string (intersperse #\newline admins*))
-          (dispfile it adminfile*))))
-
-; always reload admins on page refresh after modifying code.
-;
-; Ultimately have some way to reload non-arc files.
-
-(load-admins)
-
-; idea: a bidirectional table, so don't need two vars (and sets)
-
-(or= cookie->user* (table) user->cookies* (table) logins* (table))
 
 (def user-from-cookie ((t req))
   (aand (alref req!cooks "user")
@@ -135,6 +181,43 @@
 (def get-user ((t req))
   (whenlets u (user-from-cookie req)
     (= (logins* u) (ip))))
+
+(def cook-user! (user)
+  (do1 (link-cookie user)
+       (save-cookies)))
+
+(def user-cookie (user)
+  (car:user->cookies* user))
+
+(def link-cookie (user (o cookie (new-user-cookie user)))
+  (w/place-lock
+    (= (cookie->user* cookie) user)
+    (push cookie (user->cookies* user)))
+  cookie)
+
+(def new-user-cookie (user)
+  (evtil (+ (assert user) "&" (rand-string 32)) ~cookie->user*))
+
+(def logout-user ((t user me))
+  (wipe (logins* user))
+  (w/place-lock
+    (each cookie (user->cookies* user)
+      (wipe (cookie->user* cookie)))
+    (wipe (user->cookies* user)))
+  (save-cookies))
+
+(def disable-acct (user)
+  (set-pw user (rand-string 20))
+  (logout-user user)
+  user)
+
+(def copy-account (old new)
+  (assert (acct-exists old))
+  (assert (~acct-exists new))
+  (logout-user old)
+  (logout-user new)
+  (set-hpw new (hpasswords* old))
+  new)
 
 ; (me)        --- read the current request's user
 ; (me other)  --- the current user, only if it equals other
@@ -155,13 +238,14 @@
 (mac w/me (val . body)
   `(w/the me ,val ,@body))
 
+(def fake-req ((o args) (t u me) (t ip))
+  (inst 'request 'args (pair (map string args))
+        'ip ip 'cooks (aif (user-cookie u) `(("user" ,it)))))
+
 (mac w/args (args . body)
   `(w/the req (fake-req ,args)
      ,@body))
 
-(def fake-req ((o args) (t u me))
-  (inst 'request 'args (pair (map string args))
-        'ip (ip) 'cooks (aand (car:user->cookies* u) `(("user" ,it)))))
 
 (mac when-umatch (user . body)
   `(if (me ,user)
@@ -209,10 +293,6 @@
       (admin-page)
       (login-page 'login nil {admin-gate})))
 
-(def admin ((t u me)) (and u (mem u admins*)))
-
-(def acct-exists ((t u me)) (and u (hpasswords* u) u))
-
 (def admin-page msg
   (let user (me)
     (whitepage
@@ -225,68 +305,13 @@
       (when msg (hspace 10) (map pr msg))
       (br2)
       (urform (with (u arg!acct p arg!pw)
-                (if (or (no u) (no p) (is u "") (is p ""))
+                (if (or (empty u) (empty p))
                      (flink {pr "Bad data."})
                     (acct-exists u)
                      (flink {admin-page "User already exists: " u})
                      (do (create-acct u p)
                          "admin")))
         (pwfields "create (server) account")))))
-
-(def cook-user (user)
-  (do1 (link-cookie user)
-       (save-cookies)))
-
-(def link-cookie (user (o cookie (new-user-cookie user)))
-  (w/place-lock
-    (= (cookie->user* cookie) user)
-    (push cookie (user->cookies* user)))
-  cookie)
-
-(def new-user-cookie (user)
-  (evtil (+ (assert user) "&" (rand-string 32)) ~cookie->user*))
-
-(def logout-user ((t user me))
-  (wipe (logins* user))
-  (w/place-lock
-    (each cookie (user->cookies* user)
-      (wipe (cookie->user* cookie)))
-    (wipe (user->cookies* user)))
-  (save-cookies))
-
-(def create-acct (user pw)
-  (set-pw user pw)
-  user)
-
-(def register-acct (user)
-  (set (dc-usernames* (downcase user)))
-  user)
-
-(def disable-acct (user)
-  (set-pw user (rand-string 20))
-  (logout-user user)
-  user)
-
-(def set-hpw (user hpw)
-  (when hpw
-    (ensure-uid user)
-    (= (hpasswords* user) hpw)
-    (register-acct user)
-    (save-pws)
-    user))
-  
-(def set-pw (user pw)
-  (awhen (and pw (bhash pw))
-    (set-hpw user it)
-    user))
-
-(def copy-account (old new)
-  (assert (acct-exists old))
-  (assert (~acct-exists new))
-  (logout-user old)
-  (logout-user new)
-  (set-hpw new (hpasswords* old))
-  new)
 
 (def hello-page ()
   (whitepage (prs "hello" (me) "at" (ip))))
@@ -425,7 +450,7 @@
          (failed-login 'register it afterward (recaptcha-required))
          (do (create-acct user pw)
              (note-acct-creation)
-             (login user (ip) (cook-user user) afterward)))))
+             (login user (ip) (cook-user! user) afterward)))))
 
 (def login (user ip cookie afterward)
   (prcookie cookie)
@@ -465,27 +490,11 @@
 (def good-login (user pw ip)
   (let record (list (seconds) ip user)
     (if (check-pw user pw)
-        (do (unless (car:user->cookies* user) (cook-user user))
+        (do (unless (user-cookie user) (cook-user! user))
             (enq-limit record good-logins*)
             user)
         (do (enq-limit record bad-logins*)
             nil))))
-
-(def check-pw (user pw)
-  (aand (hpasswords* user) (bcheckpw pw it)))
-
-; bcrypt password hashing (cost 10, matching HN's $2b$10$ format).
-
-(def bhash (pw)
-  (bcrypt::hashpw pw 10))
-
-(def bcheckpw (pw hash)
-  (bcrypt::checkpw pw hash))
-
-(or= dc-usernames* (table))
-
-(def username-conflicts (user)
-  (dc-usernames*:downcase user))
 
 (def bad-newacct (user pw)
   (if (and (recaptcha-required)
@@ -514,6 +523,21 @@
        (~find ~goodchar str)
        (or (no max) (<= (len str) max))
        str))
+
+(def fake-username ()
+  (evtil (memorable-name) ~lookup-uid))
+
+(def fake-usernames (n)
+  (n-dedup n (fake-username)))
+
+(def create-users (n pw (o init))
+  (lets names (fake-usernames n)
+    (let hpw (bhash pw)
+      (w/creating-users
+        (noisy-each 1000 u names
+          (ensure-uid u)
+          (set-hpw u hpw)
+          (if init (unless (init u) (ero "Failed to init @u"))))))))
 
 (defopr logout
   (when (and (me) (good-auth (me) "logout"))
@@ -738,9 +762,7 @@
                                     (pos #\* s (+ i 1)))))
                        (do (pr (if ital "</i>" "<i>"))
                            (= ital (no ital)))
-                      (and (no nolinks)
-                           (or (litmatch "http://" s i) 
-                               (litmatch "https://" s i)))
+                      (and (no nolinks) (urlmatch s i))
                        (withs (n   (urlend s i)
                                url (cut s i n))
                          (tag (a href url rel 'nofollow)
@@ -813,23 +835,25 @@
 
 (def closedelim (c) (in c #\> #\) #\] #\}))
 
+(def urlmatch (s i)
+  (or (litmatch "http://" s i)
+      (litmatch "https://" s i)))
 
-; Walks s and calls f with each http(s) url it finds, along with the
-; indices [start end) of that url within s.  Uses the same delimiter
-; rules as markdown's urlend, so it agrees with how links get rendered.
-
-(def eachurl-pos (s f)
-  (forlen i s
-    (when (or (litmatch "http://" s i)
-              (litmatch "https://" s i))
-      (let n (urlend s i)
-        (f (cut s i n) i n)
-        (= i (- n 1))))))
+(mac eachurl (var txt . body)
+  (w/uniq (s n i)
+    `(let ,s ,txt
+       (forlen ,i ,s
+         (when (urlmatch ,s ,i)
+           (withs (,n (urlend ,s ,i)
+                   ,var (cut ,s ,i ,n))
+             ,@body
+             (= ,i (- ,n 1))))))))
 
 ; Returns the list of urls in s, in order.
 
 (def urls (s)
-  (accum a (eachurl-pos s (fn (url i n) (a url)))))
+  (eachurl url s
+    (out url)))
 
 
 (def code-block (s i)

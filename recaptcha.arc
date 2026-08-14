@@ -30,25 +30,6 @@
   (let cfg (recaptcha-config)
     (and cfg!site-key cfg!secret cfg)))
 
-
-; ----- per-IP account-creation tracking -----
-;
-; In-memory ip -> list of unix-second creation times.  Resets on
-; restart, which at worst grants one extra captcha-free signup window
-; per IP after a bounce; fine for an abuse speed bump.
-
-(= recaptcha-day* 86400)
-
-(or= acct-creations* (table))
-
-(def note-acct-creation ((t ip) (o t (seconds)))
-  ; record a creation and prune entries older than the look-back window.
-  (= (acct-creations* ip)
-     (cons t (keep [> _ (- t recaptcha-day*)] (acct-creations* ip)))))
-
-(def recent-acct-creations ((t ip) (o now (seconds)))
-  (len (keep [> _ (- now recaptcha-day*)] (acct-creations* ip))))
-
 (def recaptcha-required ((t ip))
   ; true iff the feature is configured and this IP is at/over threshold.
   (whenlet cfg (recaptcha-keys)
