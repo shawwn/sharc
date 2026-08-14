@@ -1601,13 +1601,17 @@
       (temquote x)))
 
 
-(def number (n) (in (type n) 'int 'num))
+(= sec*  1)
+(= min*  (com (* 60 sec*)))
+(= hour* (com (* 60 min*)))
+(= day*  (com (* 24 hour*)))
+(= year* (com (* 365 day*)))
+
+(def minutes-since (t1) (/ (since t1) min*))
+(def hours-since (t1)   (/ (since t1) hour*))
+(def days-since (t1)    (/ (since t1) day*))
 
 (def since (t1) (- (seconds) t1))
-
-(def minutes-since (t1) (/ (since t1) 60))
-(def hours-since (t1)   (/ (since t1) 3600))
-(def days-since (t1)    (/ (since t1) 86400))
 
 (def cache (timef valf)
   (let store (table) ; args -> (list cached-value gentime)
@@ -1937,6 +1941,8 @@
     string    (as!num x)
     char      (as!int x)
     (err "Can't convert @x to number")))
+
+(def number (n) (in (type n) 'int 'num))
 
 (def inc (x (o n 1))
   (coerce (+ (asnum x) n) (type x)))
