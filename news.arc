@@ -43,8 +43,8 @@
   noprocrast nil
   firstview  nil
   lastview   nil
-  maxvisit   20 
-  minaway    180
+  maxvisit   (com (/ (* 20 min*) min*))
+  minaway    (com (/ (* 3 hour*) min*))
   topcolor   nil
   keys       nil
   hidden     nil   ; ids of items this user has hidden from their listings
