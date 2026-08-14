@@ -34,8 +34,8 @@
    scrape-fetchlog*  (string arcdir* "scrape/last-fetch.lisp")
    scrape-user-agent*
      "hnscraper (https://news.ycombinator.com/user?id=hnscraper; contact shawnpresser@@gmail.com)"
-   scrape-item-refetch-secs* (* 60 5)   ; skip items refetched within last five minutes
-   scrape-user-refetch-secs* (* 60 60)  ; skip users refetched within last hour
+   scrape-item-refetch-secs* (* 5 min*)   ; skip items refetched within last five minutes
+   scrape-user-refetch-secs* (* 1 hour*)  ; skip users refetched within last hour
    ; robots.txt advertises Crawl-delay: 30 for generic bots.  The
    ; hnscraper account has explicit owner authorization to run faster;
    ; the About page invites contact if it's too aggressive.  Keep this
@@ -371,17 +371,16 @@
   ; Split the html into per-item chunks once, then parse each in
   ; isolation.  Without this, posmatch's O(N) scans on the full 2MB
   ; html which turns this into N*M-quadratic.
-  (accum a
-    (with (positions nil start 0)
-      (whilet p (posmatch anchor html start)
-        (push p positions)
-        (= start (+ p (len anchor))))
-      (let ps (rev positions)
-        (forlen i ps
-          (withs (p (ps i)
-                  end   (or (errsafe:ps (+ i 1)) (len html))
-                  inner (cut html p end))
-            (a inner)))))))
+  (withs (start 0 positions nil)
+    (whilet p (posmatch anchor html start)
+      (push p positions)
+      (= start (+ p (len anchor))))
+    (let ps (rev! positions)
+      (forlen i ps
+        (withs (p     (ps i)
+                end   (or (errsafe:ps (+ i 1)) (len html))
+                inner (cut html p end))
+          (out inner))))))
 
 (def parse-listpage (html)
   (map parse-listitem (parse-split html)))
@@ -419,7 +418,7 @@
       (whilet p (posmatch anchor html start)
         (push p positions)
         (= start (+ p (len anchor))))
-      (let ps (rev positions)
+      (let ps (rev! positions)
         (forlen i ps
           (withs (p (ps i)
                   end (or (errsafe:ps (+ i 1)) (len html))
@@ -519,7 +518,7 @@
       (unless (new-ids c!id)
         (set c!deleted)
         (push c merged)))
-    (rev merged)))
+    (rev! merged)))
 
 
 ; ----- Item scrape orchestration -----
@@ -546,25 +545,25 @@
 (def scrape-item! (id (o force))
   (if (and (no force) (recently-fetched-item? id))
       (do (scrapelog "  skip " id " (fetched recently)")
-          (push-scraped-users:load-json (+ scrape-item-dir* id ".json")))
+          (push-scraped-users (scraped-item id)))
       (do
         (scrapelog "  item " id)
         (let html (fetch-hn-item id)
           (if (no html)
               (do (scrapelog "  FAILED to fetch " id) nil)
-              (push-scraped-users:scrape-html! id html))))))
+              (push-scraped-users (scrape-html! id html)))))))
 
 (def scrape-item-and-users! (id (o force))
-  (do1 (scrape-item! id force)
-       (let users (scraping-users)
-         (scrape-users! users)
-         (each u users (pop-user-to-fetch u)))))
+  (whenlets it (scrape-item! id force)
+    (let users (scraped-users it)
+      (scrape-users! users)
+      (each u users (pop-user-to-fetch u)))))
 
 (def scraped-users (tem)
-  (dedup (cons tem!story!by (map !by tem!comments))))
+  (rem nil (dedup (cons tem!story!by (map !by tem!comments)))))
 
 (def scrape-and-import! (id (o force))
-  (lets it (scrape-item! id force)
+  (whenlets it (scrape-item! id force)
     (let authors (scraped-users it)
       (scrape-users! authors)
       ; users first (so items have authors)
@@ -710,16 +709,24 @@
 ; ----- Top-level entry -----
 
 (def load-scrape ((o limit 60))
-  (map0 ensure-dir (list scrape-dir* scrape-item-dir* scrape-user-dir* scrape-lists-dir*))
+  (ensure-scrapedirs)
   (load-fetchlog)
   (scrapelog "crawl-delay: " scrape-crawl-delay* "s limit=" limit)
+  (scrapelog "logging in...")
   (ensure-login)
   ; deleted comments are assigned to user "deleted", so import
   ; "deleted" now.
+  (scrapelog "importing \"deleted\"...")
   (scrape-and-import-user! "deleted")
   ; load previously-scraped lists.
+  (scrapelog "loading @(len hn-list-names*) hn lists:")
   (load-hn-lists)
   t)
+
+(def ensure-scrapedirs ()
+  (map0 ensure-dir (list scrape-dir* scrape-item-dir*
+                         scrape-user-dir* scrape-lists-dir*))
+  (ensure-newsdirs))
 
 (def scrape-and-import-user! (u (o force))
   (scrape-user! u force)
@@ -783,20 +790,18 @@
   (withs (url op seen (if dedupe (memtable (map !id (hn-lists* (sym url))))))
     (accum a
       (w/noisy iter noisy
-        (catch
-          (repeat (or n-pages inf)
-            (if (no url)
-                (throw)
-                (whenlet html (fetch-hn-url url)
-                  (with (items (parse-listpage html) nseen 0)
-                    (each item items
-                      (if (and dedupe (seen item!id))
-                          (++ nseen)
-                          (a item)))
-                    (if (is nseen (len items))
-                        (throw)))
-                  (= url (parse-morelink html))))
-            (iter)))))))
+        (repeat (or n-pages inf)
+          (unless url (break))
+          (whenlet html (fetch-hn-url url)
+            (with (items (parse-listpage html) nseen 0)
+              (each item items
+                (if (and dedupe (seen item!id))
+                    (++ nseen)
+                    (a item)))
+              (when (is nseen (len items))
+                (break)))
+            (= url (parse-morelink html)))
+          (iter))))))
 
 (def scrape-hn-list (name (o n-pages nil))
   (let items (scrape-hn-itemlist (string name) n-pages)
@@ -840,7 +845,7 @@
   t)
 
 (def load-hn-lists ()
-  (each name hn-list-names*
+  (noisy-each 1 name hn-list-names*
     (= (hn-lists* name) (load-hn-list name))))
 
 ; ----- Frontpage ID log -----
@@ -921,19 +926,12 @@
   (scraped-files scrape-user-dir*))
 
 (def scraped-files (path)
-  (map trim-file-ext
-       (keep [endmatch ".json" _]
-             (files path))))
-
-
-(def trim-file-ext (x)
-  (aif (lastpos #\. x)
-       (cut x 0 it)
-       x))
+  (each file (files path)
+    (when (endmatch ".json" file)
+      (out (cut file 0 (edge file (com (len ".json"))))))))
        
 (def import-scrape! ()
-  (map ensure-dir (list scrape-dir* scrape-item-dir* scrape-user-dir*
-                        arcdir* newsdir* storydir* profdir* votedir*))
+  (ensure-scrapedirs)
   ; hpasswords*/admins*/cookie->user* are populated by load-userinfo,
   ; which normally only runs from (asv).  If the caller hasn't started
   ; the server yet we'd hit "Unbound variable: hpasswords*" when
@@ -949,7 +947,7 @@
     ; then items, walking front.json (page+rank order from the scrape)
     (each tem (import-scraped-items!)
       (push tem!story ranked))
-    (let stories (map item:!id (rev ranked))
+    (let stories (rev! (map item:!id ranked))
       (w/lock rank-lock*
         (= stories*        stories
            ranked-stories* stories)))
@@ -971,15 +969,17 @@
     (scrapelog "imported " (len ranked) " stories")))
 
 (def import-scraped-items! ((o ids (scraped-front-ids)))
-  (accum a
-    (each id ids
-      (only&a (import-scraped-item! id)))))
+  (each id ids
+    (only&out (import-scraped-item! id))))
 
 (def import-scraped-item! (id)
   (aif (scraped-item id)
        (when (and it!story it!story!by)
-         (import-scraped-story it!story)
-         (import-scraped-comments it!comments)
+         (let saves (table)
+           (import-scraped-story it!story saves)
+           (import-scraped-comments it!comments saves)
+           (each id (sort > (keys saves))
+             (only&save-item (item id))))
          it)))
 
 ;; news.arc's gen-topstories walks `(down id maxid* 1)` calling (item
@@ -997,7 +997,7 @@
   (assert (profile u) "No such profile for @u on @id")
   (assert (lookup-uid u) "No such uid for @u on @id"))
 
-(def import-scraped-story (s)
+(def import-scraped-story (s saves)
   (let it (story-from-scraped-story s)
     ; record the story under the author's submitted list (used by
     ; /submitted and /threads).
@@ -1005,7 +1005,7 @@
       (unless (mem it!id author!submitted)
         (push it!id author!submitted)
         (save-prof s!by)))
-    (save-item it)
+    (set (saves it!id))
     (put-item it stories*)
     (register-story it)
     it))
@@ -1021,43 +1021,43 @@
        it!url   s!url
        it!dead  s!dead
        it!deleted s!deleted
+       (mem 'dupe it!keys)     s!dupe
+       (mem 'flagged it!keys)  s!flagged
        (mem 'links it!keys)    (and (~blank it!text)
                                     (posmatch "<a href" it!text))
        (mem 'imported it!keys) t)
     (wipe it!kids)
     (scrape-ero:tablist it)))
 
-(def import-scraped-comments (comments)
-  (let items (accum a
-               (each c comments
-                 ; need call-reporting here for "no such profile" errs
-                 (whenlet it (call-reporting {import-scraped-comment c})
-                   (a it))))
+(def import-scraped-comments (comments saves)
+  (let items (each c comments
+               ; need call-reporting here for "no such profile" errs
+               (only&out (call-reporting {import-scraped-comment c saves})))
     (let seen (table)
       (each c comments* (set (seen c!id)))
       (whenlet new (rem [seen _!id] items)
         (w/lock rank-lock*
           (= comments* (merge-item-lists comments* new)))))))
 
-(def import-scraped-comment (c)
+(def import-scraped-comment (c saves)
   (lets it (comment-from-scraped-comment c)
     ; link this comment under its parent's kids list.  Without this
     ; an item page renders the story but no comments -- news.arc's
     ; display-subcomments walks parent!kids, not (keep [is _!parent
     ; parent-id] all-items).
-    (whenlet p (and c!parent (item c!parent))
+    (whenlet p (only&item c!parent)
       (unless (mem it!id p!kids)
         (++ p!kids (list it!id))
-        (save-item p)))
+        (set (saves p!id))))
     ; record this comment under the author's submitted list so
     ; news's (comments user) -- which walks (uvar user submitted) --
     ; picks it up for /threads?id=USER.
     (let user (or c!by "deleted")
       (whenlet author (profile user)
         (unless (mem it!id author!submitted)
-          (= author!submitted (cons it!id author!submitted))
+          (push it!id author!submitted)
           (save-prof user))))
-    (save-item it)
+    (set (saves it!id))
     (register-comment it (unmarkdown it!text))
     (wipe (comment-cache* it!id))))
 
