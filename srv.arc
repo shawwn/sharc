@@ -787,8 +787,13 @@ Connection: close"))
       (= runs (+ runs 1))
       (bgtick id 'idle runs))))
 
+(def bgthread-running (id)
+  (aif (bgthreads* id) (~dead-thread it)))
+
 (def start-bgthreads ()
-  (map [apply new-bgthread _] pending-bgthreads*))
+  (each (id f sec) pending-bgthreads*
+    (unless (bgthread-running id)
+      (new-bgthread id f sec))))
 
 (def stop-bgthreads ()
   (each id (keys bgthreads*)
