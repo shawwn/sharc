@@ -2089,14 +2089,17 @@
   `(w/the ,var (or ,val (the ,var))
      ,@body))
 
-(def start-thread (f)
-  (new-thread {after (f) (cleanup-thread)}))
+(def start-thread (f (o name "arc"))
+  (new-thread {after (f) (cleanup-thread)} name))
 
 (def cleanup-thread ((o th (current-thread)))
   (wipe (thread-locals* th)))
 
 (mac thread body
   `(start-thread {do ,@body}))
+
+(mac named-thread (name . body)
+  `(start-thread {do ,@body} ,name))
 
 (def stop-thread (th)
   (when th
