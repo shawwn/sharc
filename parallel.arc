@@ -1,16 +1,18 @@
-(def parallel (f seq (o n 50) (o noisy nil))
+(def parallel (f seq (o n 50) (o noisy nil) (o name "arc"))
   (if (is n 0)
       (map f seq)
-      (accum a
-        (withs (i 0 done [do (a _) (noisy-report (++ i) noisy)])
-          (let threads nil
-            (after (do (each batch (tuples seq n)
-                         (let th (thread
-                                   (each x batch
-                                     (done (f x))))
-                           (push th threads)))
-                       (map0 join-thread threads)
-                       (noisy-flush noisy))
-              (each th threads
-                (stop-thread th))))))))
-
+      (withs (batches (tuples seq n)
+              slots   (map [list nil] batches)
+              threads nil)
+        (after
+          (do (map (fn (i slot batch)
+                     (push (named-thread "@{name}-parallel-@{i}"
+                             (scar slot (accum a
+                                          (each x batch
+                                            (a (f x))))))
+                           threads))
+                   (range 1 (len slots)) slots batches)
+              (map0 join-thread threads)
+              (noisy-flush noisy))
+          (each th threads (stop-thread th)))
+        (apply + nil (map car slots)))))
