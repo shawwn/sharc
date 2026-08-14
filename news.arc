@@ -43,8 +43,8 @@
   noprocrast nil
   firstview  nil
   lastview   nil
-  maxvisit   (com (/ (* 20 min*) min*))
-  minaway    (com (/ (* 3 hour*) min*))
+  maxvisit   (/ (* 20 min*) min*)
+  minaway    (/ (* 3 hour*) min*)
   topcolor   nil
   keys       nil
   hidden     nil   ; ids of items this user has hidden from their listings
@@ -645,7 +645,7 @@
   (put-item s ranked-stories* (compare > (memo scorefn)))
   (set topstories-dirty*))
 
-(defbg topstories 30
+(defbg topstories (* 30 sec*)
   (when topstories-dirty*
     ; clear this first, so a change during the save re-dirties
     (wipe topstories-dirty*)
@@ -658,7 +658,7 @@
 ; thus get stuck in front of it. I avoid this by regularly adjusting 
 ; the rank of a random top story.
 
-;(defbg rerank-random 30 (rerank-random))
+;(defbg rerank-random (* 30 sec*) (rerank-random))
 
 (def rerank-random ()
   (when ranked-stories*
@@ -906,16 +906,16 @@
 (def login-url (whence)
   (string "login?goto=" (urlencode:safe-goto whence)))
 
-(= noob-days* 14) ; how long a user's name is colored green
+(= noob-time* (* 14 day*)) ; how long a user's name is colored green
 
 (def noob ((t u me) (t i story))
   (and u (if i
              (bynoob i u)
-             (< (days-since (uvar u created)) noob-days*))))
+             (< (since (uvar u created)) noob-time*))))
 
 (def bynoob (i (o u (by i)))
   (and u (< (- (user-age u) (item-age i))
-            (* 60 24 noob-days*))))
+            (/ noob-time* min*))))
 
 ; News-Specific Defop Variants
 
@@ -1300,7 +1300,7 @@
 
 (newsop best () (bestpage))
 
-(newscache bestpage () 1000
+(newscache bestpage () (* 1000 sec*)
   (listpage (msec) (beststories) "best" "Top Links"
             (pageurl "best") t
             [pageurl "best" (+ (curpage) 1)]))
@@ -1324,7 +1324,7 @@
 
 (newsop show () (showpage))
 
-(newscache showpage () 60
+(newscache showpage () (* 1 min*)
   (listpage (msec) (showstories) "show" "Show"
             (pageurl "show") t
             [pageurl "show" (+ (curpage) 1)]))
