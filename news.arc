@@ -3313,18 +3313,20 @@
 
 (newsop leaders () (leaderspage))
 
-(= nleaders* 20)
+(= nleaders* 100)
 
-(newscache leaderspage () 1000
+(newscache leaderspage () (* 1 min*)
   (longpage (msec) nil "leaders" "Leaders" "leaders"
     (sptab
       (let i 0
+        (tr (tdr) (td) (tdr "total") (if (admin) (tdr "avg")))
+        (spacerow 10)
         (each u (firstn nleaders* (leading-users))
           (tr (tdr:pr (++ i) ".")
               (td (userlink u nil))
               (tdr:pr (karma u))
               (when (admin)
-                (tdr:prt (only&num (uvar u avg) 2 t t))))
+                (tdr:prt (only&num (update-avg u) 2 t t))))
           (if (is i 10) (spacerow 30)))))))
 
 (= leader-threshold* 1)  ; redefined later
@@ -3365,8 +3367,8 @@
     (only&update-avg (update-avg-user))))
 
 (def update-avg (user)
-  (= (uvar user avg) (comment-score user))
-  (save-prof user))
+  (do1 (= (uvar user avg) (comment-score user))
+       (save-prof user)))
 
 (def update-avg-user ()
   (rand-user [and (only&> (car (uvar _ submitted)) 
@@ -3381,9 +3383,12 @@
 ; Also ignore the highest-scoring comment, since possibly a fluff outlier.
 
 (def comment-score (user)
-  (aif (check (nthcdr 5 (comments user 50)) [len> _ 10])
+  (aif (avg-comments user)
        (avg (cdr (sort > (map !score (rem deleted it)))))
        nil))
+
+(def avg-comments (user)
+  (check (nthcdr 5 (comments user 50)) [len> _ 10]))
 
 
 ; Comment Analysis
