@@ -14,8 +14,8 @@
 ; No cycle, no lock-order violation, no thread-deadlock from SBCL: the
 ; holder is *running*.  This is not a deadlock, it is oversubscription.
 ;
-; import-scraped-comments (scrape.arc) loops over every comment of a
-; story and calls (put-item it comments*) once per comment.  put-item is
+; import-scraped-comments (scrape.arc) used to loop over every comment of
+; a story and call (put-item it comments*) once per comment.  put-item is
 ;
 ;   (w/lock rank-lock* (= comments* (reinsert-sorted ...)))
 ;
@@ -33,13 +33,24 @@
 ; stories, which averaged 981 comments each: 29421 inserts = ~1800 s of
 ; rank-lock* per pass, on a 3 s schedule.
 ;
-; The fix is the batching the same handoff applied at boot: build the
-; new list outside, take the lock once per story, merge once.  This file
-; measures both so the ratio is visible rather than asserted.
+; The fix is the batching the same handoff applied at boot: build the new
+; list outside, take the lock once, merge once.  import-scraped-comments
+; does that now.  This file measures both shapes so the ratio is visible
+; rather than asserted.
 ;
-; Expected today: "CONVOY REPRODUCED", a batched/per-comment speedup of
-; ~100x or more, and the two non-holder threads observed blocked in the
-; large majority of samples.
+; It calls put-item directly rather than going through the importer, so
+; it does NOT track whether any particular call site has been fixed.  It
+; will keep reporting CONVOY REPRODUCED for as long as put-item costs
+; O(len list) inside rank-lock*, which is inherent to reinsert-sorted.
+; Read it the way atomic-interleaved.arc is meant to be read: a standing
+; demonstration of what per-element locking does to a shared sorted list,
+; worth re-running before anyone adds a new per-element put-item.  The
+; call sites to keep an eye on are the two in scrape.arc's
+; import-scraped-story and news.arc's adjust-rank.
+;
+; Expected: "CONVOY REPRODUCED", a batched/per-element speedup around
+; 80x, and the two non-holder threads blocked in the large majority of
+; samples.
 
 (load "news.arc")
 (load "examples/locking/lockdump.arc")
@@ -152,6 +163,6 @@
 (let speedup (/ per-comment-ms (max batched-ms 0.001))
   (prn "speedup: " speedup "x")
   (if (and (> speedup 20) (> blocked-samples* (/ total-samples* 2)))
-      (prn "CONVOY REPRODUCED: per-comment locking serializes every "
-           "importer, and threads are blocked in most samples.")
+      (prn "CONVOY REPRODUCED: per-element locking serializes every "
+           "writer, and threads are blocked in most samples.")
       (prn "not reproduced -- retune nseed*/nper* upward and re-run")))

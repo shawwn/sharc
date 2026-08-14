@@ -49,7 +49,7 @@ order. Re-entering a lock already held is always allowed. See
 | `phantom-keys.arc` | `maphash` handing back a key that was never in the table, when a walk overlaps a rehash | **passes** (0 phantoms) |
 | `deadlock-place-then-atomic.arc` | `place-lock*` (40) then `*arc-mutex*` (0), because `placewiths` evaluates the value expression under the lock | **lock-order error** |
 | `atomic-interleaved.arc` | an `atomic` block torn by a bare `=`, since the two use different locks | **`*** INTERLEAVED ***`** |
-| `comment-import-convoy.arc` | `put-item` once per comment oversubscribes `rank-lock*`, blocking every other importer without any cycle | **`CONVOY REPRODUCED`** |
+| `comment-import-convoy.arc` | `put-item` once per element oversubscribes `rank-lock*`, blocking every other writer without any cycle | **`CONVOY REPRODUCED`**, by design |
 
 There used to be a `deadlock-table-then-place.arc` here, holding a data
 table's own lock via `w/lock` and then assigning inside the body. It is
@@ -62,14 +62,23 @@ body are ordered correctly.
 
 ## `comment-import-convoy.arc`
 
-This one reproduces an **open** bug rather than guarding a fixed one, so
-it prints `CONVOY REPRODUCED` today and should stop once
-`import-scraped-comments` batches its inserts. It is also the only file
-here about a hazard that no assert can catch: there is no cycle, no
-lock-order violation, and SBCL's own `thread-deadlock` detection stays
-quiet, because nothing is deadlocked. The lock is simply oversubscribed,
-and permanent blocking on a queue that never drains is indistinguishable
-from a hang from outside.
+`CONVOY REPRODUCED` is this file's **permanent** verdict, not a failure
+to fix something. It calls `put-item` directly rather than going through
+any importer, so it measures the shape rather than guarding a call site,
+and it will keep reporting the convoy for as long as `put-item` costs
+O(len list) inside `rank-lock*` — which is inherent to `reinsert-sorted`.
+Treat it like `atomic-interleaved.arc`: a standing demonstration, worth
+re-running before adding a new per-element `put-item`.
+
+The call site that prompted it, `import-scraped-comments`, now batches:
+one lock acquisition and one `merge-item-lists` per story instead of one
+per comment.
+
+It is also the only file here about a hazard that no assert can catch:
+there is no cycle, no lock-order violation, and SBCL's own
+`thread-deadlock` detection stays quiet, because nothing is deadlocked.
+The lock is simply oversubscribed, and permanent blocking on a queue that
+never drains is indistinguishable from a hang from outside.
 
 Worth noting when reading its output: the *holder* rotates between the
 three workers, while the other two are blocked in ~99% of samples. A
