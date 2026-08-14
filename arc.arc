@@ -156,15 +156,12 @@
      ,@body
      ,var))
 
-; Need rfn for use in macro expansions.
-
 (mac rfn (name parms . body)
   `(let ,name nil
      (assign ,name (fn ,parms ,@body))))
 
 (mac afn (parms . body)
-  `(let self nil
-     (assign self (fn ,parms ,@body))))
+  `(rfn self ,params ,@body))
 
 ; Ac expands x:y:z into (compose x y z), ~x into (complement x)
 
