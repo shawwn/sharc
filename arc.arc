@@ -249,9 +249,10 @@
 
 (mac while (test . body)
   (w/uniq (gf gp)
-    `((rfn ,gf (,gp)
-        (when ,gp ,@body (,gf ,test)))
-      ,test)))
+    `(w/break
+       ((rfn ,gf (,gp)
+          (when ,gp ,@body (,gf ,test)))
+        ,test))))
 
 (def empty (seq) 
   (or (no seq) 
