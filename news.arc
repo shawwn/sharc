@@ -482,11 +482,13 @@
 (def deleted (i)      i!deleted)
 (def announcement (i) (mem 'announce i!keys))
 (def imported (i)     (mem 'imported i!keys))
+(def dupe (i)         (mem 'dupe i!keys))
 
 (defplace dead         (fn (i) `(,i 'dead)))
 (defplace deleted      (fn (i) `(,i 'deleted)))
 (defplace announcement (fn (i) `(mem 'announce (,i 'keys))))
 (defplace imported     (fn (i) `(mem 'imported (,i 'keys))))
+(defplace dupe         (fn (i) `(mem 'dupe (,i 'keys))))
 
 (def live (i) (no (dead|deleted i)))
 
