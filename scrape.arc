@@ -1028,8 +1028,16 @@
     (scrape-ero:tablist it)))
 
 (def import-scraped-comments (comments)
-  (each c comments
-    (import-scraped-comment c)))
+  (let items (accum a
+               (each c comments
+                 ; need call-reporting here for "no such profile" errs
+                 (whenlet it (call-reporting {import-scraped-comment c})
+                   (a it))))
+    (let seen (table)
+      (each c comments* (set (seen c!id)))
+      (whenlet new (rem [seen _!id] items)
+        (w/lock rank-lock*
+          (= comments* (merge-item-lists comments* new)))))))
 
 (def import-scraped-comment (c)
   (lets it (comment-from-scraped-comment c)
@@ -1050,7 +1058,6 @@
           (= author!submitted (cons it!id author!submitted))
           (save-prof user))))
     (save-item it)
-    (put-item it comments*)
     (register-comment it (unmarkdown it!text))
     (wipe (comment-cache* it!id))))
 
