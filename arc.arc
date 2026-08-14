@@ -496,6 +496,11 @@
        (when ,expr
          ,@body))))
 
+(mac w/lock-or (lock expr . body)
+  `(or ,expr
+       (w/lock ,lock
+         (or ,expr ,@body))))
+
 ; setforms returns (vars get set) for a place based on car of an expr
 ;  vars is a list of gensyms alternating with expressions whose vals they
 ;   should be bound to, suitable for use as first arg to withs
