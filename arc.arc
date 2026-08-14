@@ -214,7 +214,8 @@
   (fn xs
     (if (cdr xs) (assign l (cons xs l))
         xs       (assign l (cons (car xs) l))
-                 l)))
+                 (lets r l
+                   (assign l nil)))))
 
 (mac accumulate (accfn . body)
   `(let ,accfn (accumulator)
