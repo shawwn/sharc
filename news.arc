@@ -107,17 +107,21 @@
   (serve port))
 
 (def load-news ()
-  (map0 ensure-dir (list arcdir* newsdir* storydir*
-                         votedir* profdir* frontdir*))
+  (ensure-newsdirs)
   (load-userinfo)
   (unless stories*
+    (load-item-buckets)
     (load-items)
     (ensure-topstories))
   (if (and initload-users* (empty profs*)) (load-users)))
 
-(def load-users ()
-  (pr "load users: ")
-  (noisy-each 1000 u (users)
+(def ensure-newsdirs ()
+  (map0 ensure-dir (list arcdir* newsdir* storydir*
+                         votedir* profdir* frontdir*)))
+
+(def load-users ((o names (users)))
+  (pr "load @(len names) users: ")
+  (noisy-each 1000 u names
     (profile u)))
 
 
@@ -320,12 +324,13 @@
 
 (def load-items ((o n initload*))
   (system:list "rm" "-f" (string storydir* "*/*.tmp"))
-  (let buckets (item-buckets)
-    (pr "load @(len buckets) item buckets: ")
-    (noisy-each 1 bucket buckets
-      (or= (item-ids* bucket) (item-ids bucket))))
   (pr "load items: ")
   (latest-items idfn nil n 100))
+
+(def load-item-buckets ((o buckets (item-buckets)))
+  (pr "load @(len buckets) item buckets: ")
+  (noisy-each 1 bucket buckets
+    (or= (item-ids* bucket) (item-ids bucket))))
 
 (def merge-item-lists (xs ys . zs)
   (if zs
