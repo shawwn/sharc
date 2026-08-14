@@ -63,14 +63,13 @@
 
 (def urldecode (s)
   (bytes->utf8
-    (accum a
-      (forlen i s
-        (caselet c (s i)
-          #\+ (a 32)                             ; space
-          #\% (do (when (> (edge s i) 2)
-                    (a (int (cut s (+ i 1) (+ i 3)) 16)))
-                  (++ i 2))
-          (a (int c)))))))                       ; literal byte
+    (forlen i s
+      (caselet c (s i)
+        #\+ (out 32)                           ; space
+        #\% (do (when (> (edge s i) 2)
+                  (out (dehex (cut s (+ i 1) (+ i 3)))))
+                (++ i 2))
+        (out (int c))))))                      ; literal byte
 
 (def bytes->utf8 (cs)
   (utf8-decode (as!vector cs)))
