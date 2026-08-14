@@ -1340,7 +1340,7 @@ c"
 (define-test while
   (let i 0
     (while (< i 5)
-      (if (= i 3) (break) (++ i)))
+      (if (is i 3) (break) (++ i)))
     (test? 3 i)
     (while (< i 10)
       (++ i))
@@ -1350,11 +1350,22 @@ c"
       (test? 15 i))
     (let b
         (while (< i 20)
-          (if (= i 19)
+          (if (is i 19)
               (break)
             (++ i)))
       (test? nil b)
-      (test? 19 i))))
+      (test? 19 i))
+    (test? '(19 20 21)
+           (while (< i 25)
+             (if (is i 22) (break))
+             (out i)
+             (++ i)))
+    (test? i 22)
+    (test? 24 (while (< i 25)
+                (if (is i 24) (break i))
+                (out i)
+                (++ i)))
+    (test? i 24)))
 
 (define-test for
   (let l ()

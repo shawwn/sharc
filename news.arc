@@ -3257,7 +3257,7 @@
         (keep acomment&~deleted (ancestors c))))
 
 (def ancestors (i)
-  (accum a (trav i!parent a:item self:!parent:item)))
+  (trav i!parent out:item self:!parent:item))
 
 
 ; Submitted

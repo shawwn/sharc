@@ -72,6 +72,13 @@
 (def cons args
   (reduce join args))
 
+(def snoc args
+  (+ (car args) (cdr args)))
+
+(def consif (x y) (if x (cons x y) y))
+
+(def snocif (x y) (if y (snoc x y) x))
+
 (def list args args)
 
 (def copylist (x) (apply list x))
@@ -210,6 +217,12 @@
     `(let ,g ,x
        (or ,@(map1 (fn (c) `(is ,g ,c)) choices)))))
 
+(mac when (test . body)
+  `(if ,test (do ,@body)))
+
+(mac unless (test . body)
+  `(if (no ,test) (do ,@body)))
+
 (def accumulator ((o l))
   (fn xs
     (if (cdr xs) (assign l (cons xs l))
@@ -225,28 +238,76 @@
 (mac accum (accfn . body)
   `(rev! (accumulate ,accfn ,@body)))
 
-(mac point (name . body)
+(mac point-default (name default . body)
   (w/uniq (k val)
     `(ccc (fn (,k)
-            (let ,name (fn ((o ,val)) (,k ,val))
-              ,@body)))))
+            (let ,name (fn ((o ,val ,default)) (,k ,val))
+              ,@(snocif body default))))))
+
+(mac point (name . body)
+  `(point-default ,name nil ,@body))
 
 (mac catch body
   `(point throw ,@body))
 
 (mac w/break body
   `(let out (accumulator)
-     (point break
-       ,@body
-       (rev! (out)))))
+     (point-default break (rev! (out))
+       ,@body)))
+
+(mac loop (var init update test . body)
+  (w/uniq v
+    `(w/break
+       ((rfn ,v (,var)
+          (when ,test ,@body (,v ,update)))
+        ,init))))
+
+(mac for (var init max . body)
+  (w/uniq (gi gm)
+    `(withs (,gi ,init ,gm (+ ,max 1))
+       (loop ,var ,gi (+ ,var 1) (< ,var ,gm)
+         ,@body))))
+
+(mac down (var init min . body)
+  (w/uniq (gi gm)
+    `(withs (,gi ,init ,gm (- ,min 1))
+       (loop ,var ,gi (- ,var 1) (> ,var ,gm)
+         ,@body))))
+
+(mac repeat (n . body)
+  `(for ,(uniq 'i) 1 ,n ,@body))
+
+(mac forlen (var s . body)
+  `(for ,var 0 (edge ,s) ,@body))
+
+(mac on (var s . body)
+  (if (is var 'index)
+      (err "Can't use index as first arg to on.")
+      `(let index 0
+         (each ,var ,s
+           ,@body
+           (assign index (+ index 1))))))
+
+(mac each (var expr . body)
+  `(w/break
+     (across ,expr (fn (,var) ,@body))))
+
+(def across (l f)
+  (if (alist l)
+       (map0 f l)
+      (isa!table l)
+       (maptable (fn args (f args)) l)
+       (forlen i l
+         (f (l i)))))
+
+(def mapv (f seq)
+  (if (isa!table seq)
+      (lets h (table)
+        (each (k v) seq
+          (sref h (f v) k)))
+      (map f seq)))
 
 (def iso args (apply is args)) ; kept for backwards compatibility
-
-(mac when (test . body)
-  `(if ,test (do ,@body)))
-
-(mac unless (test . body)
-  `(if (no ,test) (do ,@body)))
 
 (mac whilet (var test . body)
   (w/uniq gf
@@ -583,58 +644,6 @@
 (mac = args
   (expand=list args))
 
-(mac loop (var init update test . body)
-  (w/uniq v
-    `(w/break
-       ((rfn ,v (,var)
-          (when ,test ,@body (,v ,update)))
-        ,init))))
-
-(mac for (var init max . body)
-  (w/uniq (gi gm)
-    `(withs (,gi ,init ,gm (+ ,max 1))
-       (loop ,var ,gi (+ ,var 1) (< ,var ,gm)
-         ,@body))))
-
-(mac down (var init min . body)
-  (w/uniq (gi gm)
-    `(withs (,gi ,init ,gm (- ,min 1))
-       (loop ,var ,gi (- ,var 1) (> ,var ,gm)
-         ,@body))))
-
-(mac repeat (n . body)
-  `(for ,(uniq 'i) 1 ,n ,@body))
-
-(mac forlen (var s . body)
-  `(for ,var 0 (edge ,s) ,@body))
-
-(mac on (var s . body)
-  (if (is var 'index)
-      (err "Can't use index as first arg to on.")
-      `(let index 0
-         (each ,var ,s
-           ,@body
-           (assign index (+ index 1))))))
-
-(mac each (var expr . body)
-  `(w/break
-     (across ,expr (fn (,var) ,@body))))
-
-(def across (l f)
-  (if (alist l)
-       (map0 f l)
-      (isa!table l)
-       (maptable (fn args (f args)) l)
-       (forlen i l
-         (f (l i)))))
-
-(def mapv (f seq)
-  (if (isa!table seq)
-      (lets h (table)
-        (each (k v) seq
-          (= (h k) (f v))))
-      (map f seq)))
-
 (def clamp (n lo hi)
   (if (< n lo) lo
       (> n hi) hi
@@ -934,8 +943,6 @@
 ;        (if (isa!mac op)
 ;            (apply (rep op) (cdr e))
 ;            e))))
-
-(def consif (x y) (if x (cons x y) y))
 
 (def string args
   (if (~cdr args)
@@ -1971,10 +1978,11 @@
 
 (mac trav (x . fs)
   (w/uniq g
-    `((afn (,g)
-        (when ,g
-          ,@(map [list _ g] fs)))
-      ,x)))
+    `(w/break
+       ((afn (,g)
+          (when ,g
+            ,@(map [list _ g] fs)))
+        ,x))))
 
 (or= hooks* (table))
 
