@@ -1468,7 +1468,7 @@ straight to gcell-ref; this remains for callers holding only a symbol."
 ;;;; Threading  (sb-thread)
 ;;;; ============================================================
 
-(xdef new-thread (f)
+(xdef new-thread (f &optional (name "arc"))
   (sb-thread:make-thread
    (lambda ()
      ;; handler-bind (not handler-case) so arc-report-error runs before
@@ -1479,7 +1479,7 @@ straight to gcell-ref; this remains for callers holding only a symbol."
                                (arc-report-error c *error-output*)
                                (return-from done nil))))
          (arc-call0 f))))
-   :name "arc"))
+   :name (if (symbolp name) (symbol-name name) name)))
 
 (xdef kill-thread (th) (sb-thread:terminate-thread th) nil)
 
