@@ -350,10 +350,8 @@
   (item-ids* bucket))
 
 (mac each-item-id (var . body)
-  (w/uniq (bucket id)
-    `(each ,bucket (item-buckets)
-       (each ,var (cached-item-ids ,bucket)
-         ,@body))))
+  `(each ,var (all-item-ids)
+     ,@body))
 
 (mac each-item (var . body)
   (w/uniq id
@@ -509,7 +507,7 @@
          ,@body))))
 
 (def loaded-items (test)
-  (accum a (each-loaded-item i (test&a i))))
+  (each-loaded-item i (test&out i)))
 
 (def newslog args (apply srvlog 'news (ip) (or (me) "()") args))
 
@@ -597,16 +595,15 @@
   (rank-items n consider scorefn acomment&test))
 
 (def latest-items (test (o stop) (o n) (o noisy))
-  (accum a
-    (w/noisy iter noisy
-      (catch
-        (each-item i
-          (if (or (and stop (stop i)) (and n (<= n 0)))
-              (throw))
-          (when (test i)
-            (a i)
-            (if n (-- n))
-            (iter)))))))
+  (w/noisy iter noisy
+    (each-item i
+      (if (or (and stop (stop i))
+              (and n (<= n 0)))
+          (break))
+      (when (test i)
+        (out i)
+        (if n (-- n))
+        (iter)))))
 
 (def insert-items (xs)
   (let items (items-by-type xs)
@@ -1258,8 +1255,7 @@
          (string whence sep "p=" (urlencode:string p))
         next
          (string whence sep "next=" (urlencode:string next)
-                 (when n
-                   (string "&n=" (urlencode:string n))))
+                 (if n (string "&n=" (urlencode:string n))))
          whence)))
 
 ; Returns (start end numstart items): start/end are the index window into
@@ -3802,10 +3798,9 @@ brackets&gt; and it should work.<br><br>")
       (add-ymd 0 0 -1 (today))))
 
 (def difference (xs ys)
-  (accum a
-    (each x xs
-      (unless (mem x ys)
-        (a x)))))
+  (each x xs
+    (unless (mem x ys)
+      (out x))))
 
 (def prior-day (ymd)
   (format-ymd (add-ymd 0 0 -1 (parse-ymd ymd))))
