@@ -41,7 +41,7 @@
 
 (def start-serve (port)
   (start-bgthreads)
-  (= serve-thread* (thread (handle-serve port))))
+  (= serve-thread* (start-thread {handle-serve port} "serve")))
 
 (def restart-serve (port)
   (stop-serve)
@@ -92,11 +92,11 @@
         (do (++ requests*)
             (++ (requests/ip* ip 0))
             (with (th1 nil th2 nil)
-              (= th1 (thread
+              (= th1 (named-thread "handle-request-thread @ip"
                        (after (handle-request-thread i o ip)
                          (close i o)
                          (stop-thread th2))))
-              (= th2 (thread
+              (= th2 (named-thread "watchdog-request-thread @ip"
                        (sleep threadlife*)
                        (unless (dead-thread th1)
                          (prn "srv thread took too long for " ip))
@@ -775,7 +775,7 @@ Connection: close"))
 
 (def new-bgthread (id f sec)
   (aif (bgthreads* id) (stop-thread it))
-  (= (bgthreads* id) (start-thread {run-bgthread id f sec})))
+  (= (bgthreads* id) (start-thread {run-bgthread id f sec} id)))
 
 (def run-bgthread (id f sec)
   (let runs 0
