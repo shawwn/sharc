@@ -3809,9 +3809,10 @@ brackets&gt; and it should work.<br><br>")
       (add-ymd 0 0 -1 (today))))
 
 (def difference (xs ys)
-  (each x xs
-    (unless (mem x ys)
-      (out x))))
+  (let in-ys (memtable ys)
+    (each x xs
+      (unless (in-ys x)
+        (out x)))))
 
 (def prior-day (ymd)
   (format-ymd (add-ymd 0 0 -1 (parse-ymd ymd))))
