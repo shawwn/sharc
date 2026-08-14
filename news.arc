@@ -1623,6 +1623,8 @@
 (def deadmark (i)
   (when (flagged i)
     (pr " [flagged] "))
+  (when (dupe i)
+    (pr " [dupe] "))
   (when (and (dead i) (seesdead))
     (pr " [dead] "))
   (when (and (deleted i) (admin))
