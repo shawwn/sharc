@@ -121,6 +121,20 @@ errors out clearly rather than polluting (often locked) CL packages."
     (or (find-symbol sym-name pkg)
         (error "No symbol named ~A in package ~A (~A)" sym-name pkg-name str))))
 
+;; Copied once at load time rather than per token. copy-readtable
+;; allocates and zeroes a 256-entry macro-character table plus the
+;; dispatch tables, which dominated reading large files when it ran on
+;; every token.
+(defvar *arc-token-readtable* (copy-readtable nil))
+
+(defun arc-numeric-token-p (str)
+  "Cheap prefilter: only a digit, sign or dot can begin a number token.
+   Lets the reader be skipped entirely for the symbols that make up
+   the bulk of any file."
+  (let ((c (char str 0)))
+    (or (digit-char-p c)
+        (and (member c '(#\+ #\- #\.)) (> (length str) 1)))))
+
 (defun arc-intern-token (str)
   "Convert a raw token string to a CL value."
   (cond
@@ -132,12 +146,13 @@ errors out clearly rather than polluting (often locked) CL packages."
     ((string= str "t")   (arc-sym 't))
     (t
      ;; Try number first
-     (let ((n (ignore-errors
-                (with-standard-io-syntax
-                  (let ((*read-eval* nil)
-                        (*readtable* (copy-readtable nil)))
-                    (let ((v (read-from-string str)))
-                      (if (numberp v) v nil)))))))
+     (let ((n (and (arc-numeric-token-p str)
+                   (ignore-errors
+                     (with-standard-io-syntax
+                       (let ((*read-eval* nil)
+                             (*readtable* *arc-token-readtable*))
+                         (let ((v (read-from-string str)))
+                           (if (numberp v) v nil))))))))
        (or n (arc-sym str))))))
 
 (defun arc-copy-balanced-paren (stream buf)
