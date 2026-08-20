@@ -1818,6 +1818,13 @@ sb-thread mutex with a :name, and anything else prints as itself."
 
 (xdef exact (x) (tnil (and (integerp x) (= x (truncate x)))))
 
+;; A primitive rather than (is (type x) 'cons) in arc.arc: acons is one
+;; of the hottest predicates in the system (caris, atom, alist, map,
+;; deserialize) and the arc.arc version paid a full arc-type dispatch
+;; plus a symbol compare to answer consp.  Note this no longer counts a
+;; value annotated as 'cons, which the arc.arc version did.
+(xdef acons (x) (tnil (consp x)))
+
 ;; Clocks:
 ;;  now  -- wall-clock Unix time (seconds, double, microsecond precision);
 ;;          absolute, but can jump (NTP / manual changes).

@@ -60,7 +60,7 @@
 
 (def anan (x) (no (is x x)))
 
-(def acons (x) (is (type x) 'cons))
+; acons is an xdef in arc0.lisp; it used to be (is (type x) 'cons) here.
 
 (def atom (x) (no (acons x)))
 
