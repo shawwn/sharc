@@ -438,23 +438,41 @@ straight to gcell-ref; this remains for callers holding only a symbol."
 
 ;;;; ---- Type system ----
 
+;; Interned once at load time. arc-sym is (intern name :arc), a package
+;; hash lookup on a string, and arc-type is hot enough (every acons,
+;; atom, isa and caris goes through it) that doing that per call showed
+;; up as the top entry in profiles.
+(defvar *ty-cons*   (arc-sym "cons"))
+(defvar *ty-key*    (arc-sym "key"))
+(defvar *ty-sym*    (arc-sym "sym"))
+(defvar *ty-fn*     (arc-sym "fn"))
+(defvar *ty-char*   (arc-sym "char"))
+(defvar *ty-string* (arc-sym "string"))
+(defvar *ty-int*    (arc-sym "int"))
+(defvar *ty-num*    (arc-sym "num"))
+(defvar *ty-table*  (arc-sym "table"))
+(defvar *ty-output* (arc-sym "output"))
+(defvar *ty-input*  (arc-sym "input"))
+(defvar *ty-thread* (arc-sym "thread"))
+(defvar *ty-vector* (arc-sym "vector"))
+
 (defun arc-type (x)
   (cond
     ((arc-tagged-p x) (arc-tagged-type x))
-    ((consp x)        (arc-sym "cons"))
-    ((keywordp x)     (arc-sym "key"))
-    ((null x)         (arc-sym "sym"))
-    ((symbolp x)      (arc-sym "sym"))
-    ((functionp x)    (arc-sym "fn"))
-    ((characterp x)   (arc-sym "char"))
-    ((stringp x)      (arc-sym "string"))
-    ((exactp x)       (arc-sym "int"))
-    ((numberp x)      (arc-sym "num"))
-    ((hash-table-p x) (arc-sym "table"))
-    ((outstreamp x)   (arc-sym "output"))
-    ((instreamp x)    (arc-sym "input"))
-    ((threadp x)      (arc-sym "thread"))
-    ((vectorp x)      (arc-sym "vector"))
+    ((consp x)        *ty-cons*)
+    ((keywordp x)     *ty-key*)
+    ((null x)         *ty-sym*)
+    ((symbolp x)      *ty-sym*)
+    ((functionp x)    *ty-fn*)
+    ((characterp x)   *ty-char*)
+    ((stringp x)      *ty-string*)
+    ((exactp x)       *ty-int*)
+    ((numberp x)      *ty-num*)
+    ((hash-table-p x) *ty-table*)
+    ((outstreamp x)   *ty-output*)
+    ((instreamp x)    *ty-input*)
+    ((threadp x)      *ty-thread*)
+    ((vectorp x)      *ty-vector*)
     (t (error "Unknown type: ~S" x))))
 
 (defun exactp (x)
