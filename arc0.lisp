@@ -960,6 +960,81 @@ straight to gcell-ref; this remains for callers holding only a symbol."
       (sb-sys:with-pinned-objects (buf)
         (ssl-ctrl ssl 55 0 (sb-sys:vector-sap buf))))))
 
+;;; ---- Unwind watch ----
+;;;
+;;; Diagnostic.  The deadlock the shared context below prevents requires a
+;;; thread to leave OpenSSL by a non-local exit, and the arc callers of
+;;; this path (fetch-topstories and friends) wrap themselves in errsafe,
+;;; which discards the condition without printing -- so the event that
+;;; wedges the image leaves no trace at all.
+;;;
+;;; Both halves earn their place.  handler-bind runs BEFORE the stack
+;;; unwinds, so it can name the condition and print a backtrace from the
+;;; signalling point.  The unwind-protect catches the other case, a bare
+;;; throw carrying no condition, which handler-bind would miss.
+
+(defun call-watching-unwind (host port thunk)
+  (let ((done nil))
+    (unwind-protect
+         (handler-bind
+             ((serious-condition
+                (lambda (c)
+                  (ignore-errors
+                    (format *error-output* "~&SSL-UNWIND ~A:~D: ~S: ~A~%"
+                            host port (type-of c) c)
+                    (sb-debug:print-backtrace :stream *error-output* :count 40)
+                    (finish-output *error-output*)))))
+           (multiple-value-prog1 (funcall thunk) (setf done t)))
+      (unless done
+        (ignore-errors
+          (format *error-output*
+                  "~&SSL-UNWIND ~A:~D: exited without completing, thread ~A~%"
+                  host port sb-thread:*current-thread*)
+          (finish-output *error-output*))))))
+
+;;; ---- Shared SSL_CTX ----
+;;;
+;;; One context per verification mode, built at load time and never freed.
+;;; Creating an SSL_CTX per connection is what wedged the image: SSL_CTX_new
+;;; -> ssl_load_ciphers -> evp_generic_fetch reaches ossl_method_construct,
+;;; which takes the method store's *write* lock and holds it across the
+;;; whole construct-and-insert region.  A thread leaving that region by a
+;;; non-local exit orphans the lock, and every later HTTPS connection in the
+;;; process blocks on it forever.  (Observed: six scrape threads parked on
+;;; one pthread rwlock, EBIT set with no live owner, for nine hours.)
+;;;
+;;; Holding one context for the process lifetime keeps the providers
+;;; activated and the method store warm, so that path runs once, at load,
+;;; single-threaded, before any bgthread exists.  SSL_new on a shared
+;;; context is thread-safe and does not re-enter it.
+
+(defvar *ssl-ctx-verify* nil)
+(defvar *ssl-ctx-noverify* nil)
+
+(defun make-ssl-ctx (noverify)
+  (let ((ctx (ssl-ctx-new (tls-client-method))))
+    (unless noverify
+      (ssl-ctx-set-default-verify-paths ctx)
+      ;; SSL_VERIFY_PEER = 1
+      (ssl-ctx-set-verify ctx 1
+        (sb-alien:sap-alien (sb-sys:int-sap 0) (* t))))
+    ctx))
+
+(defun init-ssl-ctxs ()
+  "Build both shared contexts.  Called at load time so that no thread ever
+   constructs one while other threads are running."
+  (sb-sys:without-interrupts
+    (setf *ssl-ctx-verify*   (make-ssl-ctx nil)
+          *ssl-ctx-noverify* (make-ssl-ctx t)))
+  t)
+
+(defun shared-ssl-ctx (noverify)
+  (or (if noverify *ssl-ctx-noverify* *ssl-ctx-verify*)
+      (error "SSL contexts not initialized")))
+
+(when *ssl-available*
+  (init-ssl-ctxs))
+
 ;;; Gray stream that wraps an SSL connection for transparent I/O.
 ;;; Supports character read/write so Arc's readc/writec/disp/write
 ;;; work directly on SSL-connected streams.
@@ -967,7 +1042,6 @@ straight to gcell-ref; this remains for callers holding only a symbol."
 (defclass arc-ssl-stream (sb-gray:fundamental-character-input-stream
                           sb-gray:fundamental-character-output-stream)
   ((ssl-ptr  :initarg :ssl  :reader ssl-stream-ssl)
-   (ctx-ptr  :initarg :ctx  :reader ssl-stream-ctx)
    (sock     :initarg :sock :reader ssl-stream-sock)
    ;; Read buffering: SSL_read returns bytes, we decode to characters.
    (read-buf :initform "" :accessor ssl-stream-read-buf)
@@ -1039,7 +1113,7 @@ straight to gcell-ref; this remains for callers holding only a symbol."
   (sb-gray:stream-force-output s)
   (ignore-errors (ssl-shutdown (ssl-stream-ssl s)))
   (ssl-free (ssl-stream-ssl s))
-  (ssl-ctx-free (ssl-stream-ctx s))
+  ;; The context is shared and outlives every stream, so it is not freed.
   (sb-bsd-sockets:socket-close (ssl-stream-sock s)))
 
 ;;; ---- Socket read timeouts ----
@@ -1149,31 +1223,58 @@ straight to gcell-ref; this remains for callers holding only a symbol."
           (unless *ssl-available*
             (error "SSL not available (OpenSSL libraries not found)"))
           (err-clear-error)
-          (let* ((fd (sb-bsd-sockets:socket-file-descriptor sock))
-                 (ctx (ssl-ctx-new (tls-client-method))))
-            (unless noverify
-              (ssl-ctx-set-default-verify-paths ctx)
-              ;; SSL_VERIFY_PEER = 1
-              (ssl-ctx-set-verify ctx 1
-                (sb-alien:sap-alien (sb-sys:int-sap 0) (* t))))
-            (let ((ssl (ssl-new ctx)))
-              (ssl-set-fd ssl fd)
-              (ssl-set-tlsext-host-name ssl host)
-              (unless noverify
-                (ssl-set1-host ssl host))
-              (let ((ret (ssl-connect ssl)))
-                (when (<= ret 0)
-                  (let* ((code (ssl-get-error ssl ret))
-                         (vr   (ssl-get-verify-result ssl))
-                         (vmsg (when (plusp vr)
-                                 (x509-verify-cert-error-string vr)))
-                         (msg  (or vmsg (ssl-error-string))))
-                    (ssl-free ssl)
-                    (ssl-ctx-free ctx)
-                    (sb-bsd-sockets:socket-close sock)
-                    (error "SSL connect to ~A:~D failed: ~A"
-                           host port (or msg (format nil "SSL_get_error=~D" code))))))
-              (make-instance 'arc-ssl-stream :ssl ssl :ctx ctx :sock sock))))
+          (let ((fd  (sb-bsd-sockets:socket-file-descriptor sock))
+                (ctx (shared-ssl-ctx noverify)))
+            (multiple-value-bind (stream failure)
+                (call-watching-unwind host port
+                 (lambda ()
+                   (let ((ssl   (sb-sys:without-interrupts (ssl-new ctx)))
+                         (state :incomplete))
+                     (unwind-protect
+                          (progn
+                            ;; Short, non-blocking calls: an interruption
+                            ;; delivered inside one of these could unwind
+                            ;; out of OpenSSL holding an internal lock.
+                            (sb-sys:without-interrupts
+                              (ssl-set-fd ssl fd)
+                              (ssl-set-tlsext-host-name ssl host)
+                              (unless noverify
+                                (ssl-set1-host ssl host)))
+                            ;; Deliberately NOT wrapped: ssl-connect blocks
+                            ;; on the network, and deferring interrupts
+                            ;; across it would make the thread unkillable.
+                            (let ((ret (ssl-connect ssl)))
+                              (if (<= ret 0)
+                                  (let* ((code (ssl-get-error ssl ret))
+                                         (vr   (ssl-get-verify-result ssl))
+                                         (vmsg (when (plusp vr)
+                                                 (x509-verify-cert-error-string vr)))
+                                         (msg  (or vmsg (ssl-error-string))))
+                                    ;; A refused handshake is an ordinary
+                                    ;; outcome, not an unwind.  Return it and
+                                    ;; signal outside the watch, so the only
+                                    ;; thing SSL-UNWIND ever reports is a
+                                    ;; condition we did not raise ourselves.
+                                    (setf state :failed)
+                                    (values nil
+                                            (or msg (format nil "SSL_get_error=~D" code))))
+                                  (progn
+                                    (setf state :ok)
+                                    (values (make-instance 'arc-ssl-stream
+                                                           :ssl ssl :sock sock)
+                                            nil)))))
+                       ;; On :ok the stream owns the ssl and the socket.
+                       ;; Otherwise -- refused handshake or async unwind --
+                       ;; they are still ours to release.  The context is
+                       ;; shared, so it is never freed here.
+                       (unless (eq state :ok)
+                         (ignore-errors
+                           (sb-sys:without-interrupts (ssl-free ssl)))
+                         (ignore-errors
+                           (sb-bsd-sockets:socket-close sock)))))))
+              (when failure
+                (error "SSL connect to ~A:~D failed: ~A" host port failure))
+              stream)))
         (sb-bsd-sockets:socket-make-stream
          sock :input t :output t
          :element-type :default
@@ -1894,6 +1995,11 @@ sb-thread mutex with a :name, and anything else prints as itself."
   (force-output s) t)
 
 (xdef quit () (sb-ext:exit))
+
+;; Unwinding exit for a wedged image is a contradiction: (sb-ext:exit)
+;; runs exit hooks and shuts threads down gracefully, so it blocks on the
+;; very threads that are stuck.  :abort t skips all of that.
+(xdef abort-image (&optional (code 70)) (sb-ext:exit :code code :abort t))
 
 (xdef memory () (sb-kernel:dynamic-usage))
 

@@ -818,6 +818,51 @@ Connection: close"))
   (pull [caris _ id] pending-bgthreads*)
   (push (list id f sec) pending-bgthreads*))
 
+; Wedge detection.  A wedged image looks like several bgthreads stuck
+; mid-pass at the same time.  One long pass is normal -- a scrape pass can
+; legitimately run for minutes -- but several at once means they are all
+; queued behind something shared, which is the shape every hang here has
+; taken.  Counting threads rather than timing one avoids restarting a
+; healthy image in the middle of a slow pass.
+;
+; Reading bgticks* is safe from a jammed image for the same reason bgtick
+; writes it with sref: it never touches place-lock*.
+;
+; The default action is to capture and keep running, because while the
+; trigger is still unknown a wedged image is the only artifact worth
+; having.  Set bgstall-action* to 'abort once you would rather have the
+; restart than the corpse -- and only with a supervisor to restart it.
+
+(= bgstall-secs*   (* 30 min*)
+   bgstall-count*  3
+   bgstall-action* 'hold)
+
+(or= wedged* nil)
+
+(def stalled-bgthreads ((o limit bgstall-secs*))
+  (accum a
+    (each (id tick) bgticks*
+      (let (state since runs) tick
+        (let age (- (seconds) since)
+          (when (and (is state 'run) (> age limit))
+            (a (list id age runs))))))))
+
+(def capture-wedge (stuck)
+  (w/stdout (stderr)
+    (prn "WEDGED: " (len stuck) " bgthreads stalled mid-pass")
+    (each s stuck
+      (let (id age runs) s
+        (prn "  " id "  run " age "s  runs " runs)))
+    (prn "  pid " (sb-unix::unix-getpid))
+    (flushout)))
+
+(defbg bgmonitor (* 1 min*)
+  (let stuck (stalled-bgthreads)
+    (when (and (>= (len stuck) bgstall-count*) (no wedged*))
+      (= wedged* t)
+      (capture-wedge stuck)
+      (if (is bgstall-action* 'abort) (abort-image)))))
+
 
 
 ; Idea: make form fields that know their value type because of
