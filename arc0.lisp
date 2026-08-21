@@ -6,8 +6,14 @@
                              *load-truename*
                              *default-pathname-defaults*))))
 
+;;; The one definition of the package.  arc1.lisp only does (in-package
+;;; :arc); when it defined :arc as well, reloading either file warned
+;;; about package variance, since the second definition it saw lacked
+;;; the other's exports.  The exported symbols live in arc1.lisp.
+
 (defpackage :arc
-  (:use :common-lisp))
+  (:use :common-lisp)
+  (:export #:arc-load #:arc-eval #:arc-read #:arc-read-1 #:arc-tl))
 
 (in-package :arc)
 
@@ -984,7 +990,12 @@ straight to gcell-ref; this remains for callers holding only a symbol."
             (setf *libcrypto* crypto *libssl* ssl *ssl-available* t)))
       (error () nil))))
 
-(try-load-ssl)
+;; Load-time initialization, part one.  This has to run here rather than
+;; in init-runtime below, because the define-alien-routine forms that
+;; follow are gated on *ssl-available*.  Guarded so that reloading this
+;; file does not dlopen the libraries a second time.
+(unless *ssl-available*
+  (try-load-ssl))
 
 (when *ssl-available*
   ;; Only define FFI bindings when the libraries loaded successfully.
@@ -1109,8 +1120,25 @@ straight to gcell-ref; this remains for callers holding only a symbol."
   (or (if noverify *ssl-ctx-noverify* *ssl-ctx-verify*)
       (error "SSL contexts not initialized")))
 
-(when *ssl-available*
-  (init-ssl-ctxs))
+(defvar *runtime-initialized* nil)
+
+(defun init-runtime (&key force)
+  "Load-time initialization, kept apart from the definitions above so
+   that reloading this file at runtime only redefines functions.
+
+   Idempotent on purpose.  A reload must not rebuild the SSL contexts:
+   SSL_CTX_new is what wedged the image (see the shared-SSL_CTX note
+   above), it is only safe here because nothing else is running yet, and
+   the contexts are never freed, so re-running would leak the old pair
+   as well.  Pass :force to rebuild anyway, which is only sound while no
+   other thread can be inside the SSL region."
+  (when (or force (not *runtime-initialized*))
+    (when *ssl-available*
+      (init-ssl-ctxs))
+    (setf *runtime-initialized* t))
+  *runtime-initialized*)
+
+(init-runtime)
 
 ;;; Gray stream that wraps an SSL connection for transparent I/O.
 ;;; Supports character read/write so Arc's readc/writec/disp/write

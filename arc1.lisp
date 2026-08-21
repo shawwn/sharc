@@ -6,9 +6,9 @@
   (require :sb-bsd-sockets)
   (load (merge-pathnames "arc0.lisp" *load-pathname*)))
 
-(defpackage :arc
-  (:use :common-lisp)
-  (:export #:arc-load #:arc-eval #:arc-read #:arc-read-1 #:arc-tl))
+;; The package is defined in arc0.lisp, which the eval-when above has
+;; already loaded.  Defining it here too made every reload of either
+;; file warn about package variance.
 
 (in-package :arc)
 
