@@ -966,7 +966,8 @@
        (when (and it!story it!story!by)
          (let saves (table)
            (import-scraped-story it!story saves)
-           (import-scraped-comments it!comments saves)
+           (import-scraped-comments (importable-comments it!story!id it!comments)
+                                    saves)
            (each id (sort > (keys saves))
              (only&save-item (item id))))
          it)))
@@ -1015,8 +1016,35 @@
        (mem 'links it!keys)    (and (~blank it!text)
                                     (posmatch "<a href" it!text))
        (mem 'imported it!keys) t)
+    ; `parent` defaults to nil in `deftem item`, and this reuses whatever
+    ; entry is already in items*, so an id that was previously imported as
+    ; a comment keeps its stale parent unless it is cleared here (same
+    ; reason `kids` is wiped).  Without this, re-importing a clean record
+    ; does not repair an item that a self-parented comment corrupted.
+    (wipe it!parent)
     (wipe it!kids)
     (scrape-ero:tablist it)))
+
+(def importable-comments (story-id comments)
+  ; A comment that claims the story's own id, or that is its own parent,
+  ; makes the item unrenderable: news's `cansee-descendant`, `superparent`
+  ; and `ancestors` all follow these links with no cycle guard, so the srv
+  ; thread spins until the 60s watchdog kills it.  Worse, a comment sharing
+  ; the story's id overwrites the story item itself, since both resolve to
+  ; the same `items*` entry.
+  ;
+  ; This is what the pre-`f0018e0` scraper produced: `parse-comments` used
+  ; to parse the story's own `<tr class="athing submission">` row as a
+  ; comment, which then imported over the story as a deleted, self-parented,
+  ; self-kidded husk.  Drop such rows rather than importing them, and say so;
+  ; a silent skip is how 483 items picked this up unnoticed.
+  (keep (fn (c)
+          (if (or (is c!id story-id) (is c!id c!parent))
+              (do (scrapelog "skipping self-referential comment " c!id
+                             " in item " story-id)
+                  nil)
+              t))
+        comments))
 
 (def import-scraped-comments (comments saves)
   (let items (each c comments
@@ -1035,7 +1063,7 @@
     ; display-subcomments walks parent!kids, not (keep [is _!parent
     ; parent-id] all-items).
     (whenlet p (only&item c!parent)
-      (unless (mem it!id p!kids)
+      (unless (or (is p!id it!id) (mem it!id p!kids))
         (++ p!kids (list it!id))
         (set (saves p!id))))
     ; record this comment under the author's submitted list so
