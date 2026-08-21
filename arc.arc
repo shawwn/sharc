@@ -1815,6 +1815,7 @@
 
 (def reload ()
   (w/assign reloading* t
+    (reload-runtime)
     (each file (rev loaded-files*)
       (call-quietly {load file}))))
 
