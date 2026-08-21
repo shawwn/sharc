@@ -50,7 +50,8 @@
   hidden     nil   ; ids of items this user has hidden from their listings
   favorites  nil   ; ids of items this user has marked as favorite
   collapsed  nil   ; ids of comments this user has collapsed
-  delay      0)
+  delay      0
+  fetched    nil)  ; for imported profiles, the time we last re-fetched them
 
 (deftem item
   id         nil
@@ -70,7 +71,8 @@
   parts      nil
   parent     nil
   kids       nil
-  keys       nil)
+  keys       nil
+  fetched    nil)  ; for imported stories, the time we last re-fetched them
 
 
 ; Locking

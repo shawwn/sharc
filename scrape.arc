@@ -289,8 +289,7 @@
             rec!by        (parse-subtext-author   inner)
             rec!time      (parse-subtext-age      inner)
             rec!comments  (parse-subtext-comments inner)
-            rec!timestamp (parse-subtext-timestamp inner)
-            rec!seen      (seconds)))))
+            rec!timestamp (parse-subtext-timestamp inner)))))
 
 (def parse-subtext-score (html)
   (whenlet m-score (between html "<span class=\"score\"" "</span>" 0)
@@ -354,7 +353,7 @@
   ; The story page's top item lives inside <table class="fatitem"> as a
   ; <tr class="athing submission" id="N"> row followed by a subtext row.
   ; Story text (for Ask HN / text submissions) lives in <div class="toptext">.
-  (lets rec (obj type 'story)
+  (lets rec (obj type 'story fetched (seconds))
     (whenlet ft (posmatch "<table class=\"fatitem\"" html 0)
       (whenlet p (posmatch "<tr class=\"athing" html ft)
         (aif (html-attr html p "id")
@@ -386,7 +385,7 @@
   (map parse-listitem (parse-split html)))
 
 (def parse-listitem (html (o start 0))
-  (lets rec (obj type 'story)
+  (lets rec (obj type 'story fetched (seconds))
     (let p 0 ; (posmatch "<tr class=\"athing" html start)
       (= rec!id   (parse-item-id html)
          rec!rank (parse-item-rank html))
@@ -587,7 +586,6 @@
   (with (story    parsed!story
          comments parsed!comments
          old-comments (and old old!comments))
-    (= story!fetched_at (seconds))
     (let merged (merge-comments old-comments comments)
       (obj story story comments merged))))
 
@@ -616,7 +614,7 @@
 ; from-json on a 100KB user object (long `submitted` array) is ~0.4s
 ; per call in pure Arc, and parsing concurrently in many threads
 ; thrashes the allocator/GC.  Instead, save the raw response verbatim
-; and inject `fetched_at` with a tiny string surgery on the trailing
+; and inject `fetched` with a tiny string surgery on the trailing
 ; `}`.
 
 (def scrape-user-url (id)
@@ -626,14 +624,14 @@
   (when (or force (~recently-fetched-user? id))
     (let raw (curl-get-public (scrape-user-url id))
       (when (and raw (isnt raw "null") (>= (len raw) 2))
-        (dispfile (inject-fetched-at raw (seconds))
+        (dispfile (inject-fetched raw (seconds))
                   (+ scrape-user-dir* id ".json"))
         (= (scrape-last-fetch* (sym (+ "u/" id))) (seconds))
         t))))
 
-(def inject-fetched-at (raw t)
+(def inject-fetched (raw t0)
   ; raw is a JSON object string (firebase response).  Insert
-  ; ,"fetched_at":<t> just before the trailing `}`.  No-op if the
+  ; ,"fetched":<t> just before the trailing `}`.  No-op if the
   ; response doesn't look like a JSON object.  We avoid `trim`
   ; because copying a 100KB string per call wrecks throughput when
   ; many threads run this concurrently; instead, scan back from the
@@ -644,7 +642,7 @@
       (if (and (>= i 1) (is (raw i) #\}))
           (+ (cut raw 0 i)
              (if (is (raw (- i 1)) #\{) "" ",")
-             "\"fetched_at\":" (string t) "}")
+             "\"fetched\":" (string t0) "}")
           raw))))
 
 
@@ -689,7 +687,7 @@
           (when (file-exists raw-path)
             (let raw (errsafe:filechars raw-path)
               (when (and raw (>= (len raw) 2))
-                (dispfile (inject-fetched-at raw now)
+                (dispfile (inject-fetched raw now)
                           (+ scrape-user-dir* id ".json"))
                 (= (scrape-last-fetch* (sym (+ "u/" id))) now)))
             (errsafe:rmfile raw-path)))))))
@@ -1008,12 +1006,13 @@
        it!text  (or s!text  it!text)
        it!score (or s!score it!score 0)
        it!title (or s!title it!title)
-       it!url   s!url
-       it!dead  s!dead
-       it!deleted s!deleted
-       (mem 'dupe it!keys)     s!dupe
+       it!url      s!url
+       it!dead     s!dead
+       it!deleted  s!deleted
+       it!fetched  (or s!fetched (seconds))
+       (mem 'dupe    it!keys)  s!dupe
        (mem 'flagged it!keys)  s!flagged
-       (mem 'links it!keys)    (and (~blank it!text)
+       (mem 'links   it!keys)  (and (~blank it!text)
                                     (posmatch "<a href" it!text))
        (mem 'imported it!keys) t)
     ; `parent` defaults to nil in `deftem item`, and this reuses whatever
@@ -1131,9 +1130,10 @@
     (when (goodname id)
       (unless (profile id) (init-user id))
       (lets p (profs* id)
-        (when u!created (= p!created u!created))
-        (when u!karma   (= p!karma   u!karma))
-        (when u!about   (= p!about   u!about))))))
+        (= p!created  (or u!created p!created)
+           p!karma    (or u!karma   p!karma)
+           p!about    (or u!about   p!about)
+           p!fetched  (or u!fetched p!fetched))))))
 
 
 (= scrape-hn* t scrape-delay* 0.001)
