@@ -36,3 +36,5 @@ E.g. `(def ip ((t req)) req!ip)` makes `(ip)` use `(the req)` while `(ip some-re
 
 `is` is isomorphic, e.g. `(is (list 'a) (list 'a))` returns `t`. `iso` exists for backwards compatibility.
 If you need to compare object identity, use `id` (short for identical), e.g. `(id (list 'a) (list 'a))` returns `nil`.
+
+You can call CL macros e.g. like this: `(#'sb-ext::with-timeout ...)`
