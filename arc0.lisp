@@ -558,6 +558,83 @@ straight to gcell-ref; this remains for callers holding only a symbol."
   (write-byte b (if args (car args) *standard-output*))
   b)
 
+;;; ---- string truncation ----
+;;;
+;;; Long strings are unreadable in the repl and drown a backtrace (one
+;;; scraped comment can be several kb).  Cut them for *display only*:
+;;; the limit lives in a special that is nil everywhere except around
+;;; the repl's result print and error reporting, so `write` and `disp`
+;;; -- which save-table, serialize and the json paths all rely on --
+;;; keep emitting strings in full.
+;;;
+;;; The ... goes *outside* the closing quote, so "abc"... is a truncated
+;;; string and "abc..." is a string that really ends in dots.
+
+(defvar *arc-print-string-length* nil
+  "When non-nil, print at most this many characters of a string.")
+
+(defun print-string-truncated (s port)
+  (let ((n *arc-print-string-length*)
+        ;; don't re-enter the dispatch table below
+        (*print-pretty* nil))
+    (cond ((and n (> (length s) n))
+           (write (subseq s 0 n) :stream port)
+           (write-string "..." port))
+          (t
+           (write s :stream port)))))
+
+(defvar *arc-truncating-pprint-dispatch*
+  (let ((table (copy-pprint-dispatch nil)))
+    (set-pprint-dispatch 'string
+                         (lambda (stream s) (print-string-truncated s stream))
+                         0 table)
+    table)
+  "Dispatch table that truncates strings, for printers we do not own:
+   CL's own printer via write-remaining-level, and sb-debug's frame
+   printer.  Requires *print-pretty*, hence the wide right margin to
+   keep frames and repl values on one line.")
+
+(defun truncate-printed-strings (text &optional (n *arc-print-string-length*))
+  "Shorten the string literals inside already-printed TEXT to N content
+   characters each, ... after the closing quote.  For printers we cannot
+   hook: sb-debug prints a frame under its own io syntax, which discards
+   both *print-pprint-dispatch* and *debug-print-variable-alist*, so the
+   only way in is to edit what it produced.  The scan honours \\ and \",
+   and only ever cuts at an escape boundary, so it cannot split one."
+  (if (null n)
+      text
+      (with-output-to-string (out)
+        (let ((i 0) (len (length text)))
+          (loop while (< i len) do
+            (cond
+              ((char/= (char text i) #\")
+               (write-char (char text i) out)
+               (incf i))
+              (t
+               (let ((j (1+ i))     ; index just past the opening quote
+                     (chars 0)      ; content characters seen
+                     (cut nil))     ; where content passed the limit
+                 (loop
+                   (when (>= j len) (return))
+                   (let ((ch (char text j)))
+                     (when (char= ch #\") (return))
+                     (when (and (null cut) (>= chars n)) (setf cut j))
+                     (incf j (if (char= ch #\\) 2 1))
+                     (incf chars)))
+                 (cond (cut
+                        (write-string (subseq text i cut) out)
+                        (write-string "\"..." out))
+                       (t
+                        (write-string (subseq text i (min len (1+ j))) out)))
+                 (setf i (min len (1+ j)))))))))))
+
+(defmacro with-truncated-strings ((limit) &body body)
+  `(let ((*arc-print-string-length* ,limit)
+         (*print-pretty* t)
+         (*print-right-margin* 1000000)
+         (*print-pprint-dispatch* *arc-truncating-pprint-dispatch*))
+     ,@body))
+
 (defun print-level-exceeded-p (depth)
   "True when a nested object at DEPTH should print as # per *print-level*."
   (and *print-level* (>= depth *print-level*)))
@@ -612,7 +689,7 @@ straight to gcell-ref; this remains for callers holding only a symbol."
 
 (defun arc-write-val (x port &optional (depth 0))
   (cond
-    ((stringp x)    (write x :stream port))  ; quoted
+    ((stringp x)    (print-string-truncated x port))  ; quoted
     ((characterp x) (write x :stream port))
     ((null x)       (write-string "nil" port))
     ((eq x t)       (write-string "t" port))
@@ -2048,17 +2125,20 @@ sb-thread mutex with a :name, and anything else prints as itself."
 ;;;; REPL
 ;;;; ============================================================
 
+(defvar *arc-err-print-string-length* 500)
+
 (defun arc-report-frame (frame &optional (stream *error-output*))
   ;; Print frames under :invert readtable case so mixed-case
   ;; symbol names (like arc--CAR) come out without |...| escapes.
   ;; All-lowercase and all-uppercase names still print in their
   ;; canonical form; only mixed-case ones change.
   (let ((text (with-output-to-string (s)
-                (let ((*print-pretty* nil)
-                      (*readtable* (copy-readtable *readtable*)))
-                  (setf (readtable-case *readtable*) :invert)
-                  (sb-debug::print-frame-call frame s :number nil)))))
-    (format stream "~A~%" text)))
+                (with-truncated-strings (*arc-err-print-string-length*)
+                  (let ((*readtable* (copy-readtable *readtable*)))
+                    (setf (readtable-case *readtable*) :invert)
+                    (sb-debug::print-frame-call frame s :number nil))))))
+    (format stream "~A~%"
+            (truncate-printed-strings text *arc-err-print-string-length*))))
 
 (xdef report-frame #'arc-report-frame)
 
@@ -2092,10 +2172,18 @@ sb-thread mutex with a :name, and anything else prints as itself."
 
 (xdef report-backtrace #'arc-report-backtrace)
 
+(defun truncate-message (text &optional (n *arc-err-print-string-length*))
+  "Cut a condition's own report to N characters.  It is raw text rather
+   than a printed literal, so there is no closing quote to put the ...
+   after; it just goes on the end."
+  (if (and n (> (length text) n))
+      (concatenate 'string (subseq text 0 n) "...")
+      text))
+
 (defun arc-report-error (c &optional (stream *error-output*))
   (let ((*print-length* *arc-err-print-length*)
         (*print-level* *arc-err-print-level*))
-    (format stream "Error: ~A~%" c))
+    (format stream "Error: ~A~%" (truncate-message (format nil "~A" c))))
   (arc-report-backtrace stream))
 
 (xdef report-error #'arc-report-error)
@@ -2108,6 +2196,7 @@ sb-thread mutex with a :name, and anything else prints as itself."
 
 (defvar *arc-repl-print-length* 100)
 (defvar *arc-repl-print-level* 8)
+(defvar *arc-repl-print-string-length* 500)
 
 (defun arc-tl2 ()
   (format t "arc> ")
@@ -2133,7 +2222,8 @@ sb-thread mutex with a :name, and anything else prints as itself."
            (let ((val (arc-eval expr)))
              (let ((*print-length* *arc-repl-print-length*)
                    (*print-level* *arc-repl-print-level*))
-               (arc-write-val val *standard-output*))
+               (with-truncated-strings (*arc-repl-print-string-length*)
+                 (arc-write-val val *standard-output*)))
              (terpri)
              (setf (arc-global '|that|)     val)
              (setf (arc-global '|thatexpr|) expr)))))))
