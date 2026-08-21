@@ -1147,9 +1147,8 @@
 (def rand-elts (n seq)
   (n-of n (rand-elt seq)))
 
-(def rand-string (n)
-  (let c "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
-    (as!string (rand-elts n c))))
+(def rand-string (n (o alphabet "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"))
+  (as!string (rand-elts n alphabet)))
 
 (def best (f seq)
   (if (no seq)
