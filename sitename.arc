@@ -36,7 +36,7 @@
         (let (t1 t2) (list (pop toks) (pop toks))
           (push (+ t2 "." t1) toks))))
     ; omit "www."
-    (when (in (last toks) "www" nil)
+    (when (and toks (in (last toks) "www" nil))
       (zap almost toks))
     ; some domains like "dhan360.in" are incorrectly processed as
     ; multi-tld, so just split it back apart.  (toks can be empty for
