@@ -407,27 +407,16 @@
       (car url))))
 
 (def parse-comments (html story-id)
-  ; Split the html into per-comment chunks once, then parse each in
-  ; isolation.  Without this, posmatch's O(N) scans on the full 2MB
-  ; html which turns this into N*M-quadratic.
-  (accum a
-    (with (positions nil
-           start 0
-           anchor "<tr class=\"athing comtr"
-           indent-stack (table))
-      (whilet p (posmatch anchor html start)
-        (push p positions)
-        (= start (+ p (len anchor))))
-      (let ps (rev! positions)
-        (forlen i ps
-          (withs (p (ps i)
-                  end (or (errsafe:ps (+ i 1)) (len html))
-                  row (cut html p end))
-            (whenlet c (parse-comment-row row story-id indent-stack)
-              (a c)
-              (= (indent-stack c!indent) c!id)
-              (each k (keys indent-stack [> _ c!indent])
-                (wipe (indent-stack k))))))))))
+  (let indent-stack (table)
+    ; Split the html into per-comment chunks once, then parse each in
+    ; isolation.  Without this, posmatch's O(N) scans on the full 2MB
+    ; html which turns this into N*M-quadratic.
+    (each row (parse-split html "<tr class=\"athing comtr")
+      (whenlet c (parse-comment-row row story-id indent-stack)
+        (out c)
+        (= (indent-stack c!indent) c!id)
+        (each k (keys indent-stack [> _ c!indent])
+          (wipe (indent-stack k)))))))
 
 (def parse-comment-row (row story-id indent-stack)
   ; `row` is the substring starting at `<tr class="athing comtr` for one
