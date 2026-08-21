@@ -655,14 +655,13 @@
 ; all of that.
 
 (def scrape-users-parallel! (users (o force) (o batch-size scrape-user-concurrency*))
-  (let pending (if force users (rem recently-fetched-user? users))
-    (with (total (len pending) done 0)
-      (each batch (tuples pending batch-size)
-        (scrape-user-batch! batch)
-        (= done (+ done (len batch)))
-        (when (is 0 (mod done (max 1 (* batch-size 5))))
-          (scrapelog "  users " done "/" total)
-          (flushout))))))
+  (with (total (len users) done 0)
+    (each batch (tuples users batch-size)
+      (scrape-user-batch! batch)
+      (= done (+ done (len batch)))
+      (when (is 0 (mod done (max 1 (* batch-size 5))))
+        (scrapelog "  users " done "/" total)
+        (flushout)))))
 
 (def scrape-user-batch! (ids)
   (w/lock scrape-lock*
@@ -754,12 +753,13 @@
   (save-fetchlog))
 
 (def scrape-users! ((o users (scraping-users)) (o force))
-  (when (len> users 0)
-    (scrapelog "scraping up to " (len users) " users "
-               "(" scrape-user-concurrency* "-way parallel)")
-    (scrape-users-parallel! users force)
-    (save-fetchlog)
-    (scrapelog "done.")))
+  (let users (if force users (rem recently-fetched-user? users))
+    (when (len> users 0)
+      (scrapelog "scraping " (len users) " users "
+                 "(" scrape-user-concurrency* "-way parallel)")
+      (scrape-users-parallel! users force)
+      (save-fetchlog)
+      (scrapelog "done."))))
 
 
 ; ----- Scraping HN Lists -----
