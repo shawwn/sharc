@@ -100,4 +100,4 @@
 
 (when (main)
   (bsv)
-  (repl))
+  (main-repl))

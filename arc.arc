@@ -2128,6 +2128,12 @@
 (def main-thread ((o th (current-thread)))
   (is th main-thread*))
 
+(def main-repl ()
+  ;; not (repl): see boot.lisp.  Calling it here would run the prompt
+  ;; inside load's read-eval loop, and exiting it would resume reading
+  ;; this file at a now-stale offset.
+  (= main-repl* t))
+
 ; > (= (list a b c) (list 1 2 3))
 ; (1 2 3)
 ; > (list a b c)

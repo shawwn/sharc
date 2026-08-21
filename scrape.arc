@@ -1187,4 +1187,4 @@
 (when (main)
   (nsv)
   (load-scrape)
-  (repl))
+  (main-repl))

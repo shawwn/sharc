@@ -3859,5 +3859,4 @@ brackets&gt; and it should work.<br><br>")
 (when (main)
   (nsv)
   ;(load-users)
-  (repl))
-
+  (main-repl))

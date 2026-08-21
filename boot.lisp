@@ -37,11 +37,21 @@
     (arc-vlog "Loading libs.arc...~%")
     (arc:arc-load (merge-pathnames "libs.arc" arc-dir))
     (setf (arc::arc-global 'arc::|main-file*|) nil)
+    (setf (arc::arc-global 'arc::|main-repl*|) nil)
     (when files
       (setf (arc::arc-global 'arc::|main-file*|)
             (car (last files))))
     (cond (files
            (dolist (f files) (arc:arc-eval (list 'arc::|load| f)))
+           ;; A script that wants a prompt sets main-repl* rather than
+           ;; calling (repl) itself.  Calling it inside the file runs the
+           ;; repl inside load's read-eval loop, with the file still open
+           ;; at a byte offset: on exit load reads on from that offset,
+           ;; which after an edit lands mid-form ("Unexpected )") or, worse,
+           ;; on a form boundary, quietly evaluating whatever is there now.
+           ;; Here the file has been closed for a while.
+           (when (arc::arc-global 'arc::|main-repl*|)
+             (arc:arc-tl))
            (uiop:quit 0))
           ((not (interactive-stream-p *standard-input*))
            (arc-load-stdin)
