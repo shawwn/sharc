@@ -1805,6 +1805,21 @@
 (def loaded-files-changed ()
   (some file-changed loaded-files*))
 
+; arc0.lisp and arc1.lisp never go through `load`, so nothing ever gives
+; them a notetime.  Track them next to the .arc files, so that editing
+; only the lisp half still trips maybe-reload.  They are kept out of
+; loaded-files* on purpose: `reload` walks that list with `load`, and
+; these two are reloaded by reload-runtime instead.
+
+(def note-runtime-times ()
+  (each file (runtime-files)
+    (= (loaded-file-times* file) (modtime file))))
+
+(def runtime-changed ()
+  (some file-changed (runtime-files)))
+
+(note-runtime-times)
+
 (def load (file)
   (w/infile f file
     (notetime file)
@@ -1815,12 +1830,17 @@
 
 (def reload ()
   (w/assign reloading* t
+    ; Note the times before reloading, not after: reload-runtime can
+    ; refuse (a struct changed shape) or fail to compile, and a caller
+    ; polling maybe-reload must not then retry on every tick.  Wait for
+    ; the next edit instead.
+    (note-runtime-times)
     (reload-runtime)
     (each file (rev loaded-files*)
       (call-quietly {load file}))))
 
 (def maybe-reload ()
-  (when (loaded-files-changed)
+  (when (or (loaded-files-changed) (runtime-changed))
     ; reload runs unsynchronized on the accept thread, and requests in
     ; flight may observe half-redefined definitions.
     (call-reporting reload)))

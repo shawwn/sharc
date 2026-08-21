@@ -2315,6 +2315,11 @@ sb-thread mutex with a :name, and anything else prints as itself."
 (defun runtime-source-path (name)
   (merge-pathnames name (or *arc-source-dir* *default-pathname-defaults*)))
 
+(xdef runtime-files ()
+  ;; Full paths, so arc's change tracking works whatever the cwd is.
+  (mapcar (lambda (f) (namestring (runtime-source-path f)))
+          *runtime-source-files*))
+
 (defun runtime-fasl-path (name)
   "Beside the source, not in a temp directory: arc0.lisp resolves
    setup.lisp against *load-truename*, which during the load of a fasl
