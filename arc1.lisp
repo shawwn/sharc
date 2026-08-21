@@ -4,7 +4,11 @@
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (require :asdf)
   (require :sb-bsd-sockets)
-  (load (merge-pathnames "arc0.lisp" *load-pathname*)))
+  ;; Only when absent: reload-runtime compiles this file with arc0
+  ;; already loaded, and compiling must not redefine anything.
+  (unless (find-package :arc)
+    (load (merge-pathnames "arc0.lisp"
+                           (or *load-pathname* *compile-file-pathname*)))))
 
 ;; The package is defined in arc0.lisp, which the eval-when above has
 ;; already loaded.  Defining it here too made every reload of either

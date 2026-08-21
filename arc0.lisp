@@ -17,6 +17,15 @@
 
 (in-package :arc)
 
+(defvar *arc-source-dir*
+  (let ((p (or *compile-file-truename* *load-truename*)))
+    (and p (make-pathname :name nil :type nil :version nil :defaults p)))
+  "Where arc0.lisp was first loaded from.  reload-runtime reads the
+   sources from here rather than trusting *default-pathname-defaults*,
+   which a script or a thread may have rebound.")
+
+(in-package :arc)
+
 ;;;; ============================================================
 ;;;; Utilities
 ;;;; ============================================================
@@ -2264,3 +2273,139 @@ sb-thread mutex with a :name, and anything else prints as itself."
                             (return-from done nil))))
       (arc-call0 f))))
 
+
+;;;; ============================================================
+;;;; Reloading the lisp runtime
+;;;; ============================================================
+;;;
+;;; (reload-runtime) recompiles arc0.lisp and arc1.lisp and loads the
+;;; results, so the lisp half of the system can be edited without
+;;; restarting the image, the way the .arc files already can.
+;;;
+;;; Three things make that safe enough to use in a live image:
+;;;
+;;;   * Both files are compiled before either one is loaded, so a syntax
+;;;     or compile error leaves the running image completely untouched.
+;;;     This is why arc1.lisp only loads arc0.lisp when the package is
+;;;     absent: otherwise compiling arc1.lisp would load arc0.lisp as a
+;;;     side effect, redefining things during the validation step.
+;;;
+;;;   * defconstant with a changed value signals defconstant-uneql,
+;;;     which is continuable.  We continue and say so.  Code compiled
+;;;     against the old value keeps it until recompiled, which for the
+;;;     constants here means the rest of arc0.lisp, so the reload
+;;;     covers every user of them.  One wrinkle: defconstant carries an
+;;;     implicit eval-when :compile-toplevel, so a new value takes hold
+;;;     during the compile step and survives even if a later file then
+;;;     fails to compile.  Constants are the one thing the all-or-
+;;;     nothing property above does not cover.
+;;;
+;;;   * A defstruct whose shape changed cannot be applied to a live
+;;;     image: instances built under the old layout are still reachable.
+;;;     The structs are compared against the source before anything is
+;;;     compiled and the reload refuses, rather than dying part-way
+;;;     through the load and leaving half the file applied.
+;;;
+;;; Not covered, and worth knowing: init-runtime is deliberately not
+;;; re-run, so a reload never rebuilds the SSL contexts under live
+;;; threads.  If you changed that code, restart.
+
+(defvar *runtime-source-files* '("arc0.lisp" "arc1.lisp"))
+
+(defun runtime-source-path (name)
+  (merge-pathnames name (or *arc-source-dir* *default-pathname-defaults*)))
+
+(defun runtime-fasl-path (name)
+  "Beside the source, not in a temp directory: arc0.lisp resolves
+   setup.lisp against *load-truename*, which during the load of a fasl
+   is the fasl's own path.  Deleted once loaded."
+  (merge-pathnames (format nil "arc-reload-~a.fasl" (pathname-name name))
+                   (or *arc-source-dir* *default-pathname-defaults*)))
+
+(defun source-defstructs (file)
+  "((name slot ...) ...) for each top-level defstruct in FILE.  Returns
+   nil if the file cannot be read, which turns the check below into a
+   no-op rather than a false alarm."
+  (handler-case
+      (with-open-file (in file :external-format :utf-8)
+        (let ((*package* (find-package :arc))
+              (*readtable* (copy-readtable nil))
+              (found '()))
+          (loop for form = (read in nil :eof)
+                until (eq form :eof)
+                do (when (and (consp form) (eq (car form) 'defstruct))
+                     (push (cons (if (consp (second form))
+                                     (first (second form))
+                                     (second form))
+                                 (mapcar (lambda (slot)
+                                           (if (consp slot) (car slot) slot))
+                                         (remove-if #'stringp (cddr form))))
+                           found)))
+          (nreverse found)))
+    (error () nil)))
+
+(defun live-defstruct-slots (name)
+  (let ((class (find-class name nil)))
+    (when class
+      (ignore-errors
+        (mapcar #'sb-mop:slot-definition-name (sb-mop:class-slots class))))))
+
+(defun changed-structs (&optional (files *runtime-source-files*))
+  "Structs whose slots differ between the running image and the source."
+  (loop for file in files
+        append (loop for entry in (source-defstructs (runtime-source-path file))
+                     for live = (live-defstruct-slots (car entry))
+                     when (and live (not (equal live (cdr entry))))
+                       collect (list (car entry) live (cdr entry)))))
+
+(defun reload-runtime (&key force (stream *error-output*))
+  "Recompile and reload the lisp runtime.  Returns t, or nil having
+   changed nothing.  :force reloads even when a struct changed shape,
+   which leaves any instance made under the old layout behind."
+  (let ((changed (changed-structs)))
+    (when (and changed (not force))
+      (format stream "~&reload-runtime: refusing, struct shape changed:~%")
+      (dolist (c changed)
+        (format stream "  ~(~a~): live ~(~a~), source ~(~a~)~%"
+                (first c) (second c) (third c)))
+      (format stream "  live instances cannot be migrated; restart the image.~%")
+      (force-output stream)
+      (return-from reload-runtime nil)))
+  (flet ((keep-going-on-new-constants (c)
+           ;; defconstant with a changed value is continuable.  Note it
+           ;; fires while *compiling* too, since defconstant carries an
+           ;; implicit eval-when :compile-toplevel, so a compile failure
+           ;; after this point can leave the new value behind.
+           (format stream "~&reload-runtime: new value for ~(~a~)~%"
+                   (cell-error-name c))
+           (continue c)))
+    (let ((fasls '()))
+      ;; compile everything first: nothing is redefined until all of it builds
+      (dolist (file *runtime-source-files*)
+        (let ((source (runtime-source-path file))
+              (fasl   (runtime-fasl-path file)))
+          (multiple-value-bind (out warnings-p failure-p)
+              (handler-bind ((warning #'muffle-warning)
+                             (sb-ext:defconstant-uneql
+                               #'keep-going-on-new-constants))
+                (compile-file source :output-file fasl :verbose nil :print nil))
+            (declare (ignore warnings-p))
+            (when (or (null out) failure-p)
+              (format stream "~&reload-runtime: ~a failed to compile; nothing reloaded.~%"
+                      file)
+              (force-output stream)
+              (return-from reload-runtime nil))
+            (push out fasls))))
+      (setf fasls (nreverse fasls))
+      (unwind-protect
+           (dolist (fasl fasls)
+             (handler-bind ((sb-ext:defconstant-uneql
+                              #'keep-going-on-new-constants))
+               (load fasl)))
+        (dolist (fasl fasls) (ignore-errors (delete-file fasl))))))
+  (format stream "~&reload-runtime: reloaded ~{~a~^ and ~}.~%" *runtime-source-files*)
+  (force-output stream)
+  t)
+
+(xdef reload-runtime (&optional force)
+  (reload-runtime :force force))
