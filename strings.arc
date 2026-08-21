@@ -131,7 +131,7 @@
     (and (>= n 0)
          (is pat (cut string n)))))
 
-(def posmatch (pat seq (o start 0))
+(def posmatch1 (pat seq (o start 0))
   (catch
     (if (isa!fn pat)
         (for i start (edge seq)
@@ -139,6 +139,18 @@
         (for i start (edge seq (len pat))
           (when (headmatch pat seq i) (throw i))))
     nil))
+
+; optimization at the expense of Arc purity (cf. cut1/cut2 in arc.arc).
+; The pure version scans char by char through generic ref/is/+, which
+; makes every posmatch O(N) in interpreted Arc; on a 548kb html page
+; that dominated the scraper's parse time.  Native search is ~20x
+; faster and identical for strings (`is` on chars is eql).  Anything
+; else -- fn patterns, conses -- still goes through posmatch1.
+
+(def posmatch (pat seq (o start 0))
+  (if (and (isa!string pat) (isa!string seq) (<= start (len seq)))
+      (#'search pat seq :start2 start)
+      (posmatch1 pat seq start)))
 
 (def headmatch (pat seq (o start 0))
   (with (p (len pat) n (len seq))
@@ -162,13 +174,40 @@
                 (pr new))
             (pr (seq i)))))))
 
-(def multisubst (pairs seq)
+(def multisubst1 (pairs seq)
   (tostring 
     (forlen i seq
       (iflet (old new) (find [begins seq (car _) i] pairs)
         (do (++ i (edge old))
             (pr new))
         (pr (seq i))))))
+
+; The pure version tests every pattern at every index -- for uneschtml
+; that's eight headmatches per character of every comment body.  When
+; all the patterns start with the same char (again, uneschtml: they all
+; begin with "&") only those positions can start a match, so let the
+; native scan skip everything between them, and copy each unmatched run
+; with one cut instead of printing it a character at a time.
+
+(def multisubst (pairs seq)
+  (withs (olds (map car pairs)
+          lead (and (isa!string seq)
+                    (all [and (isa!string _) (~empty _)] olds)
+                    (single (dedup (map [_ 0] olds)))
+                    ((car olds) 0)))
+    (if (no lead)
+        (multisubst1 pairs seq)
+        (tostring
+          (withs (n (len seq) i 0 start 0)
+            (whilet p (and (< i n) (#'position lead seq :start i))
+              (= i p)
+              (iflet (old new) (find [begins seq (car _) i] pairs)
+                (do (when (> i start) (pr (cut seq start i)))
+                    (pr new)
+                    (++ i (len old))
+                    (= start i))
+                (++ i)))
+            (when (> n start) (pr (cut seq start n))))))))
 
 ; not a good name
 

@@ -1043,7 +1043,18 @@ c"
 (define-test posmatch
   (test? 2   (posmatch "cd" "abcdef"))
   (test? nil (posmatch "zz" "abcdef"))
-  (test? 2   (posmatch odd '(2 4 5 6)))) ; predicate form
+  (test? 2   (posmatch odd '(2 4 5 6))) ; predicate form
+  ; the native fast path must agree with the pure version everywhere
+  (test? 2   (posmatch "cd" "abcdef" 1))   ; start inside the match
+  (test? nil (posmatch "cd" "abcdef" 3))   ; start past the match
+  (test? 0   (posmatch "" "abcdef"))       ; empty pattern
+  (test? 3   (posmatch "" "abcdef" 3))
+  (test? nil (posmatch "a" "abc" 9))       ; start past the end
+  (test? 2   (posmatch "aa" "abaaa"))      ; overlapping candidates
+  (test? (posmatch1 "cd" "abcdef")   (posmatch "cd" "abcdef"))
+  (test? (posmatch1 "zz" "abcdef")   (posmatch "zz" "abcdef"))
+  (test? (posmatch1 "a" "abc" 9)     (posmatch "a" "abc" 9))
+  (test? (posmatch1 '(b c) '(a b c)) (posmatch '(b c) '(a b c))))
 
 (define-test headmatch
   (test? true  (headmatch "abc" "abcdef"))
@@ -1064,7 +1075,19 @@ c"
   (test? "x--y--z" (subst "--" "ab" "xabyabz"))) ; multi-char old/new
 
 (define-test multisubst
-  (test? "121" (multisubst '(("a" "1") ("bb" "2")) "abba")))
+  (test? "121" (multisubst '(("a" "1") ("bb" "2")) "abba"))
+  ; patterns sharing a leading char take the native fast path; mixed
+  ; leads, empty patterns and non-string seqs fall back to multisubst1
+  (test? "aXc"  (multisubst '(("&x" "X")) "a&xc"))
+  (test? "aX"   (multisubst '(("ab" "X")) "aab"))       ; overlapping
+  (test? "zXz"  (multisubst '(("ab" "X") ("zz" "Y")) "zabz")) ; mixed leads
+  (test? "abc"  (multisubst '(("&x" "X")) "abc"))       ; no candidates
+  (test? ""     (multisubst '(("&x" "X")) ""))
+  (test? "a&"   (multisubst '(("&x" "X")) "a&"))        ; partial at the end
+  (test? (multisubst1 '(("&lt;" "<") ("&gt;" ">")) "&lt;a&gt;&l")
+         (multisubst  '(("&lt;" "<") ("&gt;" ">")) "&lt;a&gt;&l"))
+  (test? (multisubst1 '(("ab" "X")) '(#\a #\b #\c))
+         (multisubst  '(("ab" "X")) '(#\a #\b #\c))))
 
 (define-test blank
   (test? true   (blank "   "))
