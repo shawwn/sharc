@@ -754,11 +754,12 @@
   (save-fetchlog))
 
 (def scrape-users! ((o users (scraping-users)) (o force))
-  (scrapelog "scraping up to " (len users) " users "
-             "(" scrape-user-concurrency* "-way parallel)")
-  (scrape-users-parallel! users force)
-  (save-fetchlog)
-  (scrapelog "done."))
+  (when (len> users 0)
+    (scrapelog "scraping up to " (len users) " users "
+               "(" scrape-user-concurrency* "-way parallel)")
+    (scrape-users-parallel! users force)
+    (save-fetchlog)
+    (scrapelog "done.")))
 
 
 ; ----- Scraping HN Lists -----
@@ -1103,11 +1104,12 @@
 
 (def import-scraped-users! ((o users (scraped-usernames)) (o force))
   (let users (if force users (filter-scraped-usernames users))
-    (scrapelog "importing @(len users) users")
-    (w/creating-users
-      (parallel [do (= (the creating-users) t)
-                    (aif (scraped-user _) (import-scraped-user! it))]
-                users 50 (if (scrape-verbose) 10)))))
+    (when (len> users 0)
+      (scrapelog "importing @(len users) users")
+      (w/creating-users
+        (parallel [do (= (the creating-users) t)
+                      (aif (scraped-user _) (import-scraped-user! it))]
+                  users 50 (if (scrape-verbose) 10))))))
 
 (def filter-scraped-usernames (users)
   (rem profile&user->uid*&hpasswords* users))
