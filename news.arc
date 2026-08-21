@@ -154,6 +154,10 @@
     (ensure-uid u)
     (unless (profile u)
       (init-user u))))
+
+(defhook login ()
+  (ensure-news-user)
+  (newslog 'login))
           
 (def init-user (u)
   (ensure-uid u)
@@ -3851,10 +3855,6 @@ brackets&gt; and it should work.<br><br>")
       (apply prs t0 ids)
       (prn))))
 
-
-(defhook login ()
-  (ensure-news-user)
-  (newslog 'top-login))
 
 (when (main)
   (nsv)
