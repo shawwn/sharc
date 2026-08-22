@@ -3441,7 +3441,11 @@
   (sum [max 0 (- active-threshold* (item-age _))]
        (cdr (family s))))
 
-(def family (i) (cons i (mappend family:item i!kids)))
+(def fam (i)
+  (cons i (mappend fam:item i!kids)))
+
+(def family (i)
+  (w/loading-items (fam i)))
 
 
 (newsop newcomments () (newcomments-page))
