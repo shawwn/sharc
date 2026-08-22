@@ -1573,6 +1573,7 @@
               (unless i (editlink s))
               (flaglink s whence)
               (hidelink s whence)
+              (ranklink s whence)
               (favelink s)
               (when (in s!type 'story 'poll) (commentlink s))
               (when (apoll s) (addoptlink s))
@@ -1779,6 +1780,14 @@
       (if (in (op) "" "news" "newest")
           (clickylink label url "clicky hider" nil)
           (link label url)))))
+
+(def rank-url (i)
+  (string "https://hnrankings.info/" i!id))
+
+(def ranklink (i whence)
+  (when (metastory i)
+    (pr bar*)
+    (link "rank" (rank-url i))))
 
 (newsopr hide (id un auth goto)
   (when (good-auth user id)
