@@ -541,6 +541,10 @@ Connection: close"))
       (when (>= (hours-since created) max-hours)
         (a id)))))
 
+(def all-fnids ()
+  (+ (each (id v) timed-fnids* (out id))
+     (each (id v) fnids* (out id))))
+
 (def harvest-fnids ((o n fnid-harvest-max*))
   (w/lock-when fnid-lock* (len> fns* n)
     (each id (dead-fnids)
