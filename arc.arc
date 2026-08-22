@@ -465,7 +465,7 @@
 ; 10    submit-lock*     submitting items
 ; 11    vote-locks*      voting for items
 ; 12    rank-lock*       ranked-stories*
-; 20    maxid-lock*      incrementing maxid*
+; 20    minid-lock*      decrementing minid*
 ; 21    maxuid-lock*     incrementing maxuid*
 ; 22    save-locks*      saving tables
 ; 23    ignore-log-lock* ignore log

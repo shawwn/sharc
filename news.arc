@@ -79,7 +79,7 @@
 
 (or= submit-lock*     (make-lock 10 "submit-lock*")
      rank-lock*       (make-lock 12 "rank-lock*")
-     maxid-lock*      (make-lock 20 "maxid")
+     minid-lock*      (make-lock 20 "minid")
      ignore-log-lock* (make-lock 23 "ignore-log")
      vote-locks*      (table))
 
@@ -314,7 +314,7 @@
 (or= stories* nil comments* nil ; descending time
      items* (table) item-ids* (table) url->story* (table))
 
-(diskvar maxid* (+ newsdir* "max-id") 0)
+(diskvar minid* (+ newsdir* "min-id") 0)
 
 (= initload* 15000)
 
@@ -424,9 +424,9 @@
       (insortnew > i!id (item-ids* (item-bucket i!id))))))
 
 (def new-item-id ()
-  (w/lock maxid-lock*
-    (do1 (evtil (++ maxid*) ~file-exists:item-path)
-         (todisk maxid*))))
+  (w/lock minid-lock*
+    (do1 (evtil (-- minid*) ~file-exists:item-path)
+         (todisk minid*))))
 
 ; these must stay constant after deploying news.
 
@@ -3022,7 +3022,7 @@
        (live c)
        (nor (admin) (editor) (author c))
        (~collapsed c) ; per-user state; don't bake into the shared cache
-       ;(< (- maxid* c!id) cc-window*)
+       ;(< (- c!id minid*) cc-window*)
        (> (since c!time) (* 1 min*)))) ; was (* 1 hour*)
 
 (def cached-comment-body (c whence indent)
@@ -3399,10 +3399,7 @@
        (save-prof user)))
 
 (def update-avg-user ()
-  (rand-user [and (only&> (car (uvar _ submitted)) 
-                          (- maxid* initload*))
-                  (only&len> (uvar _ submitted) 
-                             update-avg-threshold*)]))
+  (rand-user [only&len> (uvar _ submitted) update-avg-threshold*]))
 
 (def rand-user ((o test idfn))
   (rand-elt (loaded-users test)))
