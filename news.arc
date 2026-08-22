@@ -3268,7 +3268,8 @@
                                     number moreurl))))))))))
 
 (def submissions ((t u me) (o n)) 
-  (map item (firstn n (uvar u submitted))))
+  (w/loading-items
+    (map item (firstn n (uvar u submitted)))))
 
 (def comments ((t u me) (o n))
   (keep acomment (submissions u n)))
