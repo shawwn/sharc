@@ -1174,8 +1174,9 @@
   (tostring:underlink "reset password" "resetpw"))
 
 (def claim-link ((o user))
-  (let url (string "claim" (if user "?id=") user)
-    (tostring:underlink "claim account" url)))
+  (when (can-claim)
+    (let url (string "claim" (if user "?id=") user)
+      (tostring:underlink "claim account" url))))
 
 (def user-submissions-link ((t user me))
   (tostring:underlink "submissions" (submitted-url user)))
@@ -3879,6 +3880,9 @@ brackets&gt; and it should work.<br><br>")
 
 ; Claim username
 
+(def can-claim ()
+  (bound 'curl-get)) ; load scrape.arc and log in
+
 (newsop claim (id)
   (claim-page nil id))
 
@@ -3916,8 +3920,7 @@ brackets&gt; and it should work.<br><br>")
   (posmatch (claim-code u) (fetch-hn-profile u)))
 
 (def fetch-hn-profile (u)
-  (when (bound 'curl-get) ; load scrape.arc and log in
-    (aand (hn-user-url u) (curl-get it))))
+  (aand (can-claim) (hn-user-url u) (curl-get it)))
 
 (def hn-user-url (u)
   (aand (goodname u) "https://news.ycombinator.com/user?id=@u"))
