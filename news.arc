@@ -434,7 +434,11 @@
    prof-bucket-size* 5000
    vote-bucket-size* 5000)
 
-(def bucket-id (id size) (trunc:/ id size))
+(def bucket-id (id (o size 5000))
+  (if (< id 0)
+      (aand (bucket-id (- id) size)
+            (- it 1)) ; skip -0
+      (trunc:/ id size)))
 
 (def item-bucket  (id) (bucket-id  id item-bucket-size*))
 (def prof-bucket (uid) (bucket-id uid prof-bucket-size*))
