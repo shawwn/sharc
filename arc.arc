@@ -409,6 +409,14 @@
            (rev! acc)))
      n xs nil)))
 
+(def lastn (n xs)
+  (if (no n) xs
+    ((afn (n xs)
+       (if (and (> n 0) xs)
+           (self (- n 1) (cdr xs))
+           xs))
+     (edge xs n) xs)))
+
 (def nthcdr (n xs)
   (if (no n)  xs
       (> n 0) (nthcdr (- n 1) (cdr xs))
