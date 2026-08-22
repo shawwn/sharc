@@ -1137,6 +1137,29 @@
                   (set (,seen it))
                   it)))))
 
+(def asnum (x)
+  (case (type x)
+    (num int) x
+    string    (as!num x)
+    char      (as!int x)
+    (err "Can't convert @x to number")))
+
+(def inc (x (o n 1))
+  (coerce (+ (asnum x) n) (type x)))
+
+(def range (start end . more)
+  ((afn (start (o acc))
+     (if (> start end)
+         (rev! acc)
+         (self (inc start) (cons start acc))))
+   start))
+
+(def digits ()
+  (com:as!string (range #\0 #\9)))
+
+(def alphadigits ()
+  (com:as!string (+ (range #\0 #\9) (range #\a #\z) (range #\A #\Z))))
+
 (def rand-elt (seq) 
   (let n (len seq)
     (when (> n 0)
@@ -1147,7 +1170,7 @@
 (def rand-elts (n seq)
   (n-of n (rand-elt seq)))
 
-(def rand-string (n (o alphabet "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"))
+(def rand-string (n (o alphabet (alphadigits)))
   (as!string (rand-elts n alphabet)))
 
 (def best (f seq)
@@ -1858,6 +1881,8 @@
 (def main ()
   (and main-file* (is script-file* main-file*) (no reloading*)))
 
+(def number (n) (in (type n) 'int 'num))
+
 (def positive (x)
   (and (number x) (> x 0)))
 
@@ -1959,25 +1984,6 @@
     char      (#'char-upcase x)
     (sym key) x ; symbols and keywords are always lowercase
               (err "Can't upcase" x)))
-
-(def asnum (x)
-  (case (type x)
-    (num int) x
-    string    (as!num x)
-    char      (as!int x)
-    (err "Can't convert @x to number")))
-
-(def number (n) (in (type n) 'int 'num))
-
-(def inc (x (o n 1))
-  (coerce (+ (asnum x) n) (type x)))
-
-(def range (start end)
-  ((afn (start (o acc))
-     (if (> start end)
-         (rev! acc)
-         (self (inc start) (cons start acc))))
-   start))
 
 (def mismatch (s1 s2)
   (catch
