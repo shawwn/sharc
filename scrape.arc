@@ -1086,14 +1086,14 @@
 (def comment-from-scraped-comment (c)
   (lets it (or= (items* c!id) (inst 'item 'id c!id))
     ;(when (> id maxid*) (= maxid* id))
-    (= it!by     (get-user-uid (or c!by "deleted") c!id)
-       it!type   'comment
-       it!parent (or c!parent it!parent)
-       it!time   (or c!time it!time)
-       it!text   (or c!text it!text)
-       it!dead   (or c!dead it!dead)
-       it!deleted (or c!deleted it!deleted (no c!by))
-       it!score  (scraped-comment-score c it!score))
+    (= it!by      (get-user-uid (or c!by "deleted") c!id)
+       it!type    'comment
+       it!parent  (or c!parent it!parent)
+       it!time    (or c!time it!time)
+       it!text    (or c!text it!text)
+       it!dead    c!dead
+       it!deleted (or c!deleted (no c!by))
+       it!score   (scraped-comment-score c it!score))
     ; these keys are deliberately sticky: importing can set them, but
     ; not unset them, so that mods can apply these keys without the
     ; import process clearing them.
