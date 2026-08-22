@@ -1149,6 +1149,8 @@
       (string  nil         ,(user-hidden-link user)                 ,u   nil)
       (string  nil         ,(upvoted-links user)                    ,u   nil)
       (string  nil         ,(favorited-links u user)                 t   nil)
+      (raw     nil         ,(tostring:spacerow 10)                   t   nil)
+      (string  nil         ,(claim-link user)                        t   nil)
       )))
 
 (def topcolor-default (p u)
@@ -1165,6 +1167,10 @@
 
 (def resetpw-link ()
   (tostring:underlink "reset password" "resetpw"))
+
+(def claim-link ((o user))
+  (let url (string "claim" (if user "?id=") user)
+    (tostring:underlink "claim account" url)))
 
 (def user-submissions-link ((t user me))
   (tostring:underlink "submissions" (submitted-url user)))
@@ -3495,27 +3501,36 @@ brackets&gt; and it should work.<br><br>")
 
 (defopg resetpw (resetpw-page))
 
-(def resetpw-page ((o msg))
-  (minipage "Reset Password"
+(def resetpw-page ((o msg) (o subject (me)) (o checkpw t) (o oldpw) (o newpw))
+  (minipage "Reset Password for @subject"
     (if msg
          (pr msg)
-        (blank my!email)
-         (do (pr "Before you do this, please add your email address to your ")
+        (and (me subject) (blank my!email))
+         (do (pr "First, please put a valid email address in your ")
              (underlink "profile" (user-url (me)))
              (pr ". Otherwise you could lose your account if you mistype
                   your new password.")))
     (br2)
-    (urform (try-resetpw arg!p)
-      (single-input "New password: " 'p 20 "reset" t))))
+    (urform (try-resetpw arg!oldpw arg!pw subject checkpw)
+      (tab
+        (when checkpw
+          (row "Old Password:" (input 'oldpw oldpw 20 'password)))
+        (row "New Password:" (input 'pw newpw 20 'password))
+        (row "" (submit "Change"))))))
 
-(def try-resetpw (newpw)
-  (if (no (<= 8 (len newpw) 72))
-      (flink
-        {resetpw-page "Passwords should be between 8 and 72 characters long.
-                       Please choose another."})
-      (do (set-pw (me) newpw)
-          (save-pws)
-          "news")))
+(def try-resetpw (oldpw newpw subject checkpw)
+  (w/defs
+    (def retry (msg)
+      (flink {resetpw-page msg subject checkpw oldpw newpw}))
+    (if (no (<= 8 (len newpw) 72))
+         (retry "Passwords should be between 8 and 72 characters long.
+                Please choose another.")
+        (and checkpw (~check-pw subject oldpw))
+         (retry "Current password incorrect. Please try again.")
+         (do (set-pw subject newpw)
+             (save-pws)
+             (wipe (name->code* subject))
+             "news"))))
 
 
 ; Scrubrules
@@ -3854,6 +3869,52 @@ brackets&gt; and it should work.<br><br>")
     (w/stdout o
       (apply prs t0 ids)
       (prn))))
+
+
+; Claim username
+
+(newsop claim (id)
+  (claim-page nil id))
+
+(def claim-page ((o msg) (o subject))
+  (minipage "Claim Username"
+    (only&pr msg)
+    (br2)
+    (urform (try-claim arg!acct)
+      (tab (row "Username (case sensitive):"
+                (input 'acct subject 20))
+           (row "" (submit "Claim"))))))
+
+(def try-claim (u)
+  (if (~goodname u)
+       (flink {claim-page "Bad username." u})
+      (~lookup-uid u)
+       (flink {claim-page "No such username." u})
+      (~check-claim u)
+       (flink {claim-page (claim-msg u) u})
+      (flink {resetpw-page nil u nil})))
+
+(def claim-msg (u)
+  (tostring
+    (para "Put @(claim-code u) anywhere in the \"about\" field of your ")
+    (underlink "HN profile" (hn-user-url u))
+    (pr ", then claim again to reset the password for @{u}.")
+    (para "(Afterwards, you can remove @(claim-code u) from your profile.)")))
+
+(or= name->code* (table))
+
+(def claim-code (u)
+  (or= (name->code* u) (rand-string 6 (digits))))
+
+(def check-claim (u)
+  (posmatch (claim-code u) (fetch-hn-profile u)))
+
+(def fetch-hn-profile (u)
+  (when (bound 'curl-get) ; load scrape.arc and log in
+    (aand (hn-user-url u) (curl-get it))))
+
+(def hn-user-url (u)
+  (aand (goodname u) "https://news.ycombinator.com/user?id=@u"))
 
 
 (when (main)
