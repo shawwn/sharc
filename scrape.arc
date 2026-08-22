@@ -1106,7 +1106,7 @@
     (wipe it!kids)))
 
 (def scraped-comment-score (c (o curscore))
-  (aif c!dead     1
+  (aif c!dead     (or curscore 1)
        c!deleted  (or curscore 1)
        c!color    (score-from-comment-class it)
                   1))
