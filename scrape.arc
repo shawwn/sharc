@@ -1010,12 +1010,17 @@
        it!url      s!url
        it!dead     s!dead
        it!deleted  s!deleted
-       it!fetched  (or s!fetched (seconds))
-       (mem 'dupe    it!keys)  s!dupe
-       (mem 'flagged it!keys)  s!flagged
-       (mem 'links   it!keys)  (and (~blank it!text)
-                                    (posmatch "<a href" it!text))
-       (mem 'imported it!keys) t)
+       it!fetched  (or s!fetched (seconds)))
+    ; these keys are deliberately sticky: importing can set them, but
+    ; not unset them, so that mods can apply these keys without the
+    ; import process clearing them.
+    (when s!dupe
+      (pushnew 'dupe it!keys))
+    (when s!flagged
+      (pushnew 'flagged it!keys))
+    (when (posmatch "<a href=" it!text)
+      (pushnew 'links it!keys))
+    (pushnew 'imported it!keys)
     ; `parent` defaults to nil in `deftem item`, and this reuses whatever
     ; entry is already in items*, so an id that was previously imported as
     ; a comment keeps its stale parent unless it is cleared here (same
@@ -1088,11 +1093,16 @@
        it!text   (or c!text it!text)
        it!dead   (or c!dead it!dead)
        it!deleted (or c!deleted it!deleted (no c!by))
-       it!score  (scraped-comment-score c it!score)
-       (mem 'flagged it!keys)         c!flagged
-       (mem scrape-flagger* it!flags) c!flagged
-       (mem 'collapsed it!keys)       c!collapsed
-       (mem 'imported it!keys)        t)
+       it!score  (scraped-comment-score c it!score))
+    ; these keys are deliberately sticky: importing can set them, but
+    ; not unset them, so that mods can apply these keys without the
+    ; import process clearing them.
+    (when c!flagged
+      (pushnew 'flagged it!keys)
+      (pushnew scrape-flagger* it!flags))
+    (when c!collapsed
+      (pushnew 'collapsed it!keys))
+    (pushnew 'imported it!keys)
     (wipe it!kids)))
 
 (def scraped-comment-score (c (o curscore))
