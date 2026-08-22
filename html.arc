@@ -362,8 +362,8 @@
 (mac textarea (name rows cols . body)
   `(tag (textarea name ,name rows ,rows cols ,cols) ,@body))
 
-(def input (name (o val "") (o size 10))
-  (gentag input type 'text name name value val size size))
+(def input (name (o val "") (o size 10) (o type 'text))
+  (gentag input type type name name value val size size))
 
 (mac inputs args
   `(tag (table border 0)
