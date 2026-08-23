@@ -1925,7 +1925,7 @@
        (fontcolor noob-color* (pr user))
        (pr user)))
 
-(= show-threadavg* nil)
+(= show-threadavg* t)
 
 (def commentlink (i)
   (when (cansee i)
@@ -1934,17 +1934,28 @@
       (let n (w/loading-items (- (visible-family i) 1))
         (if (> n 0)
             (do (pr (plural n "comment"))
-                (awhen (and show-threadavg* (admin user) (threadavg i))
-                  (pr " (@(num it 1 t t))")))
+                (awhen (and show-threadavg* (admin) (threadavg i))
+                  (pr " (avg: @(num it 2 t t))"))
+                (awhen (and show-threadavg* (admin) (threadstd i))
+                  (pr " (std: @(num it 2 t t))")))
             (pr "discuss"))))))
 
 (def visible-family (i (t user me))
   (+ (if (deleted i) 0 (~cansee i user) 0 1)
      (sum [visible-family _ user] (kids i))))
 
-(def threadavg (i)
-  (only&avg (map [or (uvar _ avg) 1] 
-                 (rem admin (dedup (map by (keep live (family i))))))))
+;(def threadavgs (i)
+;  (map [or (uvar _ avg) 1]
+;       (rem admin (dedup (map by (keep live (offspring i)))))))
+
+;(def threadavg (i) (only&avg (threadavgs i)))
+;(def threadstd (i) (only&std (threadavgs i)))
+
+(def thread-comments (i)
+  (rem admin:by (keep live (offspring i))))
+
+(def threadavg (i) (only&avg (map !score (thread-comments i))))
+(def threadstd (i) (only&std (map !score (thread-comments i))))
 
 (= user-changetime* (* 2 hour*) editor-changetime* (* 1 day*))
 
