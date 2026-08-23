@@ -1461,6 +1461,21 @@
 (def median (ns (o test >))
   ((sort test ns) (trunc (/ (len ns) 2))))
 
+(def cov (xs ys)
+  (avg (map * (subtract (avg xs) xs)
+              (subtract (avg ys) ys))))
+
+(def subtract (x ns)
+  (map [- _ x] ns))
+
+(def var (xs)
+  (cov xs xs))
+
+; population standard deviation.
+
+(def std (ns)
+  (sqrt (var ns)))
+
 ; Use mergesort on assumption that mostly sorting mostly sorted lists
 ; benchmark: (let td (n-of 10000 (rand 100)) (time (sort < td)) 1) 
 
