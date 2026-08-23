@@ -3447,13 +3447,13 @@
 
 (def active-rank (s)
   (sum [max 0 (- active-threshold* (item-age _))]
-       (cdr (family s))))
-
-(def fam (i)
-  (cons i (mappend fam:item i!kids)))
+       (offspring s)))
 
 (def family (i)
-  (w/loading-items (fam i)))
+  (cons i (mappend family:item i!kids)))
+
+(def offspring (i)
+  (w/loading-items (cdr (family i))))
 
 
 (newsop newcomments () (newcomments-page))
