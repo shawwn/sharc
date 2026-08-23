@@ -1446,6 +1446,8 @@
 
 (def avg (ns) (/ (apply + ns) (len ns)))
 
+; numerical median
+
 (def med (ns)
   (with (xs (sort > ns) n (len ns))
     (if (odd n)
@@ -1453,6 +1455,8 @@
         (/ (+ (xs    (/ n 2))
               (xs (- (/ n 2) 1)))
            2))))
+
+; positional median
 
 (def median (ns (o test >))
   ((sort test ns) (trunc (/ (len ns) 2))))
