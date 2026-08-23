@@ -3965,7 +3965,7 @@ brackets&gt; and it should work.<br><br>")
   (aand (can-claim) (hn-user-url u) (curl-get it)))
 
 (def hn-user-url (u)
-  (aand (goodname u) "https://news.ycombinator.com/user?id=@u"))
+  (aand (goodname u) "@{hn-url*}/user?id=@u"))
 
 
 ; Expunge items
