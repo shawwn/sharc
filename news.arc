@@ -1408,6 +1408,7 @@
       (row (link "best")         "Highest voted recent links")
       (row (link "bestcomments") "Highest voted recent comments")
       (row (link "active")       "Most active current discussions")
+      (row (link "contro")       "Most controversial current discussions")
       (row (link "noobstories")  "Submissions from new accounts")
       (row (link "noobcomments") "Comments from new accounts")
       (row (link "leaders")      "Users with most karma")
@@ -3454,6 +3455,26 @@
 
 (def offspring (i)
   (w/loading-items (cdr (family i))))
+
+
+(newsop contro (h) (contro-page (or (safe-posint h) 48)))
+
+(newscache contro-page (h) (* 10 min*)
+  (listpage (msec) (contros h) "contro" "Controversial Threads"
+            (pageurl "contro") t
+            [pageurl "contro" (+ (curpage) 1)]))
+
+(def age-cutoff (secs)
+  [< (item-age _) (/ secs min*)])
+
+(def contros (h (o n maxend*) (o consider 2000))
+  (rank-stories n consider (memo contro-rank)
+                (andf shown
+                      (age-cutoff (* h hour*))
+                      [> (contro-rank _) 0])))
+
+(def contro-rank (s)
+  (or (threadstd s) 0))
 
 
 (newsop newcomments () (newcomments-page))
