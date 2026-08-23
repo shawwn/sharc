@@ -3936,6 +3936,112 @@ brackets&gt; and it should work.<br><br>")
   (aand (goodname u) "https://news.ycombinator.com/user?id=@u"))
 
 
+; Expunge items
+
+; Unlike delete (which just sets a flag and leaves the item on disk),
+; expunging obliterates every trace of an item: the file, the in-memory
+; caches, the votes cast on it, and the references to it in other
+; users' profiles.
+
+; Only safe for a leaf.  An item with kids (or, for a poll, parts) is
+; the only thing holding those children in the tree, so removing it
+; would orphan them; kill or delete those first.
+
+(def expungeable (i)
+  (and i (no i!kids) (no i!parts)))
+
+(def expunge-item (i)
+  (assert (expungeable i) "can't expunge @{i!id}; it still has children")
+  (unlink-item i)      ; detach from its parent
+  (unvote-item i)      ; undo the votes cast on it, and their karma
+  (unregister-item i)  ; in-memory item caches and url indexes
+  (forget-item i)      ; references in users' profiles
+  (uncache-comment i!id)
+  (pull i!id (item-ids* (item-bucket i!id)))
+  (awhen (file-exists (item-path i!id))
+    (rmfile it))
+  i!id)
+
+; Note for imported items: the scraper will happily re-import an
+; expunged id on its next crawl.  Kill it there too (or dead it) if
+; you want it to stay gone.
+
+; Detaching from the parent is what actually removes the item from the
+; site's structure; everything else is bookkeeping.
+
+(def unlink-item (i)
+  (whenlet p (and i!parent (item i!parent))
+    (pull i!id p!kids)
+    (pull i!id p!parts)
+    (save-item p)
+    (uncache-comment p!id)
+    (save-item i)))
+
+; Inverse of vote-for, for every voter at once.  We don't bother
+; undoing the effects on the item's own score -- the item is about to
+; cease to exist -- but karma lives on the author's profile, and each
+; voter's vote record lives in their votes table and profile.
+
+(def unvote-item (i)
+  (let author (by i)
+    (each vote i!votes
+      (each (name n) (errsafe vote!5)  ; legacy votes have no effects
+        (when (and author (is name 'karma))
+          (-- (karma author) n)))
+      (whenlet voter (uid->user* vote!2)
+        (wipe ((votes voter) i!id))
+        (pull [is _!1 i!id] (uvar voter votes))
+        (save-votes voter)
+        (save-prof voter)))
+    (only&save-prof author))
+  (pull [caris _ i!id] recent-votes*))
+
+(def unregister-item (i)
+  (wipe (items* i!id))
+  (pull-item i stories*)
+  (pull-item i comments*)
+  (pull-item i ranked-stories*)
+  (unregister-url i)
+  (unregister-site-items i))
+
+; Inverse of register-url.  Only clear the entry if it still points
+; here; a later dupe submission may have taken the url over.
+
+(def unregister-url (i (o url i!url))
+  (unless (blank url)
+    (let key (canonical-url url)
+      (when (is (url->story* key) i!id)
+        (wipe (url->story* key))))))
+
+; Inverse of process-url/put-site-item.  An item can be indexed under
+; several sites (its own url, that url's root site, and any url in its
+; text), and its text may have been edited since it was indexed, so
+; rather than try to rederive the sites, just sweep the table.
+
+(def unregister-site-items (i)
+  (each site (keys sitename->items* [mem i!id (sitename->items* _)])
+    (pull i!id (sitename->items* site)))
+  (save-site-items))
+
+; Users point at items from four profile fields, so walk all of them.
+; It has to be all: a stray id left in some user we never looked at
+; would break their favorites page the next time they loaded it.  The
+; cost is that every profile gets read in and stays in profs*.  Pass a
+; narrower list of users if you know who could be referring to it.
+
+(def forget-item (i (o users (users)))
+  (awhen (uid->user* i!by)
+    (pushnew it users))
+  (each u users
+    (whenlet p (profile u)
+      (when (some [mem i!id (p _)] '(submitted hidden favorites collapsed))
+        (pull i!id p!submitted)
+        (pull i!id p!hidden)
+        (pull i!id p!favorites)
+        (pull i!id p!collapsed)
+        (save-prof u)))))
+
+
 (when (main)
   (nsv)
   ;(load-users)
