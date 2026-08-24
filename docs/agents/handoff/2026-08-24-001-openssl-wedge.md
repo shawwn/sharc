@@ -101,5 +101,26 @@ looks like it implicates arc's locks. It does not:
 - A `getaddrinfo` EAI_NONAME on `news.ycombinator.com` is a transient
   resolver failure (network change, VPN, mDNSResponder, wake-from-sleep).
   `call-reporting` catches it, the bgthread continues, and the item is
-  retried next pass. In the current connect path it unwinds from
-  `tcp-connect`, ahead of the SSL region.
+  retried next pass.
+
+  It is tempting to read such a backtrace as the wedge trigger, since it
+  is an error unwinding out of an HTTPS connect in a scrape thread. It is
+  not, and this was checked rather than assumed: **no revision of
+  `tcp-connect` has ever touched OpenSSL** -- it is `get-host-by-name`,
+  `make-instance inet-socket`, `socket-connect`, `set-socket-timeout`, in
+  every commit including `a20fa35^`. In the pre-fix `arc-socket-connect`
+  the SSL region came strictly after it (`tcp-connect` at body line 15,
+  `(ssl-ctx-new (tls-client-method))` at line 22, inside `(if ssl-p ...)`,
+  unreachable until a socket exists). A name-resolution failure unwinds
+  before the method store lock is ever taken.
+
+## Still open: what unwound out of SSL_CTX_new
+
+The mechanism is established; the trigger is not. The fix's own shape is
+the best clue -- it added `without-interrupts` around the short SSL setup
+calls and deliberately not around `ssl-connect` -- which points at an
+**interrupt** rather than a signalled condition: a thread terminated while
+inside `SSL_CTX_new`, e.g. `srv.arc`'s watchdog calling `stop-thread` on a
+request thread past `threadlife*`. An error would orphan the lock just as
+well, but the interrupt path is the one the fix hardened. A saved lldb
+dump from a real wedge would settle it by showing which thread was where.
