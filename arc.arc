@@ -92,9 +92,7 @@
     (apply coerce x kind args)))
 
 (def map0 (f xs)
-  (if (no xs)
-      nil
-      (do (f (car xs)) (map0 f (cdr xs)))))
+  (if xs (do (f (car xs)) (map0 f (cdr xs)))))
 
 (def rev (xs (o acc))
   (if (no xs)
