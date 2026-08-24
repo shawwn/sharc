@@ -48,10 +48,12 @@ Flipped the `defvar` default to `t`. Nothing needed the implicit flush:
 
 `(declare 'explicit-flush nil)` restores the old behavior.
 
-No restart needed: `reload` calls `reload-runtime`, which recompiles and loads
-the `.lisp` runtime as well as re-loading `loaded-files*`, and `maybe-reload`
-watches `(runtime-changed)` alongside the `.arc` files. See
-`2026-08-21-004-reloadable-lisp-runtime.md`.
+**A reload does not pick this one up.** Not because `arc0.lisp` is missed --
+`reload-runtime` recompiles and loads the `.lisp` sources too (see
+`2026-08-21-004-reloadable-lisp-runtime.md`) -- but because `defvar` assigns
+only to an *unbound* variable. An image booted before this change keeps its
+`nil` however many times it reloads. `(declare 'explicit-flush t)` sets it, or
+restart.
 
 ### 2. Character-at-a-time string plumbing (264 -> 118)
 
@@ -219,18 +221,20 @@ same terminal now has to flush stdout itself.
 
 ## Picking these up in a running image
 
-`(reload)` is enough for all of it, `.lisp` included -- `reload-runtime`
-recompiles and loads the runtime sources, and `maybe-reload` (what `autoreload*`
-polls) checks `(runtime-changed)` as well as `loaded-files*`.
+`(reload)` handles the *code* in all four sections, `.lisp` included:
+`reload-runtime` recompiles and loads the runtime sources, and `maybe-reload`
+(what `autoreload*` polls) checks `(runtime-changed)` as well as
+`loaded-files*`.
 
-Two initializers are worth knowing about, because a reload re-runs the *form*
-but the form declines to reassign:
+What a reload does not do is re-initialize. It re-runs these two forms, and both
+decline to reassign something already bound, so an image booted before the
+change keeps the old value no matter how often it reloads:
 
-- `(defvar *arc-explicit-flush* t)` only takes effect on a variable that is
-  still unbound, so an image booted before the change keeps its old value.
-  `(declare 'explicit-flush t)` sets it directly.
-- `(or= fnkey->fnid* (table) ...)` likewise keeps whatever is already bound, so
-  an image that built the isotable keeps it. `(= fnkey->fnid* (table))` swaps
-  it, and the entries do not need migrating -- they are only a cache.
+- `(defvar *arc-explicit-flush* t)` -- `defvar` only assigns when unbound.
+  Sections 1's entire effect is this one value.
+- `(or= fnkey->fnid* (table) ...)` -- an image that built the isotable keeps it,
+  so section 4's fix does nothing until it is replaced.
 
-Neither is a reason to restart; both are one form at the repl.
+Either restart, or fix them in place with `(declare 'explicit-flush t)` and
+`(= fnkey->fnid* (table))`. The fnid table needs no migrating; it is only a
+cache.
