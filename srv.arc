@@ -755,14 +755,10 @@ Connection: close"))
   (when (admin)
     (whitepage
       (sptab
-        (each ip (let leaders nil
-                   (maptable (fn (ip n)
-                               (when (> n 100)
-                                 (insort (compare > requests/ip*)
-                                         ip
-                                         leaders)))
-                             requests/ip*)
-                   leaders)
+        (each ip (lets leaders nil
+                   (each (ip n) requests/ip*
+                     (when (> n 100)
+                       (insort (compare > requests/ip*) ip leaders))))
           (let n (requests/ip* ip)
             (row ip n (pr (num (* 100 (/ n requests*)) 1)))))))))
 
