@@ -760,7 +760,7 @@ Connection: close"))
                      (when (> n 100)
                        (insort (compare > requests/ip*) ip leaders))))
           (let n (requests/ip* ip)
-            (row ip n (pr (num (* 100 (/ n requests*)) 1)))))))))
+            (row ip n (pr (num (* 100 (/ n requests*)) 1) "%"))))))))
 
 (defop spurned
   (when (admin)
