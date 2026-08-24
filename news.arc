@@ -407,9 +407,7 @@
   `(w/lock rank-lock* (= ,var (rem ,i ,var ,same))))
 
 (def read-item (id)
-  (aand (safe-id id)
-        (file-exists (item-path id))
-        (temload 'item it)))
+  (aand (safe-id id) (temload 'item (item-path it))))
 
 (def register-item (i)
   (if (loading-items) (push i (the loaded-items))
