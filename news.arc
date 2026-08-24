@@ -1899,9 +1899,28 @@
   (awhen (and show-avg* (admin) show-avg (uvar user avg))
     (pr " (@(num it 1 t t))")))
 
-(def text-time (secs)
-  (let (Y M D h m s) (map zeropad (rev:timedate secs))
+(def text-time1 (secs)
+  (let (s m h D M Y) (map zeropad (timedate secs))
     (+ "" Y "-" M "-" D "T" h ":" m ":" s " " secs)))
+
+; The pure version is dominated by the six zeropads, each allocating its
+; own string, and then a fourteen-argument string append; agelink puts
+; one of these in the title of every comment's timestamp.  ~2,'0D is
+; zeropad's "at least two digits", so a four-digit year still prints in
+; full.
+;
+; Worth only what an uncached render pays: with the comment cache doing
+; its job a logged-out page never calls this at all (39.1ms either way),
+; and the win shows up only on an admin or first view, where it is about
+; 12ms of 100.  Cheapest thing here to give back if the CL is unwelcome.
+
+#'(defun text-time-fast (year month day h m s secs)
+    (format nil "~2,'0D-~2,'0D-~2,'0DT~2,'0D:~2,'0D:~2,'0D ~D"
+            year month day h m s secs))
+
+(def text-time (secs)
+  (let (s m h D M Y) (timedate secs)
+    (#'text-time-fast Y M D h m s secs)))
 
 (def agelink (i)
   (tag (span class "age" title (text-time i!time))
