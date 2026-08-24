@@ -907,7 +907,15 @@ c"
   ; round-trips, including multibyte and empty
   (test? "日本語" (urldecode (urlencode "日本語")))
   (test? "" (urlencode ""))
-  (test? "" (urldecode "")))
+  (test? "" (urldecode ""))
+  ; the native fast path must agree with the pure version everywhere
+  (each s '("" "a" "/" "?" "&" "=" " " "%" "+" "#" "~" "-" "." "_"
+            "item?id=49397074#49397512" "abc-._~ABC012"
+            "http://example.com/a?b=c&d='e'" "café ü" "日本語")
+    (test? (urlencode1 s) (urlencode s)))
+  ; an all-unreserved string comes back as the same object, not a copy
+  (let s "abc-._~ABC012"
+    (test? true (id s (urlencode s)))))
 
 ; ----- http-fetch -----
 ;
@@ -1055,6 +1063,25 @@ c"
   (test? (posmatch1 "zz" "abcdef")   (posmatch "zz" "abcdef"))
   (test? (posmatch1 "a" "abc" 9)     (posmatch "a" "abc" 9))
   (test? (posmatch1 '(b c) '(a b c)) (posmatch '(b c) '(a b c))))
+
+(define-test fnid-hash
+  ; fnid keys are distinguished only by how they print, so write must not
+  ; truncate or elide: two keys printing alike would put two different
+  ; links on one fnid, and the second would overwrite the first's fn.
+  (let mkkey (fn (n)
+               (list "u" "item" "?id=1"
+                     (list 'w/rlink (list (list 'i n)) '((pr "kill")))))
+    (test? false (is (fnid-hash (mkkey 1)) (fnid-hash (mkkey 2))))
+    (test? true  (is (fnid-hash (mkkey 1)) (fnid-hash (mkkey 1)))))
+  ; deep nesting survives (*print-level* would print these as #)
+  (test? false (is (fnid-hash '(1 (2 (3 (4 (5 (6 (7 (8 "a")))))))))
+                   (fnid-hash '(1 (2 (3 (4 (5 (6 (7 (8 "b"))))))))))) 
+  ; long strings survive whole (truncation would merge these)
+  (with (a (+ (newstring 600 #\x) "a") b (+ (newstring 600 #\x) "b"))
+    (test? false (is (fnid-hash (list a)) (fnid-hash (list b)))))
+  ; long lists survive whole (*print-length* would elide the tail)
+  (test? false (is (fnid-hash (+ (n-of 300 'x) '(a)))
+                   (fnid-hash (+ (n-of 300 'x) '(b))))))
 
 (define-test headmatch
   (test? true  (headmatch "abc" "abcdef"))
@@ -1719,7 +1746,16 @@ c"
       (test? (len (eschtml-char c)) end)))
   ; uneschtml decodes a whole string (the / case regressed twice before)
   (test? "<a> & \"x\" '/'"
-         (uneschtml "&lt;a&gt; &amp; &quot;x&quot; &#x27;&#x2F;&#x27;")))
+         (uneschtml "&lt;a&gt; &amp; &quot;x&quot; &#x27;&#x2F;&#x27;"))
+  ; the native fast path must agree with the pure version everywhere
+  (each s '("" "a" "<" ">" "&" "\"" "'" "/" "<>&\"'/" "abc" "a<b"
+            "http://example.com/a?b=c&d='e'" "&lt;already&gt;" "café ü")
+    (test? (eschtml1 s) (eschtml s)))
+  ; a string with nothing to escape comes back as the same object
+  (let s "nothing to escape here"
+    (test? true (id s (eschtml s))))
+  ; eschtml1 still takes any sequence, not just strings
+  (test? "a&lt;b" (eschtml (list #\a #\< #\b))))
 
 (define-test markdown-escape
   ; a backslash escapes a following * into a literal asterisk
