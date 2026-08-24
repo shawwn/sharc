@@ -766,8 +766,8 @@ Connection: close"))
   (when (admin)
     (whitepage
       (sptab
-        (map (fn ((ip n)) (row ip n))
-             (sortable spurned*))))))
+        (each (ip n) (sortable spurned*)
+          (row ip n))))))
 
 ; eventually promote to general util
 
