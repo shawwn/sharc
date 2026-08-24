@@ -321,8 +321,8 @@
 (mac w/loading-items body
   `(w/the loading-items t
      (w/the loaded-items nil
-       (do1 (do ,@body)
-            (only&insert-items (the loaded-items))))))
+       (after (do ,@body) ; required in case watchdog kills thread
+         (only&insert-items (the loaded-items))))))
 
 (def loading-items () (the loading-items))
 
