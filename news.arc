@@ -3029,51 +3029,75 @@
 ; It might solve the same problem more generally to make html code
 ; more efficient.
 
-(or= comment-cache* (table) comment-cache-timeout* (table) comment-gen* (table))
-
-(= cc-window* 10000)
+(or= comment-cache* (table) comment-gen* (table))
 
 (or= comments-printed* 0 cc-hits* 0)
 
 (= comment-caching* t) 
 
-(def uncache-comment (id)
-  (w/place-lock
-    (wipe (comment-cache* id))
-    (++ (comment-gen* id 0))))
+; Bumping the generation is enough to invalidate: it is part of the
+; cache key, so the stale body simply loses the next key comparison and
+; gets overwritten in place.
 
-; Cache comments generated for nil user that are over a minute old.
-; Only try to cache most recent 10k items.  But this window moves,
-; so if server is running a long time could have more than that in
-; cache.  Probably should actively gc expired cache entries.
+(def uncache-comment (id)
+  (++ (comment-gen* id 0)))
+
+; Cache the body of a comment as rendered for a logged-out viewer.
+;
+; comment-cache* holds ONE slot per comment id, and the slot is a
+; (key body) pair.  A lookup recomputes the key and compares it to the
+; stored one; a miss overwrites the slot.  So the cache is self-pruning
+; -- it can never hold more entries than there are comments, whatever
+; changes about how a comment renders -- and nothing has to know in
+; advance which inputs might invalidate an entry, only how to hash them
+; into the key.
+;
+; What goes in the key is everything gen-comment-body reads besides the
+; item itself: where it is being rendered (whence, indent, showpar,
+; showon), its position in the thread (the comment-nav entry, so that
+; reordering a thread can't leave a comment pointing prev/next/root at
+; stale neighbours), the generation counter that uncache-comment bumps,
+; and the age bucket, since the body prints a relative "N hours ago".
+
+(def comment-cache-key (c whence indent showpar showon)
+  (list whence indent showpar showon
+        (cnav c 'root) (cnav c 'prev) (cnav c 'next) (cnav c 'n)
+        (comment-gen* c!id 0)
+        (cc-timeout c!time)))
 
 (def display-comment-body (c whence astree indent showpar showon)
   (++ comments-printed*)
-  (if (should-cache-comment c whence astree indent showpar showon)
-      (pr (cached-comment-body c whence indent))
+  (if (should-cache-comment c astree)
+      (pr (cached-comment-body c whence indent showpar showon))
       (gen-comment-body c whence astree indent showpar showon)))
 
-(def should-cache-comment (c whence astree indent showpar showon)
-  ;(ero `(should-cache-comment ,c!id ,whence ,astree ,indent ,showpar ,showon))
-  (and comment-caching*
-       astree (no showpar) (no showon)
-       (live c)
-       (nor (admin) (editor) (author c))
-       (~collapsed c) ; per-user state; don't bake into the shared cache
-       ;(< (- c!id minid*) cc-window*)
-       (> (since c!time) (* 1 min*)))) ; was (* 1 hour*)
+; Only for logged-out viewers.  A logged-in one gets flag/fave/unvote
+; links baked into the body, and an admin gets kill/blast/delete as
+; well, so those bodies are viewer-specific and not sharable.  (Keying
+; on the viewer instead would work, but with one slot per comment two
+; people reading at once would just evict each other.)
 
-(def cached-comment-body (c whence indent)
-  (or (and (> (or (comment-cache-timeout* c!id) 0) (seconds))
-           (awhen (comment-cache* c!id)
-             (++ cc-hits*)
-             it))
-      (let gen (comment-gen* c!id 0)
-        (lets body (tostring (gen-comment-body c whence t indent nil nil))
-          (w/place-lock
-            (when (is gen (comment-gen* c!id 0))
-              (= (comment-cache-timeout* c!id) (cc-timeout c!time)
-                 (comment-cache* c!id)         body)))))))
+(def should-cache-comment (c astree)
+  (and comment-caching*
+       astree
+       (no (me))
+       (live c)
+       (~collapsed c)
+       (isnt arg!id (string c!id)) ; the page's own item renders differently
+       (> (since c!time) (* 1 min*))))
+
+(def cached-comment-body (c whence indent showpar showon)
+  (let key (comment-cache-key c whence indent showpar showon)
+    (iflet (cached-key body) (comment-cache* c!id)
+      (if (is cached-key key)
+          (do (++ cc-hits*) body)
+          (recache-comment c whence indent showpar showon key))
+      (recache-comment c whence indent showpar showon key))))
+
+(def recache-comment (c whence indent showpar showon key)
+  (let body (tostring (gen-comment-body c whence t indent showpar showon))
+    (= (comment-cache* c!id) (list key body))
+    body))
 
 ; Cache for the remainder of the current minute, hour, or day.
 
