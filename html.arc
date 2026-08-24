@@ -122,9 +122,9 @@
 
 (def sanitize (val)
   (case (type val)
-    sym    (sym:sanitize:string val)
-    char   (eschtml-char val)
     string (eschtml val)
+    char   (eschtml-char val)
+    sym    (sym:sanitize:string val)
            val))
 
 (def presc args
