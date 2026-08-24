@@ -101,7 +101,28 @@ looks like it implicates arc's locks. It does not:
 - A `getaddrinfo` EAI_NONAME on `news.ycombinator.com` is a transient
   resolver failure (network change, VPN, mDNSResponder, wake-from-sleep).
   `call-reporting` catches it, the bgthread continues, and the item is
-  retried next pass.
+  retried next pass. The one that prompted this write-up, so it is
+  recognisable if it recurs (2026-08-24):
+
+  ```
+  Error: Name service error in "getaddrinfo": 8 (nodename nor servname provided, or not known)
+  Backtrace for: #<THREAD tid=6919 "scrape-remaining-stories" RUNNING>
+   3: (error sb-bsd-sockets:host-not-found-error :errno 8 :syscall "getaddrinfo")
+   5: (sb-bsd-sockets:get-host-by-name #<unavailable argument>)
+   6: (arc::tcp-connect "news.ycombinator.com" 443 60)
+   7: (arc::arc-socket-connect "news.ycombinator.com" 443 ...)
+   9: (arc::arc-http-fetch "https://news.ycombinator.com/item?id=49389524" ...)
+  10: ((flet "WITHOUT-INTERRUPTS-BODY-" :in sb-thread::call-with-recursive-lock))
+  11: (sb-thread::call-with-recursive-lock ... #<sb-thread:mutex "hash-table lock"
+        taken owner=scrape-remaining-stories>)
+  12: (arc::arc--CALL-W/LOCKED-TABLE #<hash-table :COUNT 3> #<function arc::FETCH-HN-URL>)
+  13: (arc::SCRAPE-ITEM! 49389524 nil)
+  15: (arc::arc--CALL-REPORTING #<function arc::SCRAPE-HN-STORIES>)
+  ```
+
+  Two things in it invite the wrong conclusion: the `WITHOUT-INTERRUPTS`
+  frame at 10, and an HTTPS fetch visibly running under a held lock at 11
+  and 12. Both are addressed above.
 
   It is tempting to read such a backtrace as the wedge trigger, since it
   is an error unwinding out of an HTTPS connect in a scrape thread. It is
