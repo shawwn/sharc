@@ -105,20 +105,55 @@
       (litmatch "&#x2F;" s i) (list #\/ (+ i 6))
                               (list (s i) (+ i 1))))
 
-(def eschtml-char (c)
-  (case c
-    #\<  "&lt;"
-    #\>  "&gt;"
-    #\&  "&amp;"
-    #\"  "&quot;"
-    #\'  "&#x27;"
-    #\/  "&#x2F;"
-    c))
+; The escape table lives on the CL side so eschtml-fast below can call
+; it directly; eschtml-char is the Arc-visible name for it.
 
-(def eschtml (str)
+#'(defun eschtml-char-1 (c)
+    (case c
+      (#\<  "&lt;")
+      (#\>  "&gt;")
+      (#\&  "&amp;")
+      (#\"  "&quot;")
+      (#\'  "&#x27;")
+      (#\/  "&#x2F;")
+      (t c)))
+
+(def eschtml-char (c) (#'eschtml-char-1 c))
+
+(def eschtml1 (str)
   (tostring
     (each c str
       (pr (eschtml-char c)))))
+
+; optimization at the expense of Arc purity (cf. posmatch/multisubst in
+; strings.arc).  The pure version prints one character at a time into a
+; fresh outstring, which costs ~5us for a url -- and sanitize runs it on
+; every dynamic tag attribute, so an item page with 1600 comments paid it
+; about twenty thousand times.  The native version sizes the result in one
+; pass and fills it in a second, and returns str itself when there is
+; nothing to escape.  Non-strings (eschtml1 accepts any sequence) still
+; take the pure path.
+
+#'(defun eschtml-fast (str)
+    (let ((n (length str)) (extra 0))
+      (dotimes (i n)
+        (let ((r (eschtml-char-1 (char str i))))
+          ; eschtml-char returns the char itself when there's nothing to do
+          (when (stringp r) (incf extra (1- (length r))))))
+      (if (zerop extra)
+          str
+          (let ((out (make-string (+ n extra))) (j 0))
+            (dotimes (i n)
+              (let ((r (eschtml-char-1 (char str i))))
+                (if (stringp r)
+                    (progn (replace out r :start1 j) (incf j (length r)))
+                    (progn (setf (char out j) r) (incf j)))))
+            out))))
+
+(def eschtml (str)
+  (if (isa!string str)
+      (#'eschtml-fast str)
+      (eschtml1 str)))
 
 (def sanitize (val)
   (case (type val)
