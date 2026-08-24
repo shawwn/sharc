@@ -113,7 +113,7 @@
   (load-userinfo)
   (unless stories*
     (load-item-buckets)
-    (load-items)
+    (load-items initload*)
     (ensure-topstories))
   (if (and initload-users* (empty profs*)) (load-users)))
 
@@ -328,7 +328,7 @@
 
 ; Could be smarter about preloading by keeping track of popular pages.
 
-(def load-items ((o n initload*))
+(def load-items ((o n))
   (system:list "rm" "-f" (string storydir* "*/*.tmp"))
   (prn "load @(or n (item-count)) items:")
   (latest-items idfn nil n 1000))
@@ -3494,10 +3494,10 @@
 (def actives ((o n maxend*) (o consider 2000))
   (rank-stories n consider (memo active-rank) shown))
 
-(= active-threshold* 1500)
+(= active-threshold* (* 25 hour*))
 
 (def active-rank (s)
-  (sum [max 0 (- active-threshold* (item-age _))]
+  (sum [max 0 (- (/ active-threshold* min*) (item-age _))]
        (offspring s)))
 
 (def family (i)
