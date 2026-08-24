@@ -395,16 +395,19 @@ Connection: close"))
   (map [tokens _ #\=] 
        (cdr (tokens s [or (whitec _) (is _ #\;)]))))
 
+(def req-args ((t req))
+  (and req req!args))
+
 ; Look up a request arg by key. Reads (the req), so callers don't
 ; need to thread req through. Accepts a symbol or string key:
 ;   (arg "id")   ; explicit string
 ;   (arg 'id)    ; symbol --- arc sugar:
 ;   arg!id       ; equivalent to (arg 'id)
-(def arg (key (t req))
-  (alref req!args (if (isa!sym key) (as!string key) key)))
+(def arg (key)
+  (alref (req-args) (if (isa!sym key) (as!string key) key)))
 
-(def reassemble-args ((t req))
-  (aif req!args
+(def reassemble-args ()
+  (aif (req-args)
        (apply string "?" (intersperse '& (map reassemble-kv it)))
        ""))
 
