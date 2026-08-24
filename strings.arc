@@ -77,7 +77,7 @@
 (def string->utf8 (s)
   (bytes->string (string->bytes s :latin-1)))
 
-(def urlencode (s)
+(def urlencode1 (s)
   (tostring
     (each b (chars:utf8-encode s)
       (let c (as!char b)
@@ -85,6 +85,48 @@
             (writec c)
             (do (writec #\%)
                 (pr:zeropad (as!string b 16))))))))
+
+; Same optimization as posmatch/multisubst below: the pure version walks
+; the utf-8 bytes one at a time through as!char, unreserved and a fresh
+; zeropad string per escaped byte, which costs ~9us for a url.  replylink
+; runs it once per comment, so an item page paid it 1600 times.  ASCII
+; digits, letters and -._~ are exactly what `unreserved` admits below the
+; 128 cutoff, so a string made only of those comes back unchanged.
+
+#'(defun url-unreserved-byte-p (b)
+    (or (and (>= b 48)  (<= b 57))    ; 0-9
+        (and (>= b 65)  (<= b 90))    ; A-Z
+        (and (>= b 97)  (<= b 122))   ; a-z
+        (= b 45) (= b 46) (= b 95) (= b 126)))  ; - . _ ~
+
+; takes the utf-8 bytes from arc's own utf8-encode, since a package-marker
+; symbol like sb-ext:string-to-octets doesn't resolve inside a #' body.
+; Returns s itself (not a copy) when no byte needs escaping.
+
+#'(defun urlencode-fast (bytes s)
+    (let ((n (length bytes))
+          (extra 0))
+      (dotimes (i n)
+        (unless (url-unreserved-byte-p (aref bytes i)) (incf extra 2)))
+      (if (zerop extra)
+          s
+          (let ((out (make-string (+ n extra))) (j 0))
+            (dotimes (i n)
+              (let ((b (aref bytes i)))
+                (if (url-unreserved-byte-p b)
+                    (progn (setf (char out j) (code-char b)) (incf j))
+                    (progn (setf (char out j) #\%)
+                           (setf (char out (+ j 1))
+                                 (char "0123456789abcdef" (ash b -4)))
+                           (setf (char out (+ j 2))
+                                 (char "0123456789abcdef" (logand b 15)))
+                           (incf j 3)))))
+            out))))
+
+(def urlencode (s)
+  (if (isa!string s)
+      (#'urlencode-fast (utf8-encode s) s)
+      (urlencode1 s)))
 
 (def unreserved (c)
   (or (alphadig c) (in c #\- #\. #\_ #\~)))
