@@ -330,11 +330,11 @@
 
 (def load-items ((o n initload*))
   (system:list "rm" "-f" (string storydir* "*/*.tmp"))
-  (pr "load items: ")
+  (prn "load @initload* items:")
   (latest-items idfn nil n 100))
 
 (def load-item-buckets ((o buckets (item-buckets)))
-  (pr "load @(len buckets) item buckets: ")
+  (prn "load @(len buckets) item buckets:")
   (noisy-each 1 bucket buckets
     (or= (item-ids* bucket) (item-ids bucket))))
 
