@@ -3518,10 +3518,9 @@
   [< (item-age _) (/ secs min*)])
 
 (def contros (h (o n maxend*) (o consider 2000))
-  (rank-stories n consider (memo contro-rank)
-                (andf shown
-                      (age-cutoff (* h hour*))
-                      [> (contro-rank _) 0])))
+  (keep (andf (age-cutoff (* h hour*))
+              [> (contro-rank _) 0])
+        (rank-stories n consider (memo contro-rank) shown)))
 
 (def contro-rank (s)
   (or (threadstd s) 0))
