@@ -1959,9 +1959,16 @@
       (deq q))
     (enq val q)))
 
+; The dots go to stderr, but the "load items: " style labels that
+; introduce them are printed to stdout by the caller.  Both land on the
+; terminal, so flush stdout before switching over or the labels sit in
+; the buffer until something writes a newline and turn up after their
+; own progress dots.
+
 (def noisy-report (n noisy)
   (when noisy
     (when (main-thread)
+      (flushout)
       (w/stdout (stderr)
         (when (multiple n noisy)
           (pr ".") (flushout))
@@ -1974,6 +1981,7 @@
 
 (def noisy-flush (noisy)
   (when (main-thread)
+    (flushout)
     (w/stdout (stderr)
       (when noisy (prn) (flushout)))))
 
