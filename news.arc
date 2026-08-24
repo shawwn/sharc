@@ -595,7 +595,7 @@
 
 (def user-age ((t u me)) (minutes-since (uvar u created)))
 
-; Only looks at the 1000 most recent stories, which might one day be a 
+; Only looks at the 10000 most recent stories, which might one day be a 
 ; problem if there is massive spam. 
 
 (def gen-topstories ()
