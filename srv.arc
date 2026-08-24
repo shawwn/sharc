@@ -455,7 +455,24 @@ Connection: close"))
 
 (or= fns* (table) fnids* (table) timed-fnids* (table))
 
-(or= fnkey->fnid* (isotable) fnid->fnkey* (table))
+; SBCL's psxhash, which is what isotable hashes with, descends only a
+; couple of levels into a list.  Every fnid key buries the part that
+; makes it distinct -- the captured scope and the quoted body -- below
+; that, so all of them hashed to the same value and the table degenerated
+; into one chain compared pairwise with arc-is2.  An admin item page
+; mints an fnid per edit/flag/kill/blast/delete link, so rendering one
+; went quadratic: ~6800 links took about three seconds.  Hashing the
+; printed key into a plain table is flat (1.6us at any size).
+;
+; All this needs from write is that it be faithful: if two keys ever
+; printed the same way the second link would overwrite the first's
+; function under a shared fnid, which is worse than a bucket collision.
+; It is -- *print-level*, *print-length* and *arc-print-string-length*
+; are nil outside the repl's own printing of a result.
+
+(def fnid-hash (key) (tostring:write key))
+
+(or= fnkey->fnid* (table) fnid->fnkey* (table))
 
 (def forget-fnid (key)
   (w/lock fnid-lock*
@@ -487,7 +504,7 @@ Connection: close"))
 
 (def new-fnid (key)
   (if key
-      (let fnkey (fnid-key key)
+      (let fnkey (fnid-hash (fnid-key key))
         (or= (fnkey->fnid* fnkey)
              (lets id (gen-fnid)
                (= (fnid->fnkey* id) fnkey))))
