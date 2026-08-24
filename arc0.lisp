@@ -2424,3 +2424,39 @@ sb-thread mutex with a :name, and anything else prints as itself."
 
 (xdef reload-runtime (&optional force)
   (reload-runtime :force force))
+
+(defun object-size (obj &optional (visited (make-hash-table :test #'eq)))
+  "Exact heap bytes consumed by OBJ and everything it references, on SBCL 64-bit."
+  (when (or (gethash obj visited)
+            (typep obj '(or fixnum character single-float symbol)))
+    (return-from object-size 0))
+  (setf (gethash obj visited) t)
+  (let ((self (sb-vm::primitive-object-size obj)))
+    (cond
+      ((hash-table-p obj)
+       (let ((sum (+ self (sb-vm::primitive-object-size
+                           (sb-impl::hash-table-pairs obj)))))
+         (maphash (lambda (k v)
+                    (incf sum (object-size k visited))
+                    (incf sum (object-size v visited)))
+                  obj)
+         sum))
+      ((consp obj)
+       (+ self
+          (object-size (car obj) visited)
+          (object-size (cdr obj) visited)))
+      ((simple-vector-p obj)
+       (+ self (loop for x across obj sum (object-size x visited))))
+      ((vectorp obj)
+       self)
+      ((typep obj '(or standard-object structure-object))
+       (+ self
+          (loop for slot in (sb-mop:class-slots (class-of obj))
+                for name = (sb-mop:slot-definition-name slot)
+                when (slot-boundp obj name)
+                sum (object-size (slot-value obj name) visited))))
+      (t self))))
+
+(xdef object-size #'object-size)
+
+(xdef sizeof #'sb-vm::primitive-object-size)

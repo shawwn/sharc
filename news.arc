@@ -360,6 +360,9 @@
 (def cached-item-ids (bucket)
   (item-ids* bucket))
 
+(def all-item-ids ()
+  (mappend cached-item-ids (item-buckets)))
+
 (mac each-item-id (var . body)
   `(each ,var (all-item-ids)
      ,@body))
@@ -797,25 +800,29 @@
   (gc)
   (memory))
 
+(def megabytes (xs)
+  (string (num:/ (sum object-size xs) 1000.0 1000.0) "MB"))
+
+(def item-count ()
+  (sum len:cached-item-ids (keys item-ids*)))
+
 (def admin-bar (elapsed whence)
   (when (or (admin) arg!perf)
     (br2)
     (w/bars
       (pr (num:len fns*) " fnids")
-      (pr "loaded " (num:len items*) " of " (num:item-count) " items")
-      (pr (num:len:loaded-users) " of " (num maxuid*) " users")
-      (pr (num:len:loaded-votes) " of " (num maxuid*) " votes")
-      (pr (num:memory-after-gc) " bytes")
+      (pr "loaded " (num:len items*) " of " (num:item-count) " items"
+          " (@(megabytes (vals items*)))")
+      (pr (num:len:loaded-users) " of " (num maxuid*) " users"
+          " (@(megabytes (vals profs*)))")
+      (pr (num:len:loaded-votes) " of " (num maxuid*) " votes"
+          " (@(megabytes (vals votes*)))")
+      (let m (memory-after-gc)
+        (pr (num m) " total bytes (" (num (/ m (len items*))) " b/item)"))
       (pr (num elapsed 3 t t) " msec")
       (when (admin)
         (link "settings" "newsadmin")
         (hook 'admin-bar whence)))))
-
-(def item-count ()
-  (sum len:cached-item-ids (keys item-ids*)))
-
-(def all-item-ids ()
-  (mappend cached-item-ids (item-buckets)))
 
 (def color-stripe (c)
   (tag (table width "100%" cellspacing 0 cellpadding 1)
