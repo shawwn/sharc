@@ -186,7 +186,17 @@ straight to gcell-ref; this remains for callers holding only a symbol."
 ;;;; ============================================================
 
 (defvar *arc-atstrings*     t)
-(defvar *arc-explicit-flush* nil)
+
+;; On by default: force-output per disp made every (pr ...) a write()
+;; syscall on the response socket, which cost more than generating the
+;; html did (a 1600-comment item page spent ~225 of its 490ms there).
+;; Nothing needs the implicit flush: sbcl line-buffers stdout/stderr, so
+;; prn still reaches a terminal on its own; the places that print a
+;; partial line -- the repl prompt, noisy-each's dots -- already call
+;; flushout; and the response socket is :buffering :full and flushed by
+;; the close in handle-request-1.  (declare 'explicit-flush nil) restores
+;; the old behavior.
+(defvar *arc-explicit-flush* t)
 
 (sb-int:with-float-traps-masked (:overflow :divide-by-zero :invalid)
   (xdef -inf (/ -1d0 0d0))
