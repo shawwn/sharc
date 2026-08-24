@@ -48,8 +48,10 @@ Flipped the `defvar` default to `t`. Nothing needed the implicit flush:
 
 `(declare 'explicit-flush nil)` restores the old behavior.
 
-**This one needs a server restart.** `autoreload*` reloads `.arc` files but not
-`arc0.lisp`, so a running server picks up everything below and none of this.
+No restart needed: `reload` calls `reload-runtime`, which recompiles and loads
+the `.lisp` runtime as well as re-loading `loaded-files*`, and `maybe-reload`
+watches `(runtime-changed)` alongside the `.arc` files. See
+`2026-08-21-004-reloadable-lisp-runtime.md`.
 
 ### 2. Character-at-a-time string plumbing (264 -> 118)
 
@@ -215,9 +217,20 @@ same terminal now has to flush stdout itself.
   urls with an auth token, the way `vote` already works, would remove 6,838
   closure registrations from the page and is the next big win on that path.
 
-## Both fixes need a server restart
+## Picking these up in a running image
 
-`autoreload*` reloads `.arc` files, so sections 2 and 3 land on a running
-server by themselves. Section 1 lives in `arc0.lisp`, which is only read at
-boot. Section 4 is in `srv.arc` but behind `(or= fnkey->fnid* (table) ...)`,
-so a reload keeps the isotable that is already there.
+`(reload)` is enough for all of it, `.lisp` included -- `reload-runtime`
+recompiles and loads the runtime sources, and `maybe-reload` (what `autoreload*`
+polls) checks `(runtime-changed)` as well as `loaded-files*`.
+
+Two initializers are worth knowing about, because a reload re-runs the *form*
+but the form declines to reassign:
+
+- `(defvar *arc-explicit-flush* t)` only takes effect on a variable that is
+  still unbound, so an image booted before the change keeps its old value.
+  `(declare 'explicit-flush t)` sets it directly.
+- `(or= fnkey->fnid* (table) ...)` likewise keeps whatever is already bound, so
+  an image that built the isotable keeps it. `(= fnkey->fnid* (table))` swaps
+  it, and the entries do not need migrating -- they are only a cache.
+
+Neither is a reason to restart; both are one form at the repl.
