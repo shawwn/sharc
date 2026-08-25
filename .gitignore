@@ -1,7 +1,4 @@
 /arc/
-/scrape.json
-/smtp.json
-/recaptcha.json
 *.fasl
 *.fas
 *.lib
@@ -9,5 +6,11 @@
 *~
 \#*\#
 .DS_Store
+
+/scrape.json
+/smtp.json
+/recaptcha.json
+/notify.json
+
 /*.txt
 /*.html
