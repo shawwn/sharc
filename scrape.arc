@@ -852,7 +852,7 @@
     (after (whenlet ids (scrape-topstory-ids)
              (set-frontpage ids)
              (frontlog ids t0))
-      (sleep (max 0 (- 10 (since t0)))))))
+      (sleep (max 0 (- (* 10 sec*) (since t0)))))))
 
 (def set-frontpage (ids)
   (seen-frontpage ids)
