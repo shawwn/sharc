@@ -39,7 +39,7 @@
    ; hnscraper account has explicit owner authorization to run faster;
    ; the About page invites contact if it's too aggressive.  Keep this
    ; conservative; revert to 30 if HN ops asks.
-   scrape-crawl-delay*  5.0
+   scrape-crawl-delay*  10.0
    ; max parallel curl subprocesses for the user API.  Firebase has no
    ; advertised rate limit; 10 is comfortable.
    scrape-user-concurrency* 10
