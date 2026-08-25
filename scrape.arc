@@ -769,7 +769,10 @@
 
 (def scrape-hn-itemlist ((o op "newest") (o n-pages 3) (o dedupe t)
                          (o noisy (if (main-thread) 1 nil)))
-  (withs (url op seen (if dedupe (memtable (map !id (hn-lists* (sym url))))))
+  (withs (url op
+          seen (if dedupe (memtable (map !id (hn-lists* (sym op)))))
+          existing (table [each i (hn-lists* (sym op))
+                            (= (_ i!id) i)]))
     (accum a
       (w/noisy iter noisy
         (repeat (or n-pages inf)
@@ -778,7 +781,11 @@
             (with (items (parse-listpage html) nseen 0)
               (each item items
                 (if (and dedupe (seen item!id))
-                    (++ nseen)
+                    (do (++ nseen)
+                        ; update existing items with latest data
+                        (whenlet cur (existing item!id)
+                          (each (k v) item
+                            (= (cur k) v))))
                     (a item)))
               (when (is nseen (len items))
                 (break)))
