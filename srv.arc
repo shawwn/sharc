@@ -23,7 +23,7 @@
 
 (= quitsrv* nil)
 
-(def serve ((o port 8080))
+(def serve ((o port (readenv "PORT" 8080)))
   (init-serve port)
   (restart-serve port))
 
@@ -55,7 +55,7 @@
       (handle-request s breaksrv*))
     (ero "quit server")))
 
-(def serve1 ((o port 8080))
+(def serve1 ((o port (readenv "PORT" 8080)))
   (w/socket s port (handle-request s t)))
 
 (def ensure-srvdirs ()
