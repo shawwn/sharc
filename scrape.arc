@@ -849,12 +849,17 @@
 (def get-hnlist-item (name id)
   (find [is _!id id] (hn-lists* name)))
 
+(= frontlog-rate* (* 30 sec*)
+   frontlog-use-api* t)
+
 (def frontlog-loop ()
   (let t0 (seconds)
-    (after (whenlet ids (scrape-topstory-ids)
+    (after (whenlet ids (if frontlog-use-api*
+                            (fetch-topstories)
+                            (scrape-topstory-ids))
              (set-frontpage ids)
              (frontlog ids t0))
-      (sleep (max 0 (- (* 10 sec*) (since t0)))))))
+      (sleep (max 0 (- frontlog-rate* (since t0)))))))
 
 (def set-frontpage (ids)
   (seen-frontpage ids)
