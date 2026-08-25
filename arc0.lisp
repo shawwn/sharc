@@ -449,7 +449,7 @@ straight to gcell-ref; this remains for callers holding only a symbol."
   (and (consp l)
        (if (eq k :arc/unset) (car l)
          (if (functionp k) (funcall k (car l))
-           (test (car l) k)))))
+           (funcall test (car l) k)))))
 
 (defun arc-caar? (l &optional (k :arc/unset) &key (test #'arc-id))
   (arc-car? (arc-car? l) k :test test))
