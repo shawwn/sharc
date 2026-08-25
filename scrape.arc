@@ -698,7 +698,7 @@
   (load-fetchlog)
   (scrapelog "crawl-delay: " scrape-crawl-delay* "s limit=" limit)
   (scrapelog "logging in...")
-  (ensure-login)
+  (assert (ensure-login) "Can't log in")
   ; deleted comments are assigned to user "deleted", so import
   ; "deleted" now.
   (scrapelog "importing \"deleted\"...")
