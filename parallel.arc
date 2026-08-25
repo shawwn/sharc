@@ -16,3 +16,6 @@
               (noisy-flush noisy))
           (each th threads (stop-thread th)))
         (apply + nil (map car slots)))))
+
+(def batch-size (total threads)
+  (max 1 (+ 1 (trunc (/ total (max 1 threads))))))
