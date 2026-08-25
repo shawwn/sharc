@@ -258,8 +258,11 @@
   (aif (between html "<span class=\"titleline\">" "</span>" start)
        (withs (inner   (car it)
                pseudo  (cut inner 0 (posmatch "<a " inner))
-               m-url   (between inner "<a href=\"" "\"" 0)
-               m-title (and m-url (between inner ">" "</a>" (cadr m-url)))
+               ; dead items on /newest don't dispaly their url, so
+               ; check for that first.
+               m-dead  (between inner "<a rel=\"nofollow\">" "</a>")
+               m-url   (unless m-dead (between inner "<a href=\"" "\"" 0))
+               m-title (or m-dead (and m-url (between inner ">" "</a>" (cadr m-url))))
                url     (and m-url (uneschtml (car m-url)))
                m-site  (and m-url (parse-sitename html)))
          (parse-pseudotext! pseudo rec)
