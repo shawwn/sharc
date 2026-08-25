@@ -1194,6 +1194,7 @@
   180 (rescrape-hn-lists))
 
 (when (main)
-  (nsv)
+  (load-news)
   (load-scrape)
+  (serve)
   (main-repl))
