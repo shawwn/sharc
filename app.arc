@@ -15,7 +15,7 @@
   (load-userinfo)
   (serve port))
 
-(or= hpasswords*   (table)
+(or= hpasswords*   (table) admins*        nil
      cookie->user* (table) user->cookies* (table)
      uid->user*    (table) user->uid*     (table))
 
@@ -28,10 +28,10 @@
 (def creating-users () (the creating-users))
 
 (def load-userinfo ()
-  (load-admins)
-  (load-uids)
-  (load-pws)
-  (load-cookies)
+  (if (empty admins*) (load-admins))
+  (if (empty user->uid*) (load-uids))
+  (if (empty hpasswords*) (load-pws))
+  (if (empty cookie->user*) (load-cookies))
   t)
 
 
