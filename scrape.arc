@@ -32,8 +32,7 @@
    scrape-lists-dir* (string arcdir* "scrape/lists/")
    scrape-cookies*   (string arcdir* "scrape/cookies.txt")
    scrape-fetchlog*  (string arcdir* "scrape/last-fetch.lisp")
-   scrape-user-agent*
-     "hnscraper (https://news.ycombinator.com/user?id=hnscraper; contact shawnpresser@@gmail.com)"
+   scrape-user-agent* "hnscraper (https://news.ycombinator.com/user?id=hnscraper; contact shawnpresser@@gmail.com)"
    scrape-item-refetch-secs* (* 1 min*)   ; skip items refetched within last minute
    scrape-user-refetch-secs* (* 1 hour*)  ; skip users refetched within last hour
    ; robots.txt advertises Crawl-delay: 30 for generic bots.  The
