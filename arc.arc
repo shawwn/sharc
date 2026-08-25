@@ -1620,15 +1620,40 @@
         x)
       x))
 
+; The membership test used to be (assoc k fields), a linear scan of the
+; whole template for every field read back.  temload runs this once per
+; item on disk, so a full (load-items) did it hundreds of thousands of
+; times.  Cache one key set per template instead; the cache is keyed on
+; the field list itself, so redefining a template with deftem or addtem
+; installs a fresh list and misses the stale entry rather than reading
+; through it.
+
+(or= template-keys* (table))
+
+; Cached under the template's name -- a symbol, so it hashes well; the
+; fields list itself would be a cons full of closures.  The list is kept
+; beside the key set and compared by identity, so redefining a template
+; (deftem and addtem both install a fresh list) misses rather than
+; reading through a stale entry.  An inline template list isn't cached.
+
+(def template-keys (tem fields)
+  (if (acons tem)
+      (memtable (map car fields))
+      (aif (check (template-keys* tem) [id (car _) fields])
+           (cadr it)
+           (cadr (= (template-keys* tem)
+                    (list fields (memtable (map car fields))))))))
+
 ; Converts alist to inst; ugly; maybe should make this part of coerce.
 ; Note: discards fields not defined by the template.
 
 (def templatize (tem raw)
-  (with (x (inst tem) fields (if (acons tem) tem (templates* tem)))
-    (each (k v) raw
-      (when (assoc k fields)
-        (= (x k) (temquote v))))
-    x))
+  (lets x (inst tem)
+    (with (fields (if (acons tem) tem (templates* tem)))
+      (let known (template-keys tem fields)
+        (each (k v) raw
+          (when (known k)
+            (= (x k) (temquote v))))))))
 
 ; To write something to be read by temread, (write (tablist x))
 
