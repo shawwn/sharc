@@ -800,6 +800,7 @@ Connection: close"))
   (= (bgthreads* id) (start-thread {run-bgthread id f sec} id)))
 
 (def run-bgthread (id f sec)
+  (= (the thread-name) id)
   (let runs 0
     (bgtick id 'idle runs)
     (while t
