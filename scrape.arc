@@ -724,24 +724,11 @@
     (import-scraped-user! it)
     u))
 
-(def scrape-topstories! ((o limit 60))
-  ; `limit` caps how many ranked stories to fetch.  Default 60 ~= the
-  ; first two HN pages.  Use a smaller value for dev/testing.
-  (let ids (firstn limit (fetch-topstories))
-    ; record current rank for the importer (and for forensics).
-    (let front (let i 0
-                 (map (fn (id) (++ i)
-                        (obj page (+ 1 (trunc:/ i 30))
-                             rank (+ 1 i)))
-                      ids))
-      (save-json front (+ scrape-dir* "front.json")))
-    ids))
-
 (def scrape! ((o force) (o limit 60))
   (load-scrape limit)
   ; `limit` caps how many ranked stories to fetch.  Default 60 ~= the
   ; first two HN pages.  Use a smaller value for dev/testing.
-  (let ids (scrape-topstories! limit)
+  (let ids (firstn limit (fetch-topstories))
     (scrapelog "topstories: " (len ids) " ids")
     (scrape-items-and-users! ids force)))
 
@@ -894,16 +881,9 @@
 ; password installation entirely.
 (= scrape-dev-password* "unknown")
 
-(def scraped-front-path () (+ scrape-dir* "front.json"))
-
 (def scraped-item-path (id) (+ scrape-item-dir* id ".json"))
 
 (def scraped-user-path (u) (+ scrape-user-dir* u ".json"))
-
-(def scraped-front ()
-  (aif (file-exists:scraped-front-path) (load-json it)))
-
-(def scraped-front-ids () (map !id (scraped-front)))
 
 (def scraped-item (id)
   (aif (file-exists:scraped-item-path id) (load-json it)))
@@ -936,7 +916,7 @@
   (let ranked nil
     ; users first (so items have authors)
     (import-scraped-users!)
-    ; then items, walking front.json (page+rank order from the scrape)
+    ; then items, walking topstories.json
     (each tem (import-scraped-items!)
       (push tem!story ranked))
     (let stories (rev! (map item:!id ranked))
@@ -960,7 +940,7 @@
     (save-pws)
     (scrapelog "imported " (len ranked) " stories")))
 
-(def import-scraped-items! ((o ids (scraped-front-ids)))
+(def import-scraped-items! ((o ids (fetch-topstories)))
   (each id ids
     (only&out (import-scraped-item! id))))
 
