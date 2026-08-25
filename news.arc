@@ -3960,10 +3960,12 @@ brackets&gt; and it should work.<br><br>")
 (def front-on-day (ymd)
   (map car (parse-frontlog (read-frontlog ymd))))
 
-(def read-frontlog ((o ymd (datestring)))
+(= frontlog-consider* 60) ; stories
+
+(def read-frontlog ((o ymd (datestring)) (o n frontlog-consider*))
   (aand (file-exists (string frontdir* ymd))
         (rem blank (lines:filechars it))
-        (map readall it)))
+        (map [firstn (+ 1 n) (readall _)] it)))
 
 (def parse-frontlog (flog)
   (aand (counts (flat (map cdr flog)))
