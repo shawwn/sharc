@@ -1176,13 +1176,13 @@
     (save-topstories))
 
 (defscrape scrape-new-stories
-  1 (scrape-hn-stories (rem item (shuffle ids))))
+  1 (scrape-hn-stories (rem item|recently-fetched-item? ids)))
 
-(defscrape scrape-new-frontpage-stories
-  2 (scrape-hn-stories (rem item (firstn 60 ids))))
+(defscrape scrape-stories-top10
+  3 (scrape-hn-stories (cut ids 0 10)))
 
-(defscrape scrape-stories-p1
-  3 (scrape-hn-stories (firstn 30 ids)))
+(defscrape scrape-stories-10-30
+  3 (scrape-hn-stories (cut ids 10 30)))
 
 (defscrape scrape-stories-p2-p3
   5 (scrape-hn-stories (cut ids 30 90)))
