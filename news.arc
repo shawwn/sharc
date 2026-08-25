@@ -3953,9 +3953,10 @@ brackets&gt; and it should work.<br><br>")
   (format-ymd (add-ymd 0 0 -1 (parse-ymd ymd))))
 
 (def front-for-day (ymd)
-  (aand (difference (front-on-day ymd)
-                    (front-on-day (prior-day ymd)))
-        (rem nil (map item it))))
+  (aand ;(difference (front-on-day ymd)
+        ;            (front-on-day (prior-day ymd)))
+        (front-on-day ymd)
+        (trues item it)))
 
 (def front-on-day (ymd)
   (map car (parse-frontlog (read-frontlog ymd))))
