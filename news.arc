@@ -2773,7 +2773,7 @@
                 (td (tab (display-pollopts i here)))))
           (when (cansee&comments-active i)
             (spacerow 6)
-            (row "" "" (comment-form i here))))
+            (row "" (comment-form i here))))
         (br)
         (when (and i!kids (commentable i))
           (w/the comment-nav (comment-navs:ranked-kids i)
