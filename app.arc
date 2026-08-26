@@ -569,7 +569,7 @@
                      size formwid*)    
       (is typ 'sexpr)
        (gentag input type 'text name id 
-                     value (tostring (map [do (write _) (sp)] val))
+                     value (trim (tostring (map [do (write _) (sp)] val)))
                      size formwid*)
       (in typ 'syms 'text 'doc 'mdtext 'mdtext2 'lines 'bigtoks)
        (let text (if (in typ 'syms 'bigtoks)
