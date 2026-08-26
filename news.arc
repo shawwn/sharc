@@ -3473,7 +3473,8 @@
          (hspace 5)
          (userlink u)
          (text-age:user-age u))
-  (spacerow 5))
+  (spacerow 5)
+  (flushout))
 
 (defcache userlist (* 45 sec*)
   (sort (compare > lookup-uid) (users)))
