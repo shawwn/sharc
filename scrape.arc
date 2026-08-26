@@ -671,9 +671,8 @@
         (flushout)))))
 
 (def scrape-user-batch! (ids)
-  (w/lock scrape-lock*
-    (= ids (keep scraping-user ids))
-    (each id ids (pop-user-to-fetch id)))
+  (= ids (keep scraping-user ids))
+  (each id ids (pop-user-to-fetch id))
   ; build a single shell command that backgrounds one `curl` per id
   ; and waits for them all.
   (let cmd
