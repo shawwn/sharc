@@ -503,19 +503,23 @@
 (def ok-whole  (id) (and (exact id) (>= id 0) id))
 (def ok-posint (id) (and (exact id) (> id 0) id))
 
-(def dead (i)         i!dead)
-(def deleted (i)      i!deleted)
-(def announcement (i) (mem 'announce i!keys))
-(def imported (i)     (mem 'imported i!keys))
-(def dupe (i)         (mem 'dupe i!keys))
+(def dead (i)          i!dead)
+(def deleted (i)       i!deleted)
+(def announcement (i)  (mem 'announce i!keys))
+(def imported (i)      (mem 'imported i!keys))
+(def dupe (i)          (mem 'dupe i!keys))
+(def redact ((t u me)) (check-key 'redact u))
 
-(defplace dead         (fn (i) `(,i 'dead)))
-(defplace deleted      (fn (i) `(,i 'deleted)))
-(defplace announcement (fn (i) `(mem 'announce (,i 'keys))))
-(defplace imported     (fn (i) `(mem 'imported (,i 'keys))))
-(defplace dupe         (fn (i) `(mem 'dupe (,i 'keys))))
+(defplace dead           (fn (i) `(,i 'dead)))
+(defplace deleted        (fn (i) `(,i 'deleted)))
+(defplace announcement   (fn (i) `(mem 'announce (,i 'keys))))
+(defplace imported       (fn (i) `(mem 'imported (,i 'keys))))
+(defplace dupe           (fn (i) `(mem 'dupe (,i 'keys))))
+(defplace redact         (fn (u) `(mem 'redact (uvar ,u keys))))
 
 (def live (i) (no (dead|deleted i)))
+
+(def redacted (i) (redact:by i))
 
 (def kill (i how)
   (unless (dead i)
@@ -1118,7 +1122,9 @@
                  (when (and (is name 'topcolor)
                             (is val (hexrep site-color*)))
                    (wipe val))
-                 (= (prof name) val))
+                 (if (is name 'redact)
+                     (= (redact user) val)
+                     (= (prof name) val)))
                {do (save-prof user)
                    (user-url user)})))
 
@@ -1157,6 +1163,7 @@
       (raw     nil         ,(tostring:spacerow 5)                   ,u  nil)
       (string  nil         ,email-msg*                              ,u  nil)
       (string  email       ,(p 'email)                              ,u  ,u)
+      (yesno   redact      ,(redact user)                           ,u  ,u)
       (yesno   showdead    ,(p 'showdead)                           ,u  ,u)
       (yesno   noprocrast  ,(p 'noprocrast)                         ,u  ,u)
       (string  firstview   ,(p 'firstview)                          ,a   nil)
@@ -1654,7 +1661,8 @@
       (presc s!title))))
       
 (def pseudo-text (i)
-  (if (deleted i) "[deleted]"
+  (if (redacted i) "[redacted]"
+      (deleted i) "[deleted]"
       (flagged i) "[flagged]"
       (delayed i) "[delayed]"
                   "[dead]"))
@@ -1667,7 +1675,11 @@
   (when (and (dead i) (seesdead))
     (pr " [dead] "))
   (when (and (deleted i) (admin))
-    (pr " [deleted] ")))
+    (pr " [deleted] "))
+  (when (and (redacted i) (or (author i) (admin)))
+    ; redacted items are viewable by its author and admins, so display
+    ; a mark to signal to them that no one else can see it.
+    (pr " [redacted] ")))
 
 (= downvote-threshold* 0 downvote-time* (* 1 day*))
 
@@ -3158,7 +3170,7 @@
                 (link (ellipsize s!title 50) (item-url s!id))))))))
     (br)
     (tag (div class (+ "comment" (if (and astree (collapsed c)) " noshow" "")))
-      (if (~cansee c)
+      (if (or (~cansee c) (and (redacted c) (~author c) (~admin)))
           (pr (pseudo-text c))
           (tag (div class (string "commtext " (comment-class c)))
             (pr c!text)))
