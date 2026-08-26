@@ -861,12 +861,11 @@ Connection: close"))
 (or= wedged* nil)
 
 (def stalled-bgthreads ((o limit bgstall-secs*))
-  (accum a
-    (each (id tick) bgticks*
-      (let (state since runs) tick
-        (let age (- (seconds) since)
-          (when (and (is state 'run) (> age limit))
-            (a (list id age runs))))))))
+  (each (id tick) bgticks*
+    (let (state t0 runs) tick
+      (let age (since t0)
+        (when (and (is state 'run) (> age limit))
+          (out (list id age runs)))))))
 
 (def capture-wedge (stuck)
   (w/stdout (stderr)
