@@ -582,8 +582,8 @@
                       ""
                      (sanitize val))
          (tag (textarea name id
-                        cols (if (is typ 'doc) bigformwid* formwid*) 
-                        rows (needrows text formwid* 4)
+                        cols (needcols typ)
+                        rows (needrows text (needcols typ) 4)
                         wrap 'virtual 
                         style (if (is typ 'doc)
                                   "font-size:8.5pt"
@@ -613,6 +613,9 @@
 
 (def text-rows (text wid (o pad 3))
   (+ (trunc (/ (len text) (* wid .8))) pad))
+
+(def needcols (typ)
+  (if (is typ 'doc) bigformwid* formwid*))
 
 (def needrows (text cols (o pad 0))
   (+ pad (max (+ 1 (count #\newline text))
