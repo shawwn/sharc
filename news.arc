@@ -442,6 +442,12 @@
     (do1 (evtil (-- minid*) ~file-exists:item-path)
          (todisk minid*))))
 
+(def rewind-item-id (id)
+  (w/lock minid-lock*
+    (when (is minid* id)
+      (++ minid*)
+      (todisk minid*))))
+
 ; these must stay constant after deploying news.
 
 (= item-bucket-size* 5000
@@ -4065,6 +4071,7 @@ brackets&gt; and it should work.<br><br>")
   (pull i!id (item-ids* (item-bucket i!id)))
   (awhen (file-exists (item-path i!id))
     (rmfile it))
+  (rewind-item-id i!id)
   i!id)
 
 ; Note for imported items: the scraper will happily re-import an
