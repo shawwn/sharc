@@ -700,17 +700,16 @@
              (if (all [no (_ 4)] fields)
                  nil
                  (when-umatch user
-                   (let req (the req)
-                     (each (k v) req!args
-                       (let name (sym k)
-                         (awhen (find [is (cadr _) name] fields)
-                           ; added sho to fix bug
-                           (let (typ id val sho mod) it
-                             (when (and mod v)
-                               (let newval (readvar typ v fail*)
-                                 (unless (is newval fail*)
-                                   (f name newval))))))))
-                     (done))))
+                   (each (k v) (req-args)
+                     (let name (sym k)
+                       (awhen (find [is (cadr _) name] fields)
+                         ; added sho to fix bug
+                         (let (typ id val sho mod) it
+                           (when (and mod v)
+                             (let newval (readvar typ v fail*)
+                               (unless (in newval fail* val)
+                                 (f name newval))))))))
+                   (done)))
       (tab
         (showvars fields))
       (unless (all [no (_ 4)] fields)  ; no modifiable fields
