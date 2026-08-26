@@ -1136,7 +1136,7 @@
       (pr "Only admins see your email below. To share publicly,"
           " add to the 'about' box."))))
 
-(def user-fields (user)
+(def user-fields ((t user me))
   (withs (e (editor)
           a (admin)
           w (me user)
