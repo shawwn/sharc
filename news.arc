@@ -2819,9 +2819,10 @@
 
 (def display-item-text (s)
   (when (metastory&cansee s)
-    (unless (blank s!text)
-      (row "" "" (tag (div class "toptext" style "margin-top:4px")
-                   (pr s!text))))))
+    (tr (tag (td colspan 2))
+        (td (tag (div class "toptext"
+                      style (unless (blank s!text) "margin-top:4px"))
+              (pr s!text))))))
 
 
 ; Edit Item
