@@ -445,8 +445,8 @@
 (def rewind-item-id (id)
   (w/lock minid-lock*
     (when (is minid* id)
-      (++ minid*)
-      (todisk minid*))))
+      (do1 (evtil (++ minid*) (orf [>= _ 0] id-exists))
+           (todisk minid*)))))
 
 ; these must stay constant after deploying news.
 
