@@ -695,24 +695,23 @@
   ; Capture (the me) at form-generation time so the submit-side
   ; when-umatch can verify the submitter is the same user who
   ; received the form.
-  (let user (me)
+  (with (user (me) modifiable (some !4 fields))
     (tarform lasts
-             (if (all [no (_ 4)] fields)
-                 nil
-                 (when-umatch user
-                   (each (k v) (req-args)
-                     (let name (sym k)
-                       (awhen (find [is (cadr _) name] fields)
-                         ; added sho to fix bug
-                         (let (typ id val sho mod) it
-                           (when (and mod v)
-                             (let newval (readvar typ v fail*)
-                               (unless (in newval fail* val)
-                                 (f name newval))))))))
-                   (done)))
+             (when modifiable
+               (when-umatch user
+                 (each (k v) (req-args)
+                   (let name (sym k)
+                     (awhen (find [is _!1 name] fields)
+                       ; added sho to fix bug
+                       (let (typ id val sho mod) it
+                         (when (and mod v)
+                           (let newval (readvar typ v fail*)
+                             (unless (in newval fail* val)
+                               (f name newval))))))))
+                 (done)))
       (tab
         (showvars fields))
-      (unless (all [no (_ 4)] fields)  ; no modifiable fields
+      (when modifiable
         (br)
         (submit button)))))
                 
