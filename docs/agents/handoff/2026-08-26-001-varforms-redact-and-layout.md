@@ -1,12 +1,12 @@
 ---
 name: varforms, the redact field, and table colspans
-description: 29 commits after the startup-speedups handoff. `defplace` now takes any number of args (so `me`/`ip`/`op`/`redact` are settable places), `vars-form` stopped clobbering fields that share storage, a per-user `redact` profile flag replaces a user's comments with "[redacted]", listing tables collapsed to a fixed 2-column layout matching HN's, expunging the newest item rewinds `minid*` (with a floor at 0, which matters), and /users got much faster. Also: a numbering bug the colspan plumbing introduced in `display-page`, found and fixed on the way out.
+description: 30 commits after the startup-speedups handoff. `defplace` now takes any number of args (so `me`/`ip`/`op`/`redact` are settable places), `vars-form` stopped clobbering fields that share storage, a per-user `redact` profile flag replaces a user's comments with "[redacted]", listing tables collapsed to a fixed 2-column layout matching HN's, expunging the newest item rewinds `minid*` (with a floor at 0, which matters), and /users got much faster. Also: a numbering bug the colspan plumbing introduced in `display-page`, found and fixed on the way out.
 type: project
 ---
 
 # Handoff: varforms, redact, and table layout (2026-08-26)
 
-Covers `0749cf1..4b83bcc`, i.e. everything after
+Covers `0749cf1..f2a1b4d`, i.e. everything after
 `2026-08-25-001-startup-speedups-and-hn-rate-limit.md`. All of it is
 front-end and app-layer work; nothing in this batch touches the loader or
 the scraper's rate limiting.
@@ -102,7 +102,7 @@ not currently masked.
 
 ## 4. Listing tables are now a fixed 2 columns
 
-`bba7d03`, and then four follow-up commits fixing the pages it broke.
+`bba7d03`, and then five follow-up commits fixing the pages it broke.
 
 The old markup varied its column count depending on whether the listing
 was numbered: `(td colspan (if number 2 1))`, `(tr (if n (td)) (td) ...)`,
@@ -121,10 +121,31 @@ The pages that then needed adjusting, in the order they were found:
   conditional span.
 - `addcomment-page`: stayed at `(row "" ...)`.
 - `display-item-text`: dropped its `spacerow 2`; the comment form's
-  leading spacer went 10 -> 6.
+  leading spacer went 10 -> 6. Then `f2a1b4d` rewrote it entirely (see
+  below).
 
 `row` itself now expands via `` `(td ,_) `` rather than `(list 'td _)`,
 purely for readability.
+
+`display-item-text` ended up as the one place that could not use `row` at
+all (`f2a1b4d`):
+
+```arc
+(def display-item-text (s)
+  (when (metastory&cansee s)
+    (tr (tag (td colspan 2))
+        (td (tag (div class "toptext"
+                      style (unless (blank s!text) "margin-top:4px"))
+              (pr s!text))))))
+```
+
+Note the behavior change buried in there: the `unless (blank s!text)`
+moved from guarding the *whole row* to guarding only the `margin-top`. A
+metastory with no text now emits the row anyway, with an empty `toptext`
+div in it. That is deliberate -- it is what HN does, and the empty row
+carries the vertical spacing that the removed `spacerow 2` used to
+provide. If a story ever renders with a stray gap under the title, this is
+the line to look at.
 
 ### The colspan argument, briefly mis-forwarded
 
