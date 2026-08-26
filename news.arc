@@ -1164,7 +1164,7 @@
       (posint  maxvisit    ,(p 'maxvisit)                           ,u  ,u)
       (posint  minaway     ,(p 'minaway)                            ,u  ,u)
       (sexpr   keys        ,(p 'keys)                               ,a  ,a)
-      (hexcol  topcolor    ,(or (p 'topcolor) (hexrep site-color*)) ,k  ,k)
+      (hexcol  topcolor    ,(hexrep:main-color user)                ,k  ,k)
       ,@(topcolor-default p u)
       (int     delay       ,(p 'delay)                              ,u  ,u)
       (string  nil         ,(resetpw-link)                          ,w   nil)
