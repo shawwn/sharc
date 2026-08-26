@@ -431,7 +431,7 @@
       (register-url i i!url))))
 
 (def save-item (i)
-  (let exists (file-exists (item-path i!id))
+  (let exists (id-exists i!id)
     (ensure-dir (item-dir i!id))
     (save-table i (item-path i!id))
     (unless exists
@@ -439,7 +439,7 @@
 
 (def new-item-id ()
   (w/lock minid-lock*
-    (do1 (evtil (-- minid*) ~file-exists:item-path)
+    (do1 (evtil (-- minid*) ~id-exists)
          (todisk minid*))))
 
 (def rewind-item-id (id)
@@ -501,9 +501,9 @@
 (def safe-whole  (id) (ok-whole:saferead id))
 (def safe-posint (id) (ok-posint:saferead id))
 
-(def find-id   (id) (file-exists (item-path id)))
+(def id-exists (id) (file-exists (item-path id)))
 
-(def ok-id     (id) (and (exact id) (find-id id) id))
+(def ok-id     (id) (and (exact id) (id-exists id) id))
 (def ok-uid    (id) (and (exact id) (uid->user* id) id))
 (def ok-int    (id) (and (exact id) id))
 (def ok-whole  (id) (and (exact id) (>= id 0) id))
@@ -4072,7 +4072,7 @@ brackets&gt; and it should work.<br><br>")
   (forget-item i)      ; references in users' profiles
   (uncache-comment i!id)
   (pull i!id (item-ids* (item-bucket i!id)))
-  (awhen (file-exists (item-path i!id))
+  (awhen (id-exists i!id)
     (rmfile it))
   (rewind-item-id i!id)
   i!id)
