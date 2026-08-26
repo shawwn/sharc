@@ -1567,7 +1567,7 @@
             (tag (td class 'title)
               (morelink display-page
                         display items label title end (+ end perpage*)
-                        number moreurl (+ numstart perpage* colspan))))))))
+                        number moreurl (+ numstart perpage*) colspan)))))))
 
 ; This code is inevitably complex because the More fn needs to know 
 ; its own fnid in order to supply a correct whence arg to stuff on 
