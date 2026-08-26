@@ -793,7 +793,7 @@ Connection: close"))
 ; only the table's own leaf lock.
 
 (def bgtick (id state runs)
-  (sref bgticks* (list state (seconds) runs) id))
+  (= (bgticks* id) (list state (seconds) runs)))
 
 (def new-bgthread (id f sec)
   (aif (bgthreads* id) (stop-thread it))
