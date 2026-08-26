@@ -1,12 +1,12 @@
 ---
 name: varforms, the redact field, and table colspans
-description: 27 commits after the startup-speedups handoff. `defplace` now takes any number of args (so `me`/`ip`/`op`/`redact` are settable places), `vars-form` stopped clobbering fields that share storage, a per-user `redact` profile flag replaces a user's comments with "[redacted]", listing tables collapsed to a fixed 2-column layout matching HN's, expunging the newest item rewinds `minid*`, and /users got much faster. Also: a numbering bug the colspan plumbing introduced in `display-page`, found and fixed on the way out.
+description: 29 commits after the startup-speedups handoff. `defplace` now takes any number of args (so `me`/`ip`/`op`/`redact` are settable places), `vars-form` stopped clobbering fields that share storage, a per-user `redact` profile flag replaces a user's comments with "[redacted]", listing tables collapsed to a fixed 2-column layout matching HN's, expunging the newest item rewinds `minid*` (with a floor at 0, which matters), and /users got much faster. Also: a numbering bug the colspan plumbing introduced in `display-page`, found and fixed on the way out.
 type: project
 ---
 
 # Handoff: varforms, redact, and table layout (2026-08-26)
 
-Covers `0749cf1..456f0f9`, i.e. everything after
+Covers `0749cf1..4b83bcc`, i.e. everything after
 `2026-08-25-001-startup-speedups-and-hn-rate-limit.md`. All of it is
 front-end and app-layer work; nothing in this batch touches the loader or
 the scraper's rate limiting.
@@ -146,21 +146,74 @@ remembering when testing anything in `display-page`'s More path.
 
 ## 5. Item ids rewind on expunge
 
-`b810824`. `expunge` now calls `rewind-item-id`:
+`b810824`, then `1744582` and `4b83bcc`. `expunge-item` now ends with a
+call to `rewind-item-id`:
 
 ```arc
 (def rewind-item-id (id)
   (w/lock minid-lock*
     (when (is minid* id)
-      (++ minid*)
-      (todisk minid*))))
+      (do1 (evtil (++ minid*) (orf [>= _ 0] id-exists))
+           (todisk minid*)))))
 ```
 
-`minid*` counts *down* (user-generated items get negative ids), so
-expunging the most recently created item releases its id for reuse. The
-`(is minid* id)` guard means this only fires for the newest item; expunging
-anything older leaves a hole, as before. Takes the same lock as
-`new-item-id`.
+`minid*` counts *down* -- user-generated items get negative ids, and
+`new-item-id` decrements past anything already on disk -- so before this,
+an expunged id was gone for good. Now expunging the newest item releases
+its id, and the `evtil` walk keeps going over any holes above it, so
+expunging a contiguous run reclaims the whole run. The `(is minid* id)`
+guard means it only fires for the newest item; expunging anything older
+still leaves a hole. Takes the same lock as `new-item-id`.
+
+**Ids are therefore reusable now, which they never were before.** That is
+safe only because `expunge-item` is thorough about it -- `unlink-item`,
+`unvote-item`, `forget-item` and `uncache-comment` clear the parent, the
+votes, the profile references and the cache before the file goes. The
+caveat at news.arc:4080 still stands: the scraper will happily re-import
+an expunged *positive* id on its next crawl.
+
+### The floor at 0 matters
+
+`(orf [>= _ 0] id-exists)` is doing real work; the first version of this
+was an unbounded `(evtil (++ minid*) id-exists)`, which stops only when it
+finds an existing file. Two ways that goes wrong:
+
+- Expunge the run down to -1 and the walk crosses 0 (no item there) and
+  lands on **1**, an imported HN item. `minid*` goes positive and
+  `todisk`s that way, and the next `new-item-id` decrements to 0 and hands
+  out **id 0** -- the boundary `bucket-id` has an explicit "skip -0"
+  branch for.
+- If no item exists above the expunged one at all -- a fresh checkout, or
+  a test instance where you make one comment and expunge it -- `evtil`
+  never terminates. It spins one `stat` per iteration while holding
+  `minid-lock*`, which is a priority in the lock ordering (`arc.arc:480`),
+  not a timeout, so every `new-item-id` blocks behind it forever.
+
+On the live store this was latent rather than live: `arc/news/min-id` is
+-12 with `story/-1/-12` .. `story/-1/-1` all present, and `story/0/1`
+exists to catch the walk -- but `story/0/0` does not, so it was one full
+run of expunges away.
+
+The bound cannot stop too early: `minid*` is the most negative id ever
+allocated, so if the walk reaches 0 there is genuinely nothing negative
+left below it. `orf` short-circuits left to right (`arc.arc:1766`), so
+`id-exists` is not called once the bound fires.
+
+### `find-id` is now `id-exists`
+
+`1744582`. Same body, better name, and it replaced the open-coded
+`(file-exists (item-path ...))` at its three other call sites --
+`save-item`, `expunge-item`, and (as `~id-exists`) `new-item-id`, which
+used to spell the predicate `~file-exists:item-path`.
+
+One thing to know before "simplifying" it: **`id-exists` returns the
+path, not a boolean.** `file-exists` returns NAME itself (see
+`2026-08-25-001` §1), and `expunge-item` depends on it:
+
+```arc
+(awhen (id-exists i!id)
+  (rmfile it))
+```
 
 ## 6. /users made fast again
 
