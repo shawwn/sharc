@@ -1557,7 +1557,7 @@
     (when end
       (when (< end (len items))
         (spacerow 10 "morespace")
-        (tr (tag (td colspan (if number 2 1)))
+        (tr (tag (td colspan 2))
             (tag (td class 'title)
               (morelink display-page
                         display items label title end (+ end perpage*)
@@ -1592,7 +1592,7 @@
         (display-item-number i)
         (tag (td valign 'top class 'votelinks) (votelinks s whence))
         (titleline s s!url whence))
-      (tr (tag (td colspan (if i 2 1)))
+      (tr (tag (td colspan 2))
           (tag (td class 'subtext)
             (spanclass subline
               (hook 'itemline s)
@@ -1619,8 +1619,8 @@
             (+ "from?site=" site)))))
 
 (def display-item-number (i)
-  (when i (tag (td align 'right valign 'top class 'title)
-            (spanclass rank (pr i ".")))))
+  (tag (td align 'right valign 'top class 'title)
+    (spanclass rank (only&pr i "."))))
 
 (= follow-threshold* 5)
 
@@ -2168,7 +2168,7 @@
     (tab
       (display-item nil i (delete-url i!id whence))
       (spacerow 20)
-      (tr (td)
+      (tr (tag (td colspan (if (acomment i) 1 2)))
           (td (item-form "xdelete" i!id whence
                 (prn "Do you want this to @(if (deleted i) 'stay 'be) deleted?")
                 (br2)
@@ -2667,8 +2667,7 @@
                              (if (and (~blank o!title) (~blank o!url))
                                  (link o!title o!url)
                                  (fontcolor black (presc o!text)))))))
-  (tr (if n (td))
-      (td)
+  (tr (tag (td colspan 2))
       (tag (td class 'default)
         (spanclass comhead
           (itemscore o)
@@ -2764,11 +2763,11 @@
           (display-item-text i)
           (when (apoll i)
             (spacerow 10)
-            (tr (td)
+            (tr (tag (td colspan 2))
                 (td (tab (display-pollopts i here)))))
           (when (cansee&comments-active i)
-            (spacerow 10)
-            (row "" (comment-form i here))))
+            (spacerow 6)
+            (row "" "" (comment-form i here))))
         (br)
         (when (and i!kids (commentable i))
           (w/the comment-nav (comment-navs:ranked-kids i)
@@ -2814,9 +2813,8 @@
 (def display-item-text (s)
   (when (metastory&cansee s)
     (unless (blank s!text)
-      (spacerow 2)
-      (row "" (tag (div class "toptext" style "margin-top:4px")
-                (pr s!text))))))
+      (row "" "" (tag (div class "toptext" style "margin-top:4px")
+                   (pr s!text))))))
 
 
 ; Edit Item
@@ -2920,7 +2918,7 @@
       (let here (flink {addcomment-page parent whence text msg})
         (display-item nil parent here))
       (spacerow 10)
-      (row "" (comment-form parent whence text)))))
+      (row "" "" (comment-form parent whence text)))))
 
 (= noob-comment-msg*
    "If you haven't already, would you mind reading about HN's
@@ -3040,8 +3038,7 @@
 
 (def display-comment (n c whence (o astree) (o indent 0)
                                  (o showpar) (o showon))
-  (tr (display-item-number n)
-      (when astree (tag (td class 'ind indent indent) (hspace (* indent 40))))
+  (tr (when astree (tag (td class 'ind indent indent) (hspace (* indent 40))))
       (tag (td valign 'top class (+ "votelinks" (if (and astree (collapsed c))
                                                      " nosee" "")))
         (votelinks c whence t))
