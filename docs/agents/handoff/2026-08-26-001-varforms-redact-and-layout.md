@@ -1,12 +1,12 @@
 ---
 name: varforms, the redact field, and table colspans
-description: 26 commits after the startup-speedups handoff. `defplace` now takes any number of args (so `me`/`ip`/`op`/`redact` are settable places), `vars-form` stopped clobbering fields that share storage, a per-user `redact` profile flag replaces a user's comments with "[redacted]", listing tables collapsed to a fixed 2-column layout matching HN's, expunging the newest item rewinds `minid*`, and /users got much faster. Also: a numbering bug introduced by the colspan plumbing in `display-page`.
+description: 27 commits after the startup-speedups handoff. `defplace` now takes any number of args (so `me`/`ip`/`op`/`redact` are settable places), `vars-form` stopped clobbering fields that share storage, a per-user `redact` profile flag replaces a user's comments with "[redacted]", listing tables collapsed to a fixed 2-column layout matching HN's, expunging the newest item rewinds `minid*`, and /users got much faster. Also: a numbering bug the colspan plumbing introduced in `display-page`, found and fixed on the way out.
 type: project
 ---
 
 # Handoff: varforms, redact, and table layout (2026-08-26)
 
-Covers `0749cf1..2e9d857`, i.e. everything after
+Covers `0749cf1..456f0f9`, i.e. everything after
 `2026-08-25-001-startup-speedups-and-hn-rate-limit.md`. All of it is
 front-end and app-layer work; nothing in this batch touches the loader or
 the scraper's rate limiting.
@@ -126,23 +126,23 @@ The pages that then needed adjusting, in the order they were found:
 `row` itself now expands via `` `(td ,_) `` rather than `(list 'td _)`,
 purely for readability.
 
-### Known bug from this work
+### The colspan argument, briefly mis-forwarded
 
 `display-page` gained a `colspan` parameter (`2e9d857`) so `/users` can
 pass `0` and skip the spanning cell entirely. The recursive `morelink`
-call forwards it wrong:
+call forwarded it into the wrong slot, and `456f0f9` fixed it:
 
 ```arc
-number moreurl (+ numstart perpage* colspan)
+-  number moreurl (+ numstart perpage* colspan)
++  number moreurl (+ numstart perpage*) colspan
 ```
 
-`colspan` is being *added into `numstart`* instead of passed as the next
-positional arg. Two consequences: the next page's numbering starts two too
-high (page 2 of `/submitted` numbers from 33, not 31), and `colspan` is
-not carried forward at all. It should almost certainly read
-`number moreurl (+ numstart perpage*) colspan`. `/users` is unaffected
-because it supplies a `moreurl`, so `morelink` never takes the fnid
-branch.
+`colspan` was being *added into `numstart`* rather than passed as the next
+positional arg, so the More link's page numbered two too high (page 2 of
+`/submitted` started at 33, not 31) and `colspan` never reached the
+recursive call at all. `/users` never showed it, because it supplies a
+`moreurl` and `morelink` therefore skips the fnid branch entirely -- worth
+remembering when testing anything in `display-page`'s More path.
 
 ## 5. Item ids rewind on expunge
 
