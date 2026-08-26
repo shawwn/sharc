@@ -930,7 +930,6 @@
   (let ranked nil
     ; users first (so items have authors)
     (import-scraped-users!)
-    ; then items, walking topstories.json
     (each tem (import-scraped-items!)
       (push tem!story ranked))
     (let stories (rev! (map item:!id ranked))
