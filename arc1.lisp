@@ -1112,7 +1112,8 @@ isn't shadowed by a lexical binding."
 (defvar *arc-gensym-count* 0)
 (defun arc-gensym (&optional (x 'gs))
   (incf *arc-gensym-count*)
-  (arc-sym (format nil "~A~D" x *arc-gensym-count*)))
+  (let ((name (if (or (symbolp x) (stringp x)) x 'gs)))
+    (arc-sym (format nil "~A~D" name *arc-gensym-count*))))
 
 (xdef uniq #'arc-gensym)
 
