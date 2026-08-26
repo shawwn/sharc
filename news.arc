@@ -2918,7 +2918,7 @@
       (let here (flink {addcomment-page parent whence text msg})
         (display-item nil parent here))
       (spacerow 10)
-      (row "" "" (comment-form parent whence text)))))
+      (row "" (comment-form parent whence text)))))
 
 (= noob-comment-msg*
    "If you haven't already, would you mind reading about HN's
