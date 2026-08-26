@@ -1280,9 +1280,9 @@
     (when items
       (display-items items label title url number moreurl perpage))))
 
-(def paginated (display items label title (o url label) (o number t) (o moreurl) (o perpage perpage*))
+(def paginated (display items label title (o url label) (o number t) (o moreurl) (o perpage perpage*) (o colspan 2))
   (let (start end numstart items) (paginate items perpage)
-    (display-page display items label title url start end number moreurl numstart)))
+    (display-page display items label title url start end number moreurl numstart colspan)))
 
 (def display-items (items label title whence (o number t) (o moreurl) (o perpage perpage*))
   (paginated (fn (n i whence (o inlist))
@@ -1555,7 +1555,7 @@
 
 (def display-page (display items label title whence
                    (o start 0) (o end perpage*) (o number)
-                   (o moreurl) (o numstart (+ start 1)))
+                   (o moreurl) (o numstart (+ start 1)) (o colspan 2))
   (zerotable
     (let n (- numstart 1)
       (each i (cut items start end)
@@ -1563,11 +1563,11 @@
     (when end
       (when (< end (len items))
         (spacerow 10 "morespace")
-        (tr (tag (td colspan 2))
+        (tr (if (> colspan 0) (tag (td colspan colspan)))
             (tag (td class 'title)
               (morelink display-page
                         display items label title end (+ end perpage*)
-                        number moreurl (+ numstart perpage*))))))))
+                        number moreurl (+ numstart perpage* colspan))))))))
 
 ; This code is inevitably complex because the More fn needs to know 
 ; its own fnid in order to supply a correct whence arg to stuff on 
@@ -3462,7 +3462,7 @@
   (paginated display-user (userlist) "users" "New Users"
              (pageurl "users") t
              [pageurl "users" (+ (curpage) 1)]
-             5000))
+             5000 0))
 
 (def display-user (n u whence)
   (prrow (lookup-uid u)
