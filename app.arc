@@ -226,14 +226,12 @@
 ; only when the viewer is `other`.
 
 (def me args
-  (let m (the me)
-    (if args (is m (car args)) m)))
+  (if (no args) (the me) (caris args (the me))))
 
 (def ip () (the ip))
 
 (def op args
-  (let o (the op)
-    (if args (is o (car args)) o)))
+  (if (no args) (the op) (caris args (the op))))
 
 (mac w/me (val . body)
   `(w/the me ,val ,@body))
