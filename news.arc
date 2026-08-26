@@ -3348,7 +3348,9 @@
       (prn "No such user.")))
 
 (def user-comments ((t user me))
-  (keep cansee&~subcomment (comments user maxend*)))
+  (keep cansee&~subcomment
+        (w/loading-items 
+          (comments user maxend*))))
 
 (def display-threads (display comments label title whence
                       (o start 0) (o end threads-perpage*)
@@ -3368,8 +3370,7 @@
                                     number moreurl))))))))))
 
 (def submissions ((t u me) (o n)) 
-  (w/loading-items
-    (map item (firstn n (uvar u submitted)))))
+  (map item (firstn n (uvar u submitted))))
 
 (def comments ((t u me) (o n))
   (keep acomment (submissions u n)))
