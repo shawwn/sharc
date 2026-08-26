@@ -307,7 +307,7 @@
 )
 
 (mac row args
-  `(tr ,@(map [list 'td _] args)))
+  `(tr ,@(map [do `(td ,_)] args)))
 
 (mac prrow args
   (w/uniq (g x)
