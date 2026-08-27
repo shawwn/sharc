@@ -275,7 +275,7 @@
                     (tag-options spec rest))
               (tag-options spec rest))
           (do
-            (pr "<!-- ignoring " opt " for " spec "-->")
+            (prn "<!-- ignoring " opt " for " spec "-->")
             (tag-options spec rest))))))
 
 (def precomputable-tagopt (val)
