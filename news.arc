@@ -4035,7 +4035,8 @@ brackets&gt; and it should work.<br><br>")
 (def claim-msg (u)
   (tostring
     (para "Put @(claim-code u) anywhere in the \"about\" field of your ")
-    (underlink "HN profile" (hn-user-url u))
+    (tag (a href (hn-user-url u) target '_blank rel "noopener noreferrer")
+      (underline:pr "HN profile"))
     (pr ", then claim again to reset the password for @{u}.")
     (para "(Afterwards, you can remove @(claim-code u) from your profile.)")))
 
