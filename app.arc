@@ -1031,6 +1031,9 @@
     (local-time::offset :month m)
     (local-time::offset :day d)))
 
+(def timestamp-to-unix ((o ts (local-time::now)))
+  (local-time::timestamp-to-unix ts))
+
 (def english-list xs
   (whenlet ys (rem blank xs)
     (tostring

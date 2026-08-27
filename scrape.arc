@@ -312,7 +312,7 @@
 (def parse-subtext-age (html)
   (whenlet m-age (between html "<span class=\"age\" title=\"" "\"" 0)
     (whenlet toks (tokens (car m-age))
-      (errsafe:int (last toks)))))
+      (errsafe:timestamp-to-unix:parse-ymd (car toks)))))
 
 (def parse-subtext-timestamp (html)
   (whenlet m-timestamp (between html "><a href=\"item?id=" "</a>")
