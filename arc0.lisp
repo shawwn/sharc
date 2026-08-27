@@ -327,7 +327,7 @@ straight to gcell-ref; this remains for callers holding only a symbol."
         (t (pairwise pred (cdr lst)))))
 
 ;; Returns true iff a and b are identical. 
-(defun arc-id (a b)
+(defun arc-same (a b)
   (cond ((and (numberp a) (numberp b))
          ;; x86-64 Linux enables the :invalid FP trap by default, so a plain
          ;; (= nan nan) signals FLOATING-POINT-INVALID-OPERATION there instead
@@ -342,20 +342,22 @@ straight to gcell-ref; this remains for callers holding only a symbol."
         ((and (stringp a) (stringp b)) (string= a b))
         (t (or (eql a b) (and (null a) (null b))))))
 
-(xdef id #'arc-id)
+(xdef id #'arc-same)
 
 ;; Alias id to ident because id is one of the most common names likely
 ;; to be shadowed by a param name.
-(xdef ident #'arc-id)
+(xdef ident #'arc-same)
+
+(xdef same #'arc-same)
 
 (defun arc-is2 (a b)
-   (or (arc-id a b)
+   (or (arc-same a b)
        (cond
          ;; lists
          ((and (consp a) (consp b))
           (and (arc-is2 (car a) (car b))
                (arc-is2 (cdr a) (cdr b))))
-         ;; vectors (skip strings — arc-id already handled them)
+         ;; vectors (skip strings — arc-same already handled them)
          ((and (vectorp a) (vectorp b)
                (not (stringp a)) (not (stringp b)))
           (and (= (length a) (length b))
@@ -455,13 +457,13 @@ straight to gcell-ref; this remains for callers holding only a symbol."
 ;;;; Higher-level utilities
 ;;;; ============================================================
 
-(defun arc-car? (l &optional (k :arc/unset) &key (test #'arc-id))
+(defun arc-car? (l &optional (k :arc/unset) &key (test #'arc-same))
   (and (consp l)
        (if (eq k :arc/unset) (car l)
          (if (functionp k) (funcall k (car l))
            (funcall test (car l) k)))))
 
-(defun arc-caar? (l &optional (k :arc/unset) &key (test #'arc-id))
+(defun arc-caar? (l &optional (k :arc/unset) &key (test #'arc-same))
   (arc-car? (arc-car? l) k :test test))
 
 ;;;; ============================================================
