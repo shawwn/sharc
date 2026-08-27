@@ -880,7 +880,7 @@
        site-color*))
 
 (def site-or-hn-url ()
-  (if (in (op) "" "news")
+  (if (and (in (op) "" "news") (~req-args))
       "@{hn-url*}/@(op)"
       "news"))
 
