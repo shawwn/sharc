@@ -39,7 +39,7 @@
   ignore     nil
   email      nil
   about      nil
-  showdead   nil
+  showdead   t
   noprocrast nil
   firstview  nil
   lastview   nil
