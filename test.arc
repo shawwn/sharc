@@ -75,17 +75,17 @@
   (test? true (is 'a 'a))
   (test? false (is 'a "a"))
   (test? true (is "a" "a"))
-  (test? true (id "a" "a"))
+  (test? true (ex "a" "a"))
   (test? true (is (join) (join)))
-  (test? false (id (join) (join)))
+  (test? false (ex (join) (join)))
   (test? true (is (list 'a) (list 'a)))
-  (test? false (id (list 'a) (list 'a)))
+  (test? false (ex (list 'a) (list 'a)))
   (test? true (is (obj) (obj)))
-  (test? false (id (obj) (obj)))
+  (test? false (ex (obj) (obj)))
   (test? true (is (obj a t) (obj a t)))
-  (test? false (id (obj a t) (obj a t)))
+  (test? false (ex (obj a t) (obj a t)))
   (test? true (is -0.0 0.0))
-  (test? true (id -0.0 0.0)))
+  (test? true (ex -0.0 0.0)))
 
 (define-test short
   (test? true (or true (err 'bad)))
@@ -573,7 +573,7 @@ c"
   (test? nil          (rev-onto nil nil))
   ; the tail is shared, not copied
   (with (tail '(4 5))
-    (test? true (id (cddr (rev-onto '(2 1) tail)) tail))))
+    (test? true (ex (cddr (rev-onto '(2 1) tail)) tail))))
 
 (define-test insert-sorted
   ; descending list, insert at front / middle / end
@@ -588,7 +588,7 @@ c"
   ; inserting at the front allocates one cell and shares the whole tail --
   ; this is what keeps add-item flat regardless of how long the list is
   (with (seq '(9 7 3 1))
-    (test? true (id (cdr (insert-sorted > 10 seq)) seq))))
+    (test? true (ex (cdr (insert-sorted > 10 seq)) seq))))
 
 (define-test reinsert-sorted
   ; with no duplicate present it behaves like insert-sorted
@@ -780,7 +780,7 @@ c"
 (define-test sread-eof
   (test? 9    (w/instring i "9" (sread i eof)))
   ; sread hands the eof value straight back at end of input
-  (test? t    (same (w/instring i "" (sread i eof)) eof))
+  (test? t    (ex (w/instring i "" (sread i eof)) eof))
   ; any value can play the part of eof
   (test? 'end (w/instring i "" (sread i 'end))))
 
@@ -805,15 +805,15 @@ c"
   (test? '(1 nil 3) (w/instring i "1 nil 3" (drain (read i eof) eof)))
   (test? '(1)       (w/instring i "1 nil 3" (drain (read i)))))
 
-; whiler compares against endval with `same` instead of `is`.  That matters
+; whiler compares against endval with `ex` instead of `is`.  That matters
 ; because eof is itself a function: plain (testify eof) hands back eof to be
-; *called* as the predicate, whereas (testify eof same) compares against it.
+; *called* as the predicate, whereas (testify eof ex) compares against it.
 
 (define-test whiler-endval
-  (test? t   (same (testify eof) eof))
-  (test? nil (same (testify eof same) eof))
-  (test? t   ((testify eof same) eof))
-  (test? nil ((testify eof same) 1))
+  (test? t   (ex (testify eof) eof))
+  (test? nil (ex (testify eof ex) eof))
+  (test? t   ((testify eof ex) eof))
+  (test? nil ((testify eof ex) 1))
   (test? '(1 nil 3) (accum a (w/instring i "1 nil 3"
                                (whiler e (read i eof) eof (a e))))))
 
@@ -882,7 +882,7 @@ c"
     (test? 'table (type (load-table f)))
     (test? 0      (len (load-table f)))
     ; the default is built per call, not shared between loads
-    (test? nil    (same (load-table f) (load-table f)))
+    (test? nil    (ex (load-table f) (load-table f)))
     (rmfile f))
   ; safe-load-table swallows a missing or unreadable file and still yields a
   ; table, so callers never have to guard the very first run
@@ -1083,7 +1083,7 @@ c"
     (test? (urlencode1 s) (urlencode s)))
   ; an all-unreserved string comes back as the same object, not a copy
   (let s "abc-._~ABC012"
-    (test? true (id s (urlencode s)))))
+    (test? true (ex s (urlencode s)))))
 
 ; ----- http-fetch -----
 ;
@@ -1921,7 +1921,7 @@ c"
     (test? (eschtml1 s) (eschtml s)))
   ; a string with nothing to escape comes back as the same object
   (let s "nothing to escape here"
-    (test? true (id s (eschtml s))))
+    (test? true (ex s (eschtml s))))
   ; eschtml1 still takes any sequence, not just strings
   (test? "a&lt;b" (eschtml (list #\a #\< #\b))))
 

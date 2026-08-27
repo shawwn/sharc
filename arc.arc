@@ -106,7 +106,7 @@
                  (if (no tail)
                      prev
                      ((fn (next)
-                        (if (id next xs) (err "Circular list"))
+                        (if (ex next xs) (err "Circular list"))
                         (scdr tail prev)
                         (self tail next))
                       (cdr tail)))))
@@ -935,7 +935,7 @@
 
 (mac whiler (var expr endval . body)
   (w/uniq gf
-    `(withs (,var nil ,gf (testify ,endval same))
+    `(withs (,var nil ,gf (testify ,endval ex))
        (while (no (,gf (= ,var ,expr)))
          ,@body))))
 
@@ -1223,7 +1223,7 @@
 (mac insort (test elt seq)
   `(zap [insert-sorted ,test ,elt _] ,seq))
 
-(def reinsert-sorted (test elt seq (o same id))
+(def reinsert-sorted (test elt seq (o same ex))
   ((afn (seq (o acc))
      (if (no seq)             (rev-onto acc (list elt))
          (same elt (car seq)) (self (cdr seq) acc)
@@ -1641,7 +1641,7 @@
 (def template-keys (tem fields)
   (if (acons tem)
       (memtable (map car fields))
-      (aif (check (template-keys* tem) [id (car _) fields])
+      (aif (check (template-keys* tem) [ex (car _) fields])
            (cadr it)
            (cadr (= (template-keys* tem)
                     (list fields (memtable (map car fields))))))))

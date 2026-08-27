@@ -27,7 +27,7 @@ Don't strip informative comments or docstrings when refactoring code unless expl
 
 Don't delete files under `arc/`. e.g. `arc/news/story/1`
 
-`(is x y)` does a deep compare of x and y. For object identity, use `(same x y)`.
+`(is x y)` does a deep compare of x and y. For object identity, use `(ex x y)`. (`ex` is short for `exactly`.)
 
 You can't use ! after a closing paren, like `((newstories maxend*) 2)!id`.
 
@@ -35,6 +35,6 @@ A `(t var)` param defaults to a thread-local: `(t var)` => `(o var (the var))`, 
 E.g. `(def ip ((t req)) req!ip)` makes `(ip)` use `(the req)` while `(ip some-req)` uses the arg. See `examples/the.arc`.
 
 `is` is isomorphic, e.g. `(is (list 'a) (list 'a))` returns `t`. `iso` exists for backwards compatibility.
-If you need to compare object identity, use `same`, e.g. `(same (list 'a) (list 'a))` returns `nil`.
+If you need to compare object identity, use `ex`, e.g. `(ex (list 'a) (list 'a))` returns `nil`.
 
 You can call CL macros e.g. like this: `(#'sb-ext::with-timeout ...)`

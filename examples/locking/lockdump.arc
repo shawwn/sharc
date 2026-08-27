@@ -59,9 +59,9 @@
 
 (def thread-label (th)
   (if (no th)                        nil
-      (id th (current-thread))       'repl
-      (id th (iflive serve-thread*)) 'serve
-      (or (car:keep [id ((iflive bgthreads*) _) th]
+      (ex th (current-thread))       'repl
+      (ex th (iflive serve-thread*)) 'serve
+      (or (car:keep [ex ((iflive bgthreads*) _) th]
                     (if (bound 'bgthreads*) (keys bgthreads*)))
           th)))
 
@@ -70,7 +70,7 @@
 ; carries a name of its own, hence the fallback.
 
 (def lock-label (m)
-  (or (car:car:keep [id (lock-mutex:cadr _) m] (known-locks))
+  (or (car:car:keep [ex (lock-mutex:cadr _) m] (known-locks))
       (errsafe (sb-thread::mutex-name m))
       m))
 
@@ -100,7 +100,7 @@
   ((afn (th seen acc)
      (if (no th)
           (rev:cons 'gone acc)
-         (some [id _ th] seen)
+         (some [ex _ th] seen)
           (rev:cons 'cycle! acc)
          (let m (waiting-for th)
            (if (no m)
@@ -211,5 +211,5 @@
 
 (def bt-all ((o secs 15) (o count 40))
   (each th (sb-thread::list-all-threads)
-    (unless (id th (current-thread)) (bt th secs count)))
+    (unless (ex th (current-thread)) (bt th secs count)))
   nil)

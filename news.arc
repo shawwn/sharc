@@ -407,7 +407,7 @@
   (or (items* id)
       (whenlet i (read-item id)
         (lets cur (or= (items* id) i)
-          (when (ident cur i)
+          (when (ex cur i)
             (register-item i))))))
 
 (def sameitem (compare is !id))
