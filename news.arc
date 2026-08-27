@@ -3661,7 +3661,7 @@ brackets&gt; and it should work.<br><br>")
          (retry "Current password incorrect. Please try again.")
          (do (set-pw subject newpw)
              (save-pws)
-             (wipe (name->code* subject))
+             (update-claim subject)
              "news"))))
 
 
@@ -4046,6 +4046,12 @@ brackets&gt; and it should work.<br><br>")
 
 (def check-claim (u)
   (posmatch (claim-code u) (fetch-hn-profile u)))
+
+(def update-claim (u (o yes t))
+  (when (name->code* u)
+    (set (user-key 'claimed u))
+    (save-prof u)
+    (wipe (name->code* u))))
 
 (def fetch-hn-profile (u)
   (aand (can-claim) (hn-user-url u) (curl-get it)))
