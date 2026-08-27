@@ -922,21 +922,20 @@
 ; Repeatedly evaluates its body till it returns nil, then returns vals.
 
 (mac drain (expr (o eof nil))
-  (w/uniq (gacc gdone gres)
-    `(with (,gacc nil ,gdone nil)
+  (w/uniq (gdone gres)
+    `(let ,gdone nil
        (while (no ,gdone)
          (let ,gres ,expr
            (if (is ,gres ,eof)
                (= ,gdone t)
-               (push ,gres ,gacc))))
-       (rev! ,gacc))))
+               (out ,gres)))))))
 
 ; For the common C idiom while x = snarfdata != stopval.
 ; Rename this if use it often.
 
 (mac whiler (var expr endval . body)
   (w/uniq gf
-    `(withs (,var nil ,gf (testify ,endval))
+    `(withs (,var nil ,gf (testify ,endval same))
        (while (no (,gf (= ,var ,expr)))
          ,@body))))
 
@@ -1061,10 +1060,10 @@
    `(w/instring ,gv ,str
       (w/stdin ,gv ,@body))))
 
-(def readstring1 (s (o eof nil)) (w/instring i s (read i eof)))
+(def readstring1 (s) (w/instring i s (read i)))
 
 (def read ((o x (stdin)) (o eof nil))
-  (if (isa!string x) (readstring1 x eof) (sread x eof)))
+  (if (isa!string x) (readstring1 x) (sread x eof)))
 
 ; inconsistency between names of readfile[1] and writefile
 
@@ -1072,9 +1071,12 @@
 
 (def readfile1 (name) (w/infile s name (read s)))
 
-(def readall ((o src (stdin)))
-  (with (eof (fn ()) i (if (isa!string src) (instring src) src))
-    (drain (read i eof) eof)))
+(def readall ((o src (stdin)) (o n))
+  (if (isa!string src) (zap instring src))
+  (whiler expr (read src eof) eof
+    (if (and n (< (-- n) 0))
+        (break)
+        (out expr))))
 
 (def allchars ((o str (stdin)))
   (tostring (whilet c (readc str nil)
@@ -1354,17 +1356,18 @@
                            `(list ',(keysym k) ,v))
                          (pair args)))))
 
-(def load-table (file (o eof))
+(def load-table (file (o eof (table)))
   (w/infile i file (read-table i eof)))
 
-(def read-table ((o i (stdin)) (o eof))
+(def read-table ((o i (stdin)) (o eof nil))
   (let e (read i eof)
-    (if (alist e) (listtab e) e)))
+    (if (is e eof) e
+        (alist e)  (listtab e)
+                   e)))
 
 (def load-tables (file)
   (w/infile i file
-    (w/uniq eof
-      (drain (read-table i eof) eof))))
+    (drain (read-table i eof) eof)))
 
 (= save-stripes* 64)
 
@@ -1894,10 +1897,9 @@
 (def load (file)
   (w/infile f file
     (notetime file)
-    (w/uniq eof
-      (w/assign script-file* file
-        (whiler e (read f eof) eof
-          (eval e))))))
+    (w/assign script-file* file
+      (whiler e (read f eof) eof
+        (eval e)))))
 
 (def reload ()
   (w/assign reloading* t

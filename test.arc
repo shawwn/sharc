@@ -721,6 +721,123 @@ c"
     (test? src (w/infile i f (drain (readb i))))
     (rmfile f)))
 
+; ----- read / eof -----
+
+; Reading signals end of input with the `eof` sentinel rather than nil, so a
+; literal nil in the stream stays distinguishable from running out of input.
+
+(define-test sread-eof
+  (test? 9    (w/instring i "9" (sread i eof)))
+  ; sread hands the eof value straight back at end of input
+  (test? t    (same (w/instring i "" (sread i eof)) eof))
+  ; any value can play the part of eof
+  (test? 'end (w/instring i "" (sread i 'end))))
+
+(define-test read-forms
+  (test? 42     (read "42"))
+  (test? '(a b) (read "(a b)"))
+  (test? '(a b) (readstring1 "(a b)"))
+  (test? 7      (w/instring i "7" (read i eof))))
+
+(define-test readall-forms
+  (test? '(1 2 3) (readall "1 2 3"))
+  (test? nil      (readall ""))
+  ; the optional second argument caps how many forms come back
+  (test? '(1 2)   (readall "1 2 3 4 5" 2))
+  (test? nil      (readall "1 2 3" 0)))
+
+(define-test drain-eof
+  (test? '(1 2 3) (w/instring i "1 2 3" (drain (read i eof) eof)))
+  (test? '(1 2 3) (w/instring i "1 2 3" (drain (read i))))
+  ; against the eof sentinel a literal nil is ordinary data; against the
+  ; default nil eof that same nil ends the drain
+  (test? '(1 nil 3) (w/instring i "1 nil 3" (drain (read i eof) eof)))
+  (test? '(1)       (w/instring i "1 nil 3" (drain (read i)))))
+
+; whiler compares against endval with `same` instead of `is`.  That matters
+; because eof is itself a function: plain (testify eof) hands back eof to be
+; *called* as the predicate, whereas (testify eof same) compares against it.
+
+(define-test whiler-endval
+  (test? t   (same (testify eof) eof))
+  (test? nil (same (testify eof same) eof))
+  (test? t   ((testify eof same) eof))
+  (test? nil ((testify eof same) 1))
+  (test? '(1 nil 3) (accum a (w/instring i "1 nil 3"
+                               (whiler e (read i eof) eof (a e))))))
+
+; read-table yields nil at end of input, and that is what lets load-tables
+; terminate.  If it returned an empty table there instead, load-tables would
+; accumulate empty tables until the heap is exhausted.
+
+; read-table turns an alist into a table and leaves anything else alone.
+; (alist nil) is t, which is what makes a saved *empty* table -- save-table
+; writes one as (tablist h) = nil -- come back as an empty table.
+
+(define-test alist-listtab
+  (test? t      (alist nil))
+  (test? t      (alist '((a 1))))
+  (test? nil    (alist 'sym))
+  (test? 'table (type (listtab nil)))
+  (test? 0      (len (listtab nil)))
+  (test? '(a b) (sort < (keys (listtab '((a 1) (b 2))))))
+  ; read-table compares against eof with `is`, which is isomorphic: two
+  ; distinct empty tables are equal.  That is safe only because reading text
+  ; can never produce a table, so nothing in a stream can collide with a
+  ; (table) sentinel.  Pinned here because read-table depends on it.
+  (test? t (is (table) (table))))
+
+(define-test read-table-eof
+  (test? '(a b) (sort < (keys (w/instring i "((a 1) (b 2))" (read-table i)))))
+  (test? nil    (w/instring i "" (read-table i)))
+  ; read-table takes the value to treat as end of input.  Pass the eof
+  ; sentinel whenever nil is a legitimate payload: save-table writes an empty
+  ; table as (tablist h) = nil, so load-table and load-tables pass it and get
+  ; an empty table back instead of stopping short.
+  (test? 'table (type (w/instring i "nil" (read-table i eof))))
+  (test? 0      (len  (w/instring i "nil" (read-table i eof))))
+  ; against the default nil eof, a nil payload is indistinguishable from the
+  ; end of the stream -- which is why the callers above do not rely on it
+  (test? nil    (w/instring i "nil" (read-table i))))
+
+(define-test load-tables-file
+  (let f "test-load-tables.tmp"
+    (w/outfile o f (disp "((a 1) (b 2))\n((c 3))\n" o))
+    (test? 2            (len (load-tables f)))
+    (test? '((a b) (c)) (map [sort < (keys _)] (load-tables f)))
+    ; load-table reads just the first one
+    (test? '(a b)       (sort < (keys (load-table f))))
+    (rmfile f))
+  (let f "test-load-tables-empty.tmp"
+    (w/outfile o f)
+    (test? nil (load-tables f))
+    (rmfile f))
+  ; an empty table in the middle of the file must not truncate the drain
+  (let f "test-load-tables-nil.tmp"
+    (w/outfile o f (disp "((a 1))\n()\n((c 3))\n" o))
+    (test? 3 (len (load-tables f)))
+    (test? '((a) () (c)) (map [sort < (keys _)] (load-tables f)))
+    (rmfile f))
+  ; and an empty table round-trips through save-table as a table, not nil
+  (let f "test-save-empty-table.tmp"
+    (save-table (table) f)
+    (test? 'table (type (load-table f)))
+    (test? 0      (len (load-table f)))
+    (rmfile f))
+  ; load-table's eof defaults to (table), so callers like load-pws get an
+  ; empty table rather than nil even when the file holds nothing at all
+  (let f "test-load-table-empty-file.tmp"
+    (w/outfile o f)
+    (test? 'table (type (load-table f)))
+    (test? 0      (len (load-table f)))
+    ; the default is built per call, not shared between loads
+    (test? nil    (same (load-table f) (load-table f)))
+    (rmfile f))
+  ; safe-load-table swallows a missing or unreadable file and still yields a
+  ; table, so callers never have to guard the very first run
+  (test? 'table (type (safe-load-table "test-no-such-file.tmp")))
+  (test? 0      (len  (safe-load-table "test-no-such-file.tmp"))))
+
 ; ----- strings.arc -----
 
 (define-test tokens
@@ -1822,6 +1939,16 @@ c"
 ; without letting an early failure hide later assertions.
 (mac test-is (name expected expr)
   `(define-test ,name (test? ,expected ,expr)))
+
+; Symbol case is folded, so 'y and 'Y are one symbol.  This is why the note
+; below matters, and why a membership test like (in x 'y 'yes 'Y 'YES) has two
+; redundant branches.
+
+(define-test symbol-case-folding
+  (test? t (is 'y 'Y))
+  (test? t (is 'yes 'YES))
+  (test? t (in 'Y 'y 'yes))
+  (test? 1 (len (dedup '(y Y)))))
 
 ; NOTE: test names avoid differing only by letter case -- since symbol case is
 ; folded, two names like `write-sym-t` / `write-sym-T` would collapse into one
