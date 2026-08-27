@@ -12,6 +12,7 @@
 /smtp.json
 /recaptcha.json
 /notify.json
+/script.arc
 
 /*.txt
 /*.html
