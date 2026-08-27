@@ -56,15 +56,26 @@ stays with its scrollback intact instead of vanishing.
 
 ### Updating the code
 
-The server's `arc/` is now its own live datastore. **Do not rsync `arc/`
-from a laptop** or you will clobber it. Push code only:
+`/opt/sharc` is a git checkout tracking `origin`
+(<https://github.com/shawwn/sharc>), so updates come from a pull, not a
+copy. **Do not rsync onto it**: that dirties tracked files, and the next
+pull refuses with "your local changes would be overwritten by merge".
 
 ```sh
-rsync -Pa --exclude 'arc/' ./ deploy@hetzner:/opt/sharc/
+git push                                  # from the laptop
+sudo -u deploy git -C /opt/sharc pull     # on the server
+systemctl restart sharc                   # only if a .lisp file changed
 ```
 
-`.arc` files hot-reload under `DEV=1`. Changes to `.lisp` files (the
-compiler and runtime) need `systemctl restart sharc`.
+`.arc` files hot-reload under `DEV=1`; `.lisp` files (the compiler and
+runtime) need the restart.
+
+Run git as `deploy`, not as root. The tree is owned by `deploy`, and root
+git refuses with `detected dubious ownership in repository at
+'/opt/sharc'`.
+
+The server's `arc/` is its own live datastore, and `.gitignore` carries
+`/arc/`, so a pull will not touch it. Never copy `arc/` from a laptop.
 
 ## SBCL
 

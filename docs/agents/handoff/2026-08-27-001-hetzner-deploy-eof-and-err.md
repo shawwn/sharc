@@ -69,8 +69,17 @@ cert.
 under `DEV=1`, but `.lisp` files do not, so the runtime changes in this
 batch need `systemctl restart sharc` to take effect. The server has been
 scraping independently since 2026-08-26, so **its `arc/` is its own live
-datastore** -- push code with `rsync -Pa --exclude 'arc/'` and never
-sync the data directory from a laptop.
+datastore**.
+
+Update the server with a pull, not a copy: `/opt/sharc` is a git checkout
+tracking `origin`, and rsyncing onto it dirties tracked files so the next
+pull refuses. Run git as `deploy`, since root hits `detected dubious
+ownership`. `.gitignore` carries `/arc/`, so a pull cannot touch the
+datastore.
+
+```sh
+sudo -u deploy git -C /opt/sharc pull
+```
 
 ## 2. Reading signals eof with a sentinel, not nil
 
