@@ -2233,6 +2233,15 @@
                    (a `(= ,var (val ,i))))))
            val)))
 
+(def yesno ((o question) (o default))
+  (if question (prn question))
+  (pr "Continue? " (if default "[Y/n]" "[y/N]") " ")
+  (flushout)
+  (let it (read (stdin) eof)
+    (if (is it eof)
+        default
+        (in it 'Y 'YES))))
+
 ; Referencing the bare symbol `scope` (or `scope%`) compiles to
 ; (%scope env), where ac splices in its compile-time lexical environment.
 ; For each distinct lexical in scope, emit (name (fn () name) (fn (v) ...))
