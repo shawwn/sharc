@@ -57,15 +57,17 @@
 (or= scrapelog-lock* (make-lock 52 "scrapelog"))
 
 (def scrapelog args
-  (if (scrape-verbose) (w/lock scrapelog-lock*
-                         (aif (the thread-name) (pr it ": "))
-                         (apply prn args))))
+  (when (scrape-verbose)
+    (w/lock scrapelog-lock*
+      (aif (the thread-name) (pr it ": "))
+      (apply prn args))))
 
 (def scrape-ero args
-  (if (scrape-verbose) (w/lock scrapelog-lock*
-                         (w/stdout (stderr)
-                           (aif (the thread-name) (pr it ": ")))
-                         (apply ero args))))
+  (when (scrape-verbose)
+    (w/lock scrapelog-lock*
+      (w/stdout (stderr)
+        (aif (the thread-name) (pr it ": ")))
+      (apply ero args))))
 
 ; Curl.
 
