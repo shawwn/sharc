@@ -49,7 +49,7 @@
 
 (or= scrape-last-fetch* (table))     ; id -> unix seconds when last fetched
 
-(= scrape-verbose* nil)
+(= scrape-verbose* t)
 
 (def scrape-verbose ()
   (or scrape-verbose* (main-thread)))
