@@ -27,7 +27,10 @@
 
 (mac define-test (name . body)
   (let label (sym:string "test-" name)
-    `(do (def ,label ()
+    ; Check before defining, so a duplicate doesn't clobber the
+    ; existing test.
+    `(do (assert (~tests* ',name) (+ "Duplicate test: " ',name))
+         (def ,label ()
            (point return ,@body))
          (= (tests* ',name) ,label))))
 
