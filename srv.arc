@@ -474,15 +474,16 @@ Connection: close"))
 
 (or= fnkey->fnid* (table) fnid->fnkey* (table))
 
-(def forget-fnid (key)
+(def forget-fnids ((o ids (all-fnids)))
   (w/lock fnid-lock*
-    (wipe (fns* key))
-    (wipe (fnids* key))
-    (wipe (timed-fnids* key))
-    (whenlet fnkey (fnid->fnkey* key)
-      (wipe (fnkey->fnid* fnkey))
-      (wipe (fnid->fnkey* key))
-      t)))
+    (each key ids
+      (wipe (fns* key))
+      (wipe (fnids* key))
+      (wipe (timed-fnids* key))
+      (whenlet fnkey (fnid->fnkey* key)
+        (wipe (fnkey->fnid* fnkey))
+        (wipe (fnid->fnkey* key))))
+    t))
 
 ; count on huge (expt 64 22) size of fnid space to avoid clashes
 
@@ -567,14 +568,12 @@ Connection: close"))
 
 (def harvest-fnids ((o n fnid-harvest-max*))
   (w/lock-when fnid-lock* (len> fns* n)
-    (each id (dead-fnids)
-      (forget-fnid id)))
+    (forget-fnids (dead-fnids)))
   (w/lock-when fnid-lock* (len> fns* n)
     (withs (n (min n (len fns*))
             nharvest (trunc (/ n fnid-harvest-ratio*)))
       (let (kill keep) (split (fnids) nharvest)
-        (each id kill
-          (forget-fnid id))))))
+        (forget-fnids kill)))))
 
 (= fnurl* "/x" rfnurl* "/r" rfnurl2* "/y")
 
