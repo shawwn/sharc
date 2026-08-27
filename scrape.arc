@@ -448,11 +448,8 @@
       ; The comhead contains nested <span> children (.age, .navs, ...)
       ; so use the outer "</span></div>" landmark, not the first </span>.
       (let comhead (or (car (between row "<span class=\"comhead\">" "</span></div>" 0)) "")
-        (aif (between comhead "<a href=\"user?id=" "\"" 0)
-             (= rec!by (car it)))
-        (aif (between comhead "<span class=\"age\" title=\"" "\"" 0)
-             (whenlet toks (tokens (car it))
-               (= rec!time (errsafe:int (last toks)))))
+        (aif (parse-subtext-author comhead) (= rec!by   it))
+        (aif (parse-subtext-age comhead)    (= rec!time it))
         (if (posmatch "[flagged]" comhead) (set rec!flagged))
         (if (posmatch "[dead]"    comhead) (set rec!dead))
         (aand (between comhead "class=\"togg clicky\"" "</a>" 0)
