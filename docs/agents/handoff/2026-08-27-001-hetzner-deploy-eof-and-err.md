@@ -65,9 +65,13 @@ cert.
 
 ### The server is running stale code
 
-`/opt/sharc/arc0.lisp` predates the `ex` rename. `.arc` files hot-reload
-under `DEV=1`, but `.lisp` files do not, so the runtime changes in this
-batch need `systemctl restart sharc` to take effect. The server has been
+`/opt/sharc/arc0.lisp` predates the `ex` rename. Picking that up needs
+`(reload)` in the repl, **not** a restart: `DEV=1` autoreloads `.arc`
+files, and `(reload)` calls `(reload-runtime)`, which recompiles the lisp
+half into the live image (see
+`2026-08-21-004-reloadable-lisp-runtime.md`). Only a struct shape change
+forces a restart, and reload-runtime refuses loudly in that case rather
+than corrupting anything. The server has been
 scraping independently since 2026-08-26, so **its `arc/` is its own live
 datastore**.
 

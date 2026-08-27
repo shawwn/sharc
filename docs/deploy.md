@@ -64,11 +64,31 @@ pull refuses with "your local changes would be overwritten by merge".
 ```sh
 git push                                  # from the laptop
 sudo -u deploy git -C /opt/sharc pull     # on the server
-systemctl restart sharc                   # only if a .lisp file changed
 ```
 
-`.arc` files hot-reload under `DEV=1`; `.lisp` files (the compiler and
-runtime) need the restart.
+Then pick the code up from the repl, without restarting anything:
+
+```arc
+arc> (reload)
+```
+
+**`.lisp` changes do not need a restart.** `DEV=1` autoreloads `.arc`
+files on their own, and `(reload)` calls `(reload-runtime)`, which
+recompiles `arc0.lisp` and `arc1.lisp` and loads them into the live image
+in about 290ms. See `docs/agents/handoff/2026-08-21-004-reloadable-lisp-runtime.md`.
+
+The one case that does need a restart is when a **struct changed shape**.
+`reload-runtime` refuses rather than leaving live instances stranded
+under the old layout:
+
+```
+reload-runtime: refusing, struct shape changed:
+  live instances cannot be migrated; restart the image.
+```
+
+It returns nil having changed nothing, so a refusal is safe: fix it or
+`systemctl restart sharc`. `(reload-runtime t)` reloads anyway and
+abandons any instance made under the old layout.
 
 Run git as `deploy`, not as root. The tree is owned by `deploy`, and root
 git refuses with `detected dubious ownership in repository at
@@ -217,6 +237,11 @@ openssl or libssl upgrade:
 ```sh
 systemctl restart sharc
 ```
+
+This is the one place a real restart is required rather than `(reload)`.
+`reload-runtime` recompiles lisp *source* into the live image; it cannot
+re-map a shared library the process already has open. Only a new process
+picks up the new libssl.
 
 The proper fix is not a setting. tmux attaches to a tmux server, not to
 an arbitrary process, so the app cannot be daemonised separately and
