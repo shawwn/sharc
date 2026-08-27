@@ -366,8 +366,8 @@
       str
       (string str end)))
 
-(def plural (n x (o end "s"))
-  (string n " " (pluralize n x end)))
+(def plural (n x (o end "s") (o sep " "))
+  (string n sep (pluralize n x end)))
 
 
 ; http://www.eki.ee/letter/chardata.cgi?HTML4=1

@@ -2000,7 +2000,7 @@
     (tag (a href (item-or-hn-url i!id))
       (let n (w/loading-items (- (visible-family i) 1))
         (if (> n 0)
-            (do (pr (plural n "comment"))
+            (do (pr (plural n "comment" "s" "&nbsp;"))
                 (awhen (and show-threadavg* (admin) (threadavg i))
                   (pr " (avg: @(num it 2 t t))"))
                 (awhen (and show-threadavg* (admin) (threadstd i))
