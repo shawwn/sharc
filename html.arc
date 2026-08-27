@@ -29,7 +29,8 @@
   (or (opmeths* (list spec opt))
       (case opt
         (id align valign) opsym
-        (name type title) opstring
+        type              opraw
+        (name title)      opstring
         (class style src) opstring
         (onclick onfocus) opstring
         (color bgcolor)   opcolor
@@ -56,6 +57,9 @@
   (w/uniq gv
     `(whenlet ,gv ,val
        (pr ,(string " " key "=\"#") (hexrep ,gv) #\"))))
+
+(def opraw (key val)
+  `(aif ,val (pr ,(+ " " key "=\"") it #\")))
 
 (def opstring (key val)
   `(aif ,val (pr ,(+ " " key "=\"") (sanitize it) #\")))
@@ -165,7 +169,7 @@
 (def presc args
   (apply pr (map sanitize args)))
 
-(attribute a          href           opstring)
+(attribute a          href           opraw)
 (attribute a          rel            opstring)
 (attribute a          class          opstring)
 (attribute a          id             opsym)
