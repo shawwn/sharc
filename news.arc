@@ -293,8 +293,11 @@
 (def loaded-votes ((o f idfn))
   (keys votes* f))
 
-(def check-key (k (t u me))
+(def user-key (k (t u me))
   (and u (mem k (uvar u keys))))
+
+(defplace user-key (fn (k (o u '(me)))
+                     `(mem ,k (uvar ,u keys))))
 
 (def by (i)
   (assert (uid->user* i!by) (uid-message i)))
@@ -514,7 +517,7 @@
 (def announcement (i)  (mem 'announce i!keys))
 (def imported (i)      (mem 'imported i!keys))
 (def dupe (i)          (mem 'dupe i!keys))
-(def redact ((t u me)) (check-key 'redact u))
+(def redact ((t u me)) (user-key 'redact u))
 
 (defplace dead           (fn (i) `(,i 'dead)))
 (defplace deleted        (fn (i) `(,i 'deleted)))
@@ -2246,11 +2249,11 @@
       (withs (ip   (logins* (me))
               vote (list (seconds) ip (user-id) dir i!score nil)
               effect (fn (name n) (push (list name n) vote!5) n))
-        (unless (or (and (or (ignored) check-key!novote)
+        (unless (or (and (or (ignored) user-key!novote)
                          (~author i))
                     (and (is dir 'down)
                          (~editor)
-                         (or check-key!nodowns
+                         (or user-key!nodowns
                              (> (downvote-ratio) downvote-ratio-limit*)
                              ; prevention of karma-bombing
                              (just-downvoted (by i))))
@@ -2429,7 +2432,7 @@
 
 (def oversubmitting (kind (o url))
   (and enforce-oversubmit*
-       (or check-key!toofast
+       (or user-key!toofast
            (ignored)
            (< (user-age) new-age-threshold*)
            (< (karma) new-karma-threshold*))
