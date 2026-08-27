@@ -181,6 +181,12 @@ straight to gcell-ref; this remains for callers holding only a symbol."
         `(progn (defun ,f ,x ,@body)
                 (xdef ,name #',f)))))
 
+(defvar arc-eof
+  (let ((self nil))
+    (setf self (sb-int::named-lambda (arc-sym "eof") () self))))
+
+(xdef eof arc-eof)
+
 ;;;; ============================================================
 ;;;; Options
 ;;;; ============================================================
