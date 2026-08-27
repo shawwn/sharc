@@ -110,7 +110,7 @@
   (unless (file-exists scrape-config*)
     (when (file-exists scrape-example*)
       (copyfile scrape-example* scrape-config*)))
-  (or (and (file-exists scrape-config*) (load-json scrape-config*))
+  (or (file-exists&load-json scrape-config*)
       (obj username "hnscraper")))
 
 (def save-scrape-config (cfg)
@@ -1130,7 +1130,7 @@
     ; have an entry (don't clobber a real password if one was
     ; set via the web UI later).  Skip entirely if dev-password
     ; is nil/empty.
-    (awhen (aand scrape-dev-password* (check it ~empty))
+    (awhen (check scrape-dev-password* ~empty)
       (or= (hpasswords* p!id) (password-hash it)))
     (save-prof p!id)))
 
