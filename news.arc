@@ -2708,12 +2708,29 @@
   (string (if id "item?id=") id (if anchor "#") anchor))
 
 (newsop item (id)
+  (unless (safe-item id)
+    (awhen (safe-posint id)
+      (tostring:errsafe:import-story it)))
   (let s (safe-item id)
     (if (news-type s)
         (do (if (deleted s) (note-baditem))
             (item-page s))
         (do (note-baditem)
             (pr "No such item.")))))
+
+(def import-story (id)
+  (let story (hn-superparent id)
+    (when (is story!type "story")
+      (scrape-and-import! story!id))))
+
+(def hn-item (id)
+  (aand (safe-posint id)
+        (errsafe:from-json:http-fetch
+          (+ "https://hacker-news.firebaseio.com/v0"
+             "/item/" id ".json"))))
+
+(def hn-superparent (id)
+  (aand (hn-item id) (if it!parent (hn-superparent it!parent) it)))
 
 (newsopr item.json (id)
   (responding type-header*!json (prn)
