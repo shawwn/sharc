@@ -89,12 +89,12 @@ cd sbcl-2.6.3-x86-64-linux && INSTALL_ROOT=/usr/local sh install.sh
 
 x86-64 Linux enables the `:invalid` floating point trap by default; macOS on
 ARM does not. So `(= nan nan)` *signalled* on the server instead of returning
-nil, and `test.arc`'s `literals` test died in `arc-id`.
+nil, and `test.arc`'s `literals` test died in the identity primitive.
 
-`arc-id` in `arc0.lisp` now masks the trap for the float case only, leaving
-integer comparison on the fast path. `anan` is `(no (is x x))`, so it depends
-on `is` returning nil here. After the fix both platforms give identical
-results and the suite is `968 passed, 0 failed` on each.
+`arc-exactly` in `arc0.lisp` (once `arc-id`, then `arc-same`) now masks the
+trap for the float case only, leaving integer comparison on the fast path.
+`anan` is `(no (is x x))`, so it depends on `is` returning nil here. After
+the fix both platforms give identical results and the suite passes on each.
 
 ## TLS / certbot
 
@@ -171,10 +171,59 @@ The app is writing to `arc/` while restic runs, so a snapshot is a
 crash-consistent view, not an atomic one. Fine for this workload; worth
 knowing before trusting a restore of a half-written `hpw`.
 
+## Unattended upgrades and needrestart
+
+Ubuntu's `apt-daily-upgrade` timer runs unattended-upgrades, which calls
+`needrestart`, which restarts any service holding a deleted library. The
+running sbcl maps `libssl.so.3` and `libcrypto.so.3`, so an openssl
+upgrade makes `sharc.service` a candidate -- and because the tmux server
+**is** that unit's main process, restarting it destroys the repl session
+and the app's in-memory state.
+
+That is exactly what happened on 2026-08-27:
+
+```
+06:25:04  unattended-upgrades: libssl3t64, openssl 3.0.13-0ubuntu3.12 -> .15
+06:25:05  systemd: Reexecuting requested (unit apt-daily-upgrade.service)
+06:25:06  tmux: server exited unexpectedly
+06:25:06  sharc.service: Main process exited, code=dumped, status=6/ABRT
+06:25:06  sharc.service: Started
+```
+
+tmux was a bystander; it does not link libssl at all.
+
+`/etc/needrestart/conf.d/sharc.conf` now excludes the unit:
+
+```perl
+$nrconf{override_rc}{qr(^sharc)} = 0;
+```
+
+**This carries an obligation.** With the override in place the running
+image keeps the *old* libssl mapped until someone restarts it by hand,
+and this app makes outbound HTTPS connections to scrape HN. After any
+openssl or libssl upgrade:
+
+```sh
+systemctl restart sharc
+```
+
+The proper fix is not a setting. tmux attaches to a tmux server, not to
+an arbitrary process, so the app cannot be daemonised separately and
+then attached to -- decoupling would need the image to listen for repl
+connections on a socket, the swank model, which this runtime does not
+have. There is a browser repl in the meantime: `prompt.arc` defines an
+admin-gated `/repl` op, which reaches the live image without a terminal.
+
+### Pending kernel upgrade
+
+`needrestart` also reports that the running kernel is `6.8.0-117-generic`
+against an expected `6.8.0-138-generic`. Unattended-upgrades will not
+reboot on its own unless configured to, so this is waiting on a
+deliberate reboot. That one is a real outage, not just an app restart.
+
 ## Things that are deliberately true
 
 - Port 8080 binds `0.0.0.0`, but ufw only opens 22/80/443, so it is not
   reachable from outside. Binding to `127.0.0.1` would be tidier.
-- `ranklink` is commented out in `news.arc`'s subline on purpose.
 - The Mac and the server are independent instances with separate datastores.
   They both scrape, so they drift. The server is the live one.
