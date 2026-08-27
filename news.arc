@@ -758,6 +758,8 @@
 (mac npage (title . body)
   `(tag (html op (op)) ; op lets hn.js know which listing it's on
      (tag head
+       (gentag meta name "referrer" content "origin")
+       (gentag meta name "viewport" content "width=device-width, initial-scale=1.0")
        (gen-css-url)
        (gentag link rel "shortcut icon" href favicon-url*)
        (tag (script src (static-src "hn.js")))

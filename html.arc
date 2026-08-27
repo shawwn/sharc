@@ -230,6 +230,8 @@
 (attribute link       rel            opsym)
 (attribute link       type           opsym)
 (attribute link       href           opstring)
+(attribute meta       name           opsym)
+(attribute meta       content        opstring)
 
 
 (mac gentag args (start-tag args))
