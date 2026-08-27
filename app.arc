@@ -102,10 +102,13 @@
 
 (def register-accts ()
   (= dc-usernames* (table [each (k v) hpasswords*
-                            (set (_:downcase k))])))
+                            (= (_:downcase k) k)])))
+
+; always re-register accounts after a reload.
+(register-accts)
 
 (def register-acct (user)
-  (set (dc-usernames* (downcase user)))
+  (= (dc-usernames* (downcase user)) user)
   user)
 
 (def username-conflicts (user)
@@ -507,14 +510,21 @@
         underscores, and should be between 2 and 15 characters long.  
         Please choose another."
       (acct-exists user)
-       "That username is taken. Please choose another."
+       "That username is taken. @(claim-hn-profile user)"
       (username-conflicts user)
        "That username conflicts with an existing one.  Names are
-        case-insensitive.  Please choose another."
+        case-insensitive.  @(claim-hn-profile:username-conflicts user)"
       (or (no pw) (no (<= 8 (len pw) 72)))
        "Passwords should be between 8 and 72 characters long. Please
         choose another."
        nil))
+
+(def claim-hn-profile (user)
+  (if srvops*!claim
+      (+ "You can "
+         (tostring:link "claim" "claim?id=@user")
+         " it if you own the HN account @{user}.")
+      "Please choose another."))
 
 (def goodchar (c)
   (or (alphadig c) (in c #\- #\_)))
