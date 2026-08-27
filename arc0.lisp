@@ -1968,7 +1968,13 @@ sb-thread mutex with a :name, and anything else prints as itself."
 (xdef protect (during after)
   (unwind-protect (arc-call0 during) (arc-call0 after)))
 
-(xdef err #'error)
+(xdef err (&rest args)
+  ;; Arc's err concatenates its arguments; it is not a format control.
+  ;; Passing the text through ~a keeps a literal ~ in a message (common,
+  ;; since ~ is complement and assert echoes the failing expression) from
+  ;; being read as a directive, and keeps extra args from being dropped.
+  (error "~a" (with-output-to-string (s)
+                (dolist (a args) (arc-disp-val a s)))))
 
 (xdef on-err (errfn f)
   (handler-case (arc-call0 f)
