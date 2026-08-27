@@ -328,7 +328,17 @@ straight to gcell-ref; this remains for callers holding only a symbol."
 
 ;; Returns true iff a and b are identical. 
 (defun arc-id (a b)
-  (cond ((and (numberp a) (numberp b)) (= a b))
+  (cond ((and (numberp a) (numberp b))
+         ;; x86-64 Linux enables the :invalid FP trap by default, so a plain
+         ;; (= nan nan) signals FLOATING-POINT-INVALID-OPERATION there instead
+         ;; of returning nil, while macOS/ARM returns nil.  Mask the trap for
+         ;; the float case so NaN compares false (IEEE semantics) everywhere.
+         ;; anan is (no (is x x)), so it depends on this returning nil.
+         ;; Integers keep the untouched fast path.
+         (if (or (floatp a) (floatp b))
+             (sb-int:with-float-traps-masked (:invalid)
+               (= a b))
+             (= a b)))
         ((and (stringp a) (stringp b)) (string= a b))
         (t (or (eql a b) (and (null a) (null b))))))
 
