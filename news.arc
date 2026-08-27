@@ -879,6 +879,11 @@
        (hex>color it)
        site-color*))
 
+(def site-or-hn-url ()
+  (if (in (op) "" "news")
+      "@{hn-url*}/@(op)"
+      "news"))
+
 (def pagetop (switch lid label (o title) (o whence))
 ; (tr (tdcolor black (vspace 5)))
   (tr (tdcolor (main-color)
@@ -889,7 +894,7 @@
                 (tag (td style "line-height:12pt; height:10px;")
                   (spanclass pagetop
                     (tag (b class 'hnname)
-                      (link this-site* "news"))
+                      (link this-site* (site-or-hn-url)))
                     (toprow label))))
              (if (is switch 'full)
                  (tag (td style "text-align:right;padding-right:4px;")
