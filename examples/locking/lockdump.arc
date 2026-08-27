@@ -200,7 +200,7 @@
   (if (isa!sym x)
       (or (and (bound 'bgthreads*) (bgthreads* x))
           (and (is x 'serve) (iflive serve-thread*))
-          (err "No such thread: @x"))
+          (err "No such thread" x))
       x))
 
 (def bt (x (o secs 15) (o count 40))

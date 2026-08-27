@@ -950,7 +950,7 @@
   (let nums (date-nums s)
     (if (valid-date nums)
         nums
-        (err (string "Invalid date: " s)))))
+        (err "Invalid date" s))))
 
 (def date-nums (s)
   (with ((ynow mnow dnow) (date)
@@ -999,7 +999,7 @@
     (case (len xs)
       1 (local-time::parse-timestring ymd)
       2 (local-time::parse-timestring (+ xs!0 "T" xs!1 ":00Z"))
-      3 (err "Don't know how to parse @ymd"))))
+      3 (err "Don't know how to parse" ymd))))
 
 (def format-ymd ((o ts (today)))
   (local-time::format-timestring

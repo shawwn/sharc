@@ -1968,13 +1968,43 @@ sb-thread mutex with a :name, and anything else prints as itself."
 (xdef protect (during after)
   (unwind-protect (arc-call0 during) (arc-call0 after)))
 
-(xdef err (&rest args)
-  ;; Arc's err concatenates its arguments; it is not a format control.
+;; Limits for printing values inside an error message or a backtrace frame,
+;; kept in one place because err and arc-report-frame share them.
+(defvar *arc-err-print-string-length* 120)
+(defvar *arc-err-print-length* 10)
+(defvar *arc-err-print-level* 4)
+
+(defun arc-error-string (msg &rest args)
+  ;; Arc's err writes the message, then ": " and the value arguments
+  ;; separated by spaces; it is not a format control.  Call sites therefore
+  ;; do not punctuate their own message.  The message is displayed and the
+  ;; values are written, so a value that happens to be a string still reads
+  ;; as one and nil and t show up rather than vanishing:
+  ;;   (err "Foo")             => Foo
+  ;;   (err "Foo" 1 2 3 4)     => Foo: 1 2 3 4
+  ;;   (err "Foo" "thing")     => Foo: "thing"
+  ;;   (err "Can't copy" nil)  => Can't copy: nil
   ;; Passing the text through ~a keeps a literal ~ in a message (common,
   ;; since ~ is complement and assert echoes the failing expression) from
   ;; being read as a directive, and keeps extra args from being dropped.
-  (error "~a" (with-output-to-string (s)
-                (dolist (a args) (arc-disp-val a s)))))
+  ;; The value arguments print under the same limits as a backtrace frame
+  ;; (*arc-err-print-*), so one oversized argument cannot bury the message.
+  ;; msg itself is not truncated: it is the text the caller chose.
+  (with-output-to-string (s)
+    (arc-disp-val msg s)
+    (when args
+      (arc-disp-val ":" s)
+      (with-truncated-strings (*arc-err-print-string-length*)
+        (let ((*print-length* *arc-err-print-length*)
+              (*print-level*  *arc-err-print-level*))
+          (dolist (a args)
+            (write-char #\space s)
+            (arc-write-val a s)))))))
+
+(xdef errstr #'arc-error-string)
+
+(xdef err (msg &rest args)
+  (error "~a" (apply #'arc-error-string msg args)))
 
 (xdef on-err (errfn f)
   (handler-case (arc-call0 f)
@@ -2202,8 +2232,6 @@ sb-thread mutex with a :name, and anything else prints as itself."
 ;;;; REPL
 ;;;; ============================================================
 
-(defvar *arc-err-print-string-length* 500)
-
 (defun arc-report-frame (frame &optional (stream *error-output*))
   ;; Print frames under :invert readtable case so mixed-case
   ;; symbol names (like arc--CAR) come out without |...| escapes.
@@ -2218,9 +2246,6 @@ sb-thread mutex with a :name, and anything else prints as itself."
             (truncate-printed-strings text *arc-err-print-string-length*))))
 
 (xdef report-frame #'arc-report-frame)
-
-(defvar *arc-err-print-length* 10)
-(defvar *arc-err-print-level* 4)
 
 (defun arc-map-backtrace (fn)
   (sb-debug:map-backtrace fn))

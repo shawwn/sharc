@@ -304,7 +304,7 @@ Connection: close"))
            (let filetype (static-filetype op)
              (aif (and filetype (file-exists (string staticdir* op)))
                   (do (prn (or (type-header* filetype)
-                               (err "Unknown mime type for @filetype")))
+                               (err "Unknown mime type" filetype)))
                       (awhen static-max-age*
                         (prn "Cache-Control: max-age=" it))
                       (prn)

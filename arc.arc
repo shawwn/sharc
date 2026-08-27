@@ -106,7 +106,7 @@
                  (if (no tail)
                      prev
                      ((fn (next)
-                        (if (id next xs) (err "circular list"))
+                        (if (id next xs) (err "Circular list"))
                         (scdr tail prev)
                         (self tail next))
                       (cdr tail)))))
@@ -280,7 +280,7 @@
 
 (mac on (var s . body)
   (if (is var 'index)
-      (err "Can't use index as first arg to on.")
+      (err "Can't use index as first arg to `on`")
       `(let index 0
          (each ,var ,s
            ,@body
@@ -488,7 +488,7 @@
   (and (isa!table x) (is x!type 'lock)))
 
 (def lockable (l)
-  (check l alock (err "Not a lock: @l")))
+  (check l alock (err "Not a lock" l)))
 
 (mac w/lock (x . body)
   `(call-w/lock ,x {do ,@body}))
@@ -613,7 +613,7 @@
               (cons (car fs) args)))
         (cdr f))
       (is (car f) 'no)
-       (err "Can't invert " (cons f args))
+       (err "Can't invert" (cons f args))
        (cons f args)))
 
 (unless (bound 'place-lock*)
@@ -1052,8 +1052,8 @@
       (w/stdout ,gv ,@body)
       (inside ,gv))))
 
-(mac assert (expr (o msg "Assertion failed"))
-  `(or ,expr (err (string ,msg ": " (tostring:pr ',expr)))))
+(mac assert (expr (o msg "Assertion failed") . args)
+  `(or ,expr (err ,msg ,@(or args (list `',expr)))))
 
 (mac fromstring (str . body)
   (w/uniq gv
@@ -1149,7 +1149,7 @@
     (num int) x
     string    (as!num x)
     char      (as!int x)
-    (err "Can't convert @x to number")))
+    (err "Can't convert to number" x)))
 
 (def inc (x (o n 1))
   (coerce (+ (asnum x) n) (type x)))
@@ -1405,7 +1405,7 @@
                      (each (k v) x 
                        (= (new k) v)))
             vector (as!vector:as!cons x)
-                   (err "Can't copy " x))
+                   (err "Can't copy" x))
     (each (k v) (pair args)
       (= (x2 k) v))
     x2))
@@ -1419,7 +1419,7 @@
     string ""
     table  (table)
     vector (as!vector nil)
-           (err "Can't make a fresh @(type x)")))
+           (err "Can't make a fresh type" (type x))))
 
 (def abs (n)
   (if (< n 0) (- n) n))

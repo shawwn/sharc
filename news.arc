@@ -2200,7 +2200,7 @@
              4 "April" 5 "May"  6 "June"
              7 "July"  8 "Aug"  9 "Sept"
              10 "Oct"  11 "Nov" 12 "Dec"
-             (err "Bad month number"))
+             (err "Bad month number" M))
       (+ M " " D ", " Y))))
 
 (def text-age (mins)
@@ -2296,7 +2296,7 @@
           sockvotes (-- i!sockvotes n)
           karma     (do (-- (karma (by i)) n)
                         (save-prof (by i)))
-          (err "Unknown vote-for effect name @name")))
+          (err "Unknown vote-for effect" name)))
       (metastory&adjust-rank i)
       (pull [is _!2 (user-id)] i!votes)
       (save-item i)

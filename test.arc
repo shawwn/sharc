@@ -724,6 +724,54 @@ c"
     (test? src (w/infile i f (drain (readb i))))
     (rmfile f)))
 
+; ----- err -----
+
+; err writes the message, then ": " and its value arguments separated by
+; spaces.  Call sites therefore do not punctuate their own message.  The
+; message is displayed and the values are written, so a value that happens
+; to be a string still reads as one.  Values print under the same limits as
+; a backtrace frame, so one oversized argument cannot bury the message.
+
+(def errmsg (f) (on-err details f))
+
+(define-test err-joins-args
+  ; no values, no colon
+  (test? "Foo"           (errmsg (fn () (err "Foo"))))
+  (test? "sym-only"      (errmsg (fn () (err 'sym-only))))
+  (test? "Foo: 1 2 3 4"  (errmsg (fn () (err "Foo" 1 2 3 4))))
+  (test? "Foo: only"     (errmsg (fn () (err "Foo" 'only))))
+  ; a string value is written, so it keeps its quotes
+  (test? "Foo: \"thing\"" (errmsg (fn () (err "Foo" "thing"))))
+  ; nil and t show up rather than vanishing
+  (test? "Foo: nil t"    (errmsg (fn () (err "Foo" nil t))))
+  (test? "list: (\"a\" b)" (errmsg (fn () (err "list" '("a" b)))))
+  ; assert echoes the failing expression as err's value argument
+  (test? "msg: nil"      (errmsg (fn () (assert nil "msg")))))
+
+; ~ is complement in Arc and assert echoes the failing expression, so a
+; message can easily contain one.  err must not read it as a format
+; directive: ~a used to consume a nonexistent argument and signal a
+; FORMAT-ERROR instead of the intended message.
+
+(define-test err-tilde-is-literal
+  (test? "tilde ~acct-exists ok" (errmsg (fn () (err "tilde ~acct-exists ok"))))
+  (test? "~a ~s ~%"              (errmsg (fn () (err "~a ~s ~%")))))
+
+(define-test err-truncates-values
+  ; a long string value is cut to *arc-err-print-string-length* with a
+  ; trailing ellipsis rather than dumped whole
+  (let msg (errmsg (fn () (err "Foo" (string (n-of 600 #\x)))))
+    (test? t   (< (len msg) 600))
+    (test? t   (isnt nil (posmatch "..." msg))))
+  ; a long list collapses after *arc-err-print-length* elements
+  (test? "Foo: (1 2 3 4 5 6 7 8 9 10 ...)" (errmsg (fn () (err "Foo" (range 1 200)))))
+  ; and nesting past *arc-err-print-level* prints as #
+  (test? "Foo: (1 (2 (3 (4 #))))"
+         (errmsg (fn () (err "Foo" '(1 (2 (3 (4 (5 (6 (7 (8 9))))))))))))
+  ; the message itself is the caller's text and is left alone
+  (let long (string (n-of 600 #\y))
+    (test? 600 (len (errmsg (fn () (err long)))))))
+
 ; ----- read / eof -----
 
 ; Reading signals end of input with the `eof` sentinel rather than nil, so a
