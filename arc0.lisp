@@ -2242,7 +2242,7 @@ sb-thread mutex with a :name, and anything else prints as itself."
 (xdef report-frame #'arc-report-frame)
 
 (defun arc-map-backtrace (fn)
-  (sb-debug:map-backtrace fn))
+  (sb-debug::map-backtrace fn))
 
 (xdef map-backtrace #'arc-map-backtrace)
 
