@@ -283,8 +283,8 @@
 (def user-key (k (t u me))
   (and u (mem k (uvar u keys))))
 
-(defplace user-key (fn (k (o u '(me)))
-                     `(mem ,k (uvar ,u keys))))
+(defplace user-key (k (o u '(me)))
+  `(mem ,k (uvar ,u keys)))
 
 (def by (i)
   (assert (uid->user* i!by) (uid-message i)))
@@ -523,12 +523,12 @@
 (def dupe (i)          (mem 'dupe i!keys))
 (def redact ((t u me)) (user-key 'redact u))
 
-(defplace dead           (fn (i) `(,i 'dead)))
-(defplace deleted        (fn (i) `(,i 'deleted)))
-(defplace announcement   (fn (i) `(mem 'announce (,i 'keys))))
-(defplace imported       (fn (i) `(mem 'imported (,i 'keys))))
-(defplace dupe           (fn (i) `(mem 'dupe (,i 'keys))))
-(defplace redact         (fn (u) `(mem 'redact (uvar ,u keys))))
+(defplace dead         (i) `(,i 'dead))
+(defplace deleted      (i) `(,i 'deleted))
+(defplace announcement (i) `(mem 'announce (,i 'keys)))
+(defplace imported     (i) `(mem 'imported (,i 'keys)))
+(defplace dupe         (i) `(mem 'dupe (,i 'keys)))
+(defplace redact       (u) `(mem 'redact (uvar ,u keys)))
 
 (def live (i) (no (dead|deleted i)))
 
@@ -1731,7 +1731,7 @@
 (def voted (i)
   (aif (votes) (it i!id)))
 
-(defplace voted (fn (i) `((votes* (me)) (,i 'id))))
+(defplace voted (i) `((votes* (me)) (,i 'id)))
 
 ; could memoize votelink more, esp for non-logged in users,
 ; since only uparrow is shown; could straight memoize

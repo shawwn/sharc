@@ -530,11 +530,12 @@
                ,@body))
            ',name)))
 
-(mac defplace (name place)
-  `(defset ,name args
-     (list (list)
-           (apply ,place args)
-           `(fn (val) (= ,(apply ,place args) val)))))
+(mac defplace (name args . body)
+  (let place `(apply (fn ,args ,@body) args)
+    `(defset ,name args
+       (list (list)
+             ,place
+             `(fn (val) (= ,,place val))))))
 
 (defset car (x)
   (w/uniq g

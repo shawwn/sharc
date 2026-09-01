@@ -236,9 +236,9 @@
 (def op args
   (if (no args) (the op) (caris args (the op))))
 
-(defplace me (fn () '(the me)))
-(defplace ip (fn () '(the ip)))
-(defplace op (fn () '(the op)))
+(defplace me () '(the me))
+(defplace ip () '(the ip))
+(defplace op () '(the op))
 
 (mac w/me (val . body)
   `(w/the me ,val ,@body))
