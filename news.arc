@@ -1731,7 +1731,8 @@
 (def voted (i)
   (aif (votes) (it i!id)))
 
-(defplace voted (i) `((votes* (me)) (,i 'id)))
+(defplace voted (i (o u '(me)))
+  `((votes* ,u) (,i 'id)))
 
 ; could memoize votelink more, esp for non-logged in users,
 ; since only uparrow is shown; could straight memoize
