@@ -844,7 +844,7 @@
       (pr (num:len:loaded-votes) " of " (num maxuid*) " votes"
           " (@(megabytes (vals votes*)))")
       (let m (memory-after-gc)
-        (pr (num m) " total bytes (" (num (/ m (len items*))) " B/item)"))
+        (pr (num m) " total bytes (" (num (/ m (max 1 (len items*)))) " B/item)"))
       (pr (num elapsed 3 t t) " msec")
       (when (admin)
         (link "settings" "newsadmin")
