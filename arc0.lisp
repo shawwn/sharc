@@ -2285,7 +2285,7 @@ sb-thread mutex with a :name, and anything else prints as itself."
 (xdef repl #'arc-tl)
 
 (defvar *arc-repl-print-length* 100)
-(defvar *arc-repl-print-level* 8)
+(defvar *arc-repl-print-level* 60)
 (defvar *arc-repl-print-string-length* 500)
 
 (defun arc-tl2 ()
