@@ -2125,12 +2125,6 @@ sb-thread mutex with a :name, and anything else prints as itself."
 
 (xdef msec #'arc-msec)
 
-(defun arc-nsec ()
-  (multiple-value-bind (s ns) (sb-unix:clock-gettime sb-unix:clock-monotonic)
-    (+ (* s 1000000000) ns)))
-
-(xdef nsec #'arc-nsec)
-
 (defun arc-current-process-milliseconds ()
   (* 1d0 (* 1000 (/ (get-internal-run-time)
                     internal-time-units-per-second))))
