@@ -455,7 +455,8 @@
          (failed-login 'register it afterward (recaptcha-required))
          (do (create-acct user pw)
              (note-acct-creation)
-             (login user (ip) (cook-user! user) afterward)))))
+             (do1 (login user (ip) (cook-user! user) afterward)
+                  (hook 'register))))))
 
 (def login (user ip cookie afterward)
   (prcookie cookie)

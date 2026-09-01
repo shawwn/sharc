@@ -146,19 +146,6 @@
     (save-table (profile u) (prof-path uid))
     u))
 
-; Need this because can create users on the server (for other apps)
-; without setting up places to store their state as news users.
-
-(def ensure-news-user ((t u me))
-  (when (acct-exists u)
-    (ensure-uid u)
-    (unless (profile u)
-      (init-user u))))
-
-(defhook login ()
-  (ensure-news-user)
-  (newslog 'login))
-          
 (def init-user (u)
   (ensure-uid u)
   (w/place-lock
@@ -313,6 +300,23 @@
 
 (def same-ip (i s) (is i!ip s!ip))
 
+; Need this because can create users on the server (for other apps)
+; without setting up places to store their state as news users.
+
+(def ensure-news-user ((t u me))
+  (when (acct-exists u)
+    (ensure-uid u)
+    (unless (profile u)
+      (init-user u))))
+
+(defhook login ()
+  (ensure-news-user)
+  (newslog 'login))
+
+(defhook register ()
+  (set user-key!claimed)
+  (save-prof)
+  (newslog 'create))
 
 (or= stories* nil comments* nil ; descending time
      items* (table) item-ids* (table) url->story* (table))
