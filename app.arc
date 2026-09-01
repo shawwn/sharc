@@ -38,7 +38,7 @@
 (def admin ((t u me)) (if (only&mem u admins*) u))
 
 (def load-admins ()
-  (= admins* (map string (readfile adminfile*))))
+  (= admins* (map string (errsafe:readfile adminfile*))))
 
 (def save-admins ()
   (w/lock (save-lock adminfile*)
@@ -56,7 +56,7 @@
   (keys user->uid* test))
 
 (def load-uids ()
-  (= user->uid* (load-table uidfile*))
+  (= user->uid* (safe-load-table uidfile*))
   (each (k v) user->uid* (= (uid->user* v) k)))
 
 (def save-uids ()
@@ -94,7 +94,7 @@
 (def acct-exists ((t u me)) (if (only&hpasswords* u) u))
 
 (def load-pws ()
-  (= hpasswords* (load-table hpwfile*))
+  (= hpasswords* (safe-load-table hpwfile*))
   (register-accts)
   t)
 
@@ -170,7 +170,7 @@
 (or= cookie->user* (table) user->cookies* (table) logins* (table))
 
 (def load-cookies ()
-  (= cookie->user* (load-table cookfile*)
+  (= cookie->user* (safe-load-table cookfile*)
      user->cookies* (table))
   (each (cookie user) cookie->user*
     (push cookie (user->cookies* user))))
