@@ -3090,9 +3090,9 @@
 ; It might solve the same problem more generally to make html code
 ; more efficient.
 
-(= comment-cache* (table) comment-gen* (table))
+(or= comment-cache* (table) comment-gen* (table))
 
-(= comments-printed* 0 cc-hits* 0)
+(or= comments-printed* 0 cc-hits* 0)
 
 (= comment-caching* t) 
 
