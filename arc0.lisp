@@ -2239,6 +2239,197 @@ it runs, and to take a while.  Run it off-peak."
 
 (xdef global-sizes #'arc-global-sizes)
 
+;;;; ---- retainer analysis ----
+;;;;
+;;;; object-size and global-sizes walk *forward* from a root: given
+;;;; comment-cache*, what does it hold?  These walk *backward* from an
+;;;; object: who is still pointing at this, and why hasn't the gc taken
+;;;; it?  That is the question heap-hist cannot answer -- it names the
+;;;; type that is eating the heap, never the owner.
+
+(defun arc-deref (x)
+  "Weak pointers in, objects out; anything else passes through.
+heap-big hands back weak pointers so that its own result list can't turn
+up as a retainer of every object it just reported."
+  (if (typep x 'sb-ext:weak-pointer)
+      (sb-ext:weak-pointer-value x)
+      x))
+
+(xdef deref #'arc-deref)
+
+(defun arc-fun-label (f)
+  (let ((name (and (functionp f)
+                   (ignore-errors (nth-value 2 (function-lambda-expression f))))))
+    (if (symbolp name) name (arc-sym "anonymous"))))
+
+(defun arc-object-label (obj)
+  "A short, printable description of OBJ.
+Retainer chains are made of these rather than of the objects themselves,
+so printing one at the repl can't dump a 400k-entry table to a terminal."
+  (typecase obj
+    (gcell        (list (arc-sym "global") (arc-sym (gcell-name obj))))
+    (null         nil)
+    (symbol       obj)
+    (hash-table   (list (arc-sym "table") (hash-table-count obj)))
+    (cons         (arc-sym "cons"))
+    (string       (list (arc-sym "string") (length obj)))
+    (vector       (list (arc-sym "vector") (length obj)))
+    (sb-thread:thread
+     (list (arc-sym "thread") (sb-thread:thread-name obj)))
+    (sb-kernel:code-component
+     (list (arc-sym "code")
+           (arc-fun-label (ignore-errors (sb-kernel:%code-entry-point obj 0)))))
+    (function     (list (arc-sym "fn") (arc-fun-label obj)))
+    (t            (list (arc-sym "instance") (class-name (class-of obj))))))
+
+(defvar *arc-scanner-code*
+  (sb-kernel:fun-code-header (sb-kernel:%fun-fun #'sb-vm::map-referencing-objects))
+  "Code component of map-referencing-objects, for arc-scanner-artifact-p.")
+
+(defun arc-scanner-artifact-p (r)
+  "Is R the scanner's own callback rather than a real retainer?
+map-referencing-objects closes its inner callback over the object being
+searched for, so it hands that closure back as a referrer of every
+object you ask about.  Expanding it walks into the code graph and away
+from whatever is actually holding the target -- it cost a working
+retaining-path until it was filtered here.  Identified by code component
+rather than by name, since the closure is anonymous."
+  (and (functionp r)
+       (eq (ignore-errors (sb-kernel:fun-code-header (sb-kernel:%fun-fun r)))
+           *arc-scanner-code*)))
+
+(defun arc-retainer-objects (obj limit &optional skip)
+  "Up to LIMIT heap objects that directly reference OBJ.
+Weak pointers never count: they keep nothing alive, and heap-big holds
+one to every object it reports.  SKIP, when given, is an eq table of
+objects to ignore -- retaining-path passes its own bookkeeping, whose
+tables and conses would otherwise show up as retainers of everything the
+search has touched so far."
+  (let ((obj (arc-deref obj))
+        (found nil)
+        (n 0))
+    (unless (typep obj '(or fixnum character single-float))
+      (sb-vm::map-referencing-objects
+       (lambda (r)
+         (unless (or (>= n limit)
+                     (eq r obj)
+                     (typep r 'sb-ext:weak-pointer)
+                     (arc-scanner-artifact-p r)
+                     (and skip (gethash r skip)))
+           (incf n)
+           (push r found)))
+       :dynamic obj))
+    (nreverse found)))
+
+(defun arc-retainers (obj &optional (limit 40))
+  "Labels for everything that directly references OBJ.
+Collects garbage first: map-referencing-objects walks allocated objects,
+not live ones, so without this a dead list left over from the previous
+call still shows up here as a retainer."
+  (sb-ext:gc :full t)
+  (mapcar #'arc-object-label (arc-retainer-objects obj limit)))
+
+(xdef retainers #'arc-retainers)
+
+(defun arc-retainer-dead-end-p (obj)
+  "Nodes worth reporting but not worth expanding.
+An object can be a literal constant in compiled code, and chasing a code
+component leads into the code graph rather than to whatever cache is
+actually holding it.  Threads and packages are roots in their own right."
+  (typep obj '(or sb-kernel:code-component sb-thread:thread package)))
+
+(defun arc-retaining-path (obj &optional (depth 10) (width 6))
+  "Why OBJ is still alive: the chain of references from a named global
+down to it, as labels, root first.
+
+Walks backward a level at a time, expanding at most WIDTH objects per
+level and going at most DEPTH levels deep, and stops at the first global
+it reaches.  So a leaked comment body comes back as
+
+  ((global comment-cache*) (table 371596) (vector 65536) cons (string 2100))
+
+When no global is reached within the budget the deepest chain explored
+comes back instead, so check whether the head of the result is a global
+rather than checking for nil.  A partial chain still says something: one
+that ends at a lisp-side structure names the owner anyway, and a chain of
+length 1 means the object has no heap retainer at all, which means a
+running thread is pinning it -- sbcl scans thread stacks conservatively."
+  (let* ((obj (arc-deref obj))
+         ;; Every referrer gets checked for being a global; only WIDTH of
+         ;; them get expanded.  Both come out of one heap scan, so looking
+         ;; wider than we walk is free -- and without it a target with a
+         ;; dozen referrers can have the global that owns it sorted past
+         ;; the expansion budget and missed entirely.
+         (scan (max 32 (* 4 width)))
+         ;; seen does double duty: it is the visited set, and it is the
+         ;; skip set handed to arc-retainer-objects.  Everything this
+         ;; search allocates ends up pointing at objects the search is
+         ;; asking about, so without listing our own structures here the
+         ;; walk finds itself and follows its own tail instead of the
+         ;; target's owner.  Sized generously so rehashing can't strand a
+         ;; stale pairs vector outside the skip set.
+         (seen (make-hash-table :test #'eq :size 1024))
+         (frontier (list (list obj))))
+    (setf (gethash obj seen) t)
+    (dotimes (level depth)
+      ;; A full gc per level, not just once up front.  map-referencing-
+      ;; objects walks *allocated* objects rather than live ones, so the
+      ;; dead scan results from the previous level are still sitting in
+      ;; the heap pointing at everything we are about to ask about.
+      (sb-ext:gc :full t)
+      (setf (gethash seen seen) t
+            (gethash (sb-impl::hash-table-pairs seen) seen) t)
+      ;; The frontier spine, and every cons in every node chain hanging
+      ;; off it, reference objects under search.
+      (do ((c frontier (cdr c))) ((null c))
+        (setf (gethash c seen) t)
+        (do ((n (car c) (cdr n))) ((null n)) (setf (gethash n seen) t)))
+      (let ((next nil) (n 0))
+        (dolist (node frontier)
+          (let ((rs (arc-retainer-objects (car node) scan seen)))
+            (do ((c rs (cdr c))) ((null c)) (setf (gethash c seen) t))
+            (dolist (r rs)
+              (unless (gethash r seen)
+                (setf (gethash r seen) t)
+                (when (gcell-p r)
+                  (return-from arc-retaining-path
+                    (mapcar #'arc-object-label (cons r node))))
+                (when (and (< n width) (not (arc-retainer-dead-end-p r)))
+                  (incf n)
+                  (let ((entry (cons r node)))
+                    (setf (gethash entry seen) t)
+                    (push entry next)))))))
+        (when (null next) (return))
+        (setf frontier (nreverse next))))
+    (mapcar #'arc-object-label (car frontier))))
+
+(xdef retaining-path #'arc-retaining-path)
+
+(defun arc-heap-big (&optional (n 20) (min-bytes 65536))
+  "The N largest individual live objects, as (bytes label ref) rows.
+Individual: a 400k-entry table shows up as its pairs vector, not as the
+megabytes it transitively holds -- global-sizes is what measures that.
+This is the way in to retaining-path, which needs an object to ask about,
+and heap-hist only ever names a type.  ref is a weak pointer, so holding
+the result doesn't make this list a retainer of everything in it; pass it
+straight to retaining-path, or deref it to get the object."
+  (sb-ext:gc :full t)
+  (let (rows)
+    (sb-vm:map-allocated-objects
+     (lambda (obj widetag size)
+       (declare (ignore widetag))
+       (when (>= size min-bytes)
+         (push (cons size obj) rows)))
+     :dynamic)
+    (setf rows (sort rows #'> :key #'car))
+    (mapcar (lambda (r)
+              (list (car r)
+                    (arc-object-label (cdr r))
+                    (sb-ext:make-weak-pointer (cdr r))))
+            (subseq rows 0 (min n (length rows))))))
+
+(xdef heap-big #'arc-heap-big)
+
 ;;;; ---- close / force-close ----
 
 (xdef close (&rest args)
