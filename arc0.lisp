@@ -2176,16 +2176,24 @@ sb-thread mutex with a :name, and anything else prints as itself."
 (xdef memory () (sb-kernel:dynamic-usage))
 
 (defun arc-heap-hist ()
+  "Top live-object types after a full GC, as (count bytes type) rows.
+Bytes matter more than count when hunting a leak -- a million conses and
+a handful of megabyte strings look nothing alike by count -- so the top
+30 is taken by bytes.  Rows come back sorted by type name so two
+snapshots taken minutes apart can be diffed line by line."
   (sb-ext:gc :full t)
-  (let ((h (make-hash-table :test 'eq)))
+  (let ((counts (make-hash-table :test 'equal))
+        (bytes (make-hash-table :test 'equal)))
     (sb-vm:map-allocated-objects
      (lambda (obj widetag size)
-       (declare (ignore widetag size))
-       (incf (gethash (type-of obj) h 0)))
+       (declare (ignore widetag))
+       (let ((type (type-of obj)))
+         (incf (gethash type counts 0))
+         (incf (gethash type bytes 0) size)))
      :dynamic)
     (let (rows)
-      (maphash (lambda (k v) (push (cons v k) rows)) h)
-      (sort (subseq (sort rows #'> :key #'car) 0 30)
+      (maphash (lambda (k v) (push (list v (gethash k bytes 0) k) rows)) counts)
+      (sort (subseq (sort rows #'> :key #'second) 0 (min 30 (length rows)))
             #'string< :key #'arc-heap-name))))
 
 (defun arc-heap-name (x)
@@ -2197,6 +2205,39 @@ sb-thread mutex with a :name, and anything else prints as itself."
           nil)))
 
 (xdef heap-hist #'arc-heap-hist)
+
+(defun arc-globals-list ()
+  "Every Arc global that has ever been referenced or bound, name-sorted.
+Includes names that were referenced but never bound -- see bound."
+  (let (names)
+    (maphash (lambda (k c) (declare (ignore c)) (push k names)) *arc-globals*)
+    (mapcar #'arc-sym (sort names #'string<))))
+
+(xdef globals #'arc-globals-list)
+
+(defun arc-global-sizes ()
+  "(name bytes) for every bound global, largest first, after a full GC.
+One visited table is shared across the whole scan, so an object reachable
+from two globals is charged to whichever is walked first and the bytes
+sum to the reachable heap rather than double-counting shared structure.
+Globals are walked in name order so the attribution is stable and two
+snapshots can be diffed.
+
+This is expensive: the visited table grows to one entry per live object,
+so on a multi-gigabyte image expect it to add a gigabyte of its own while
+it runs, and to take a while.  Run it off-peak."
+  (sb-ext:gc :full t)
+  (let ((visited (make-hash-table :test #'eq))
+        rows)
+    (dolist (name (arc-globals-list))
+      (let ((c (find-gcell name)))
+        (when c
+          (let ((v (gcell-value c)))
+            (unless (eq v *arc-unbound*)
+              (push (list name (object-size v visited)) rows))))))
+    (sort rows #'> :key #'second)))
+
+(xdef global-sizes #'arc-global-sizes)
 
 ;;;; ---- close / force-close ----
 
@@ -2469,7 +2510,10 @@ sb-thread mutex with a :name, and anything else prints as itself."
   (reload-runtime :force force))
 
 (defun object-size (obj &optional (visited (make-hash-table :test #'eq)))
-  "Exact heap bytes consumed by OBJ and everything it references, on SBCL 64-bit."
+  "Exact heap bytes consumed by OBJ and everything it references, on SBCL 64-bit.
+Pass one VISITED table across several roots to size them against each
+other: shared structure is charged to whichever root reaches it first, so
+the sizes partition the reachable heap instead of double-counting it."
   (when (or (gethash obj visited)
             (typep obj '(or fixnum character single-float symbol)))
     (return-from object-size 0))
@@ -2485,11 +2529,32 @@ sb-thread mutex with a :name, and anything else prints as itself."
                   obj)
          sum))
       ((consp obj)
-       (+ self
-          (object-size (car obj) visited)
-          (object-size (cdr obj) visited)))
+       ;; Walk the cdr spine iteratively.  Recursing down it blows the
+       ;; control stack on lists news.arc actually holds -- a 10000-long
+       ;; ranked-stories*, a 400k-long id list -- long before it runs out
+       ;; of heap.
+       (let ((sum self) (x obj))
+         (loop
+           (incf sum (object-size (car x) visited))
+           (let ((next (cdr x)))
+             (cond ((not (consp next))
+                    (return (+ sum (object-size next visited))))
+                   ((gethash next visited)
+                    (return sum))
+                   (t (setf (gethash next visited) t)
+                      (incf sum (sb-vm::primitive-object-size next))
+                      (setf x next)))))))
       ((simple-vector-p obj)
        (+ self (loop for x across obj sum (object-size x visited))))
+      ((sb-kernel:closurep obj)
+       ;; A closure's primitive size is just its header plus one word per
+       ;; captured value, so without this branch every defmemo and
+       ;; defcache in the image sizes as ~32 bytes -- their caches live
+       ;; only in a closed-over variable and nothing else points at them.
+       (let ((sum self))
+         (sb-kernel:do-closure-values (v obj)
+           (incf sum (object-size v visited)))
+         sum))
       ((vectorp obj)
        self)
       ((typep obj '(or standard-object structure-object))
