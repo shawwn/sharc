@@ -1902,6 +1902,9 @@
       (whiler e (read f eof) eof
         (eval e)))))
 
+(def loaded-files ()
+  (rev (cons "reload.arc" (rem "reload.arc" loaded-files*))))
+
 (def reload ()
   (w/assign reloading* t
     ; Note the times before reloading, not after: reload-runtime can
@@ -1910,7 +1913,7 @@
     ; the next edit instead.
     (note-runtime-times)
     (reload-runtime)
-    (each file (rev loaded-files*)
+    (each file (loaded-files)
       (call-quietly {load file}))))
 
 (def maybe-reload ()
