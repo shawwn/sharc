@@ -575,24 +575,24 @@ straight to gcell-ref; this remains for callers holding only a symbol."
 (xdef call-w/stdin (port thunk)
   (let ((*standard-input* port)) (arc-call0 thunk)))
 
-(xdef readc (&rest args)
-  (let ((c (read-char (if args (car args) *standard-input*) nil nil)))
+(xdef readc (&optional (port *standard-input*))
+  (let ((c (read-char port nil nil)))
     (or c nil)))
 
-(xdef readb (&rest args)
-  (let ((b (read-byte (if args (car args) *standard-input*) nil nil)))
+(xdef readb (&optional (port *standard-input*))
+  (let ((b (read-byte port nil nil)))
     (or b nil)))
 
-(xdef peekc (&rest args)
-  (let ((c (peek-char nil (if args (car args) *standard-input*) nil nil)))
+(xdef peekc (&optional (port *standard-input*))
+  (let ((c (peek-char nil port nil nil)))
     (or c nil)))
 
-(xdef writec (c &rest args)
-  (write-char c (if args (car args) *standard-output*))
+(xdef writec (c &optional (port *standard-output*))
+  (write-char c port)
   c)
 
-(xdef writeb (b &rest args)
-  (write-byte b (if args (car args) *standard-output*))
+(xdef writeb (b &optional (port *standard-output*))
+  (write-byte b port)
   b)
 
 ;;; ---- string truncation ----
