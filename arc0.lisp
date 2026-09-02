@@ -595,6 +595,19 @@ straight to gcell-ref; this remains for callers holding only a symbol."
   (write-byte b port)
   b)
 
+(xdef writebytes (bs &optional (port *standard-output*))
+  (if (typep port 'sb-sys:fd-stream)
+      (write-sequence bs port)
+      ;; tostring binds stdout to a string stream, which takes
+      ;; characters, not octets.  Decoding here is the slow path by
+      ;; design -- the point of holding bytes is to hand them to a
+      ;; socket untouched -- but it beats a type-error from the middle
+      ;; of page generation.
+      (write-string (sb-ext:octets-to-string
+                     bs :external-format '(:utf-8 :replacement #\?))
+                    port))
+  bs)
+
 ;;; ---- string truncation ----
 ;;;
 ;;; Long strings are unreadable in the repl and drown a backtrace (one
