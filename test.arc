@@ -1883,6 +1883,22 @@ c"
   (test? "a\tb"   (from-json "\"a\\tb\""))
   (test? "A"      (from-json "\"\\u0041\"")))
 
+(define-test json-decode-surrogates
+  ; a character outside the bmp arrives as a utf-16 pair, not as \u1f600
+  (test? (string (coerce 128512 'char))
+         (from-json "\"\\ud83d\\ude00\""))
+  (test? (string "a" (coerce 128512 'char) "b")
+         (from-json "\"a\\ud83d\\ude00b\""))
+  (test? (string (coerce 128512 'char) (coerce 128640 'char))
+         (from-json "\"\\ud83d\\ude00\\ud83d\\ude80\""))
+  ; an unpaired surrogate is not a unicode scalar value and has no utf-8
+  ; encoding, so it degrades to U+FFFD instead of signalling later on
+  (test? (string json-replacement-char*) (from-json "\"\\ud83d\""))
+  (test? (string json-replacement-char*) (from-json "\"\\ude00\""))
+  ; and a stray high surrogate must not swallow the text after it
+  (test? (string json-replacement-char* "ZZ") (from-json "\"\\ud83dZZ\""))
+  (test? (string json-replacement-char* "A")  (from-json "\"\\ud83d\\u0041\"")))
+
 (define-test json-decode-array
   (test? nil       (from-json "[]"))
   (test? '(1 2 3)  (from-json "[1,2,3]"))

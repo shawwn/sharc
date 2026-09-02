@@ -221,13 +221,52 @@
                         (writec e))))
             (do (writec c) (json-bump st)))))))
 
-(def json-parse-unicode-escape (st)
+; A character outside the bmp arrives as a utf-16 surrogate pair -- an
+; emoji is \ud83d\ude00, not \u1f600 -- so reading one \uXXXX at a time
+; yielded two halves of a character instead of the character.  Worse, a
+; surrogate is not a unicode scalar value at all: sbcl's character type
+; will hold one, but utf-8 cannot encode it, so the error surfaced only
+; later, when something wrote the string back out.
+;
+; A surrogate that is not part of a well-formed pair cannot be recovered,
+; so it becomes U+FFFD -- what the standard prescribes, and encodable.
+
+(= json-replacement-char* (coerce 65533 'char))   ; U+FFFD
+
+(def json-surrogate-hi (n) (<= 55296 n 56319))    ; D800..DBFF
+(def json-surrogate-lo (n) (<= 56320 n 57343))    ; DC00..DFFF
+
+(def json-parse-hex4 (st)
   (let n 0
     (repeat 4
       (let c (json-peek st)
         (json-bump st)
         (= n (+ (* n 16) (json-hex-digit c)))))
-    (coerce n 'char)))
+    n))
+
+(def json-parse-unicode-escape (st)
+  (let n (json-parse-hex4 st)
+    (if (json-surrogate-hi n)
+         (iflet lo (json-parse-trailing-surrogate st)
+                (coerce (+ 65536 (* 1024 (- n 55296)) (- lo 56320)) 'char)
+                json-replacement-char*)
+        (json-surrogate-lo n)
+         json-replacement-char*
+         (coerce n 'char))))
+
+; The \uXXXX after a high surrogate, when it is the low half of the pair.
+; Rewinds when it is anything else, so a stray high surrogate can't
+; swallow the text that follows it.
+
+(def json-parse-trailing-surrogate (st)
+  (let start st!pos
+    (or (when (is (json-peek st) #\\)
+          (json-bump st)
+          (when (is (json-peek st) #\u)
+            (json-bump st)
+            (let lo (json-parse-hex4 st)
+              (when (json-surrogate-lo lo) lo))))
+        (do (= st!pos start) nil))))
 
 (def json-hex-digit (c)
   (let i (only&int c)
