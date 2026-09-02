@@ -1080,12 +1080,12 @@
         (out expr))))
 
 (def allchars ((o str (stdin)))
-  (tostring (whilet c (readc str nil)
+  (tostring (whilet c (readc str)
               (writec c))))
 
 (def allbytes ((o str (stdin)))
   (let bs nil
-    (whilet b (readb str nil)
+    (whilet b (readb str)
       (push b bs))
     (as!vector (rev! bs))))
 
