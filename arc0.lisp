@@ -2318,7 +2318,10 @@ search has touched so far."
                      (and skip (gethash r skip)))
            (incf n)
            (push r found)))
-       :dynamic obj))
+       ;; :all, not :dynamic.  A referrer can sit in static, immobile or
+       ;; read-only space, and scanning only the dynamic heap silently
+       ;; reports such an object as retained by nothing at all.
+       :all obj))
     (nreverse found)))
 
 (defun arc-retainers (obj &optional (limit 40))
