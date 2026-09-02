@@ -2187,7 +2187,7 @@ snapshots taken minutes apart can be diffed line by line."
     (sb-vm:map-allocated-objects
      (lambda (obj widetag size)
        (declare (ignore widetag))
-       (let ((type (type-of obj)))
+       (let ((type (arc-heap-type obj)))
          (incf (gethash type counts 0))
          (incf (gethash type bytes 0) size)))
      :dynamic)
@@ -2196,13 +2196,27 @@ snapshots taken minutes apart can be diffed line by line."
       (sort (subseq (sort rows #'> :key #'second) 0 (min 30 (length rows)))
             #'string< :key #'arc-heap-name))))
 
-(defun arc-heap-name (x)
-  (if (consp x)
-      (or (arc-heap-name (car x))
-          (arc-heap-name (cdr x)))
-      (if (symbolp x)
-          (symbol-name x)
-          nil)))
+(defun arc-heap-type (obj)
+  "type-of, with array dimensions dropped.
+type-of calls a 60-character string a (simple-array character (60)) and a
+61-character one a different type entirely, so bucketing on it shatters
+every string in the image across thousands of length buckets.  A heap
+that was 1.5GB of rendered html then reports as nothing in particular:
+no single length is large enough to reach a top-30 by bytes, and the
+rows that do make it add up to a third of the heap."
+  (let ((type (type-of obj)))
+    (if (consp type)
+        (case (car type)
+          ((simple-array array) (list (car type) (second type)))
+          (t (car type)))
+        type)))
+
+(defun arc-heap-name (row)
+  "Sort key for heap-hist rows: the type, printed.
+Types that share a leading symbol -- (simple-array character) against
+(simple-array (unsigned-byte 32)) -- have to order stably, or two
+snapshots stop lining up when you diff them."
+  (princ-to-string (third row)))
 
 (xdef heap-hist #'arc-heap-hist)
 
