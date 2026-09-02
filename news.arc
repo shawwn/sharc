@@ -3090,9 +3090,9 @@
 ; It might solve the same problem more generally to make html code
 ; more efficient.
 
-(or= comment-cache* (table) comment-gen* (table))
+(= comment-cache* (table) comment-gen* (table))
 
-(or= comments-printed* 0 cc-hits* 0)
+(= comments-printed* 0 cc-hits* 0)
 
 (= comment-caching* t) 
 
@@ -3129,7 +3129,7 @@
 (def display-comment-body (c whence astree indent showpar showon)
   (++ comments-printed*)
   (if (should-cache-comment c astree)
-      (pr (cached-comment-body c whence indent showpar showon))
+      (writebytes (cached-comment-bytes c whence indent showpar showon))
       (gen-comment-body c whence astree indent showpar showon)))
 
 ; Only for logged-out viewers.  A logged-in one gets flag/fave/unvote
@@ -3137,6 +3137,18 @@
 ; well, so those bodies are viewer-specific and not sharable.  (Keying
 ; on the viewer instead would work, but with one slot per comment two
 ; people reading at once would just evict each other.)
+
+; astree is required for two reasons.  recache-comment always generates
+; the body with astree t -- a tree render carries root/prev/next links
+; and an anchored whenceid, where a flat listing carries context and
+; flag links instead -- so a listing handed a cached body would show the
+; wrong navigation.  And it keeps the cache off the tostring paths: the
+; pages newscache buffers into a string, and the story-refill endpoint,
+; all render comments with astree nil, so writebytes only ever sees the
+; socket's fd-stream.  Nothing depends on that second one for
+; correctness -- writebytes decodes rather than signalling when it is
+; handed a string stream -- but it is the difference between giving the
+; socket bytes it can use verbatim and paying for a decode.
 
 (def should-cache-comment (c astree)
   (and comment-caching*
@@ -3147,18 +3159,17 @@
        (isnt arg!id (string c!id)) ; the page's own item renders differently
        (> (since c!time) (* 1 min*))))
 
-(def cached-comment-body (c whence indent showpar showon)
+(def cached-comment-bytes (c whence indent showpar showon)
   (let key (comment-cache-key c whence indent showpar showon)
-    (iflet (cached-key body) (comment-cache* c!id)
+    (iflet (cached-key bytes) (comment-cache* c!id)
       (if (is cached-key key)
-          (do (++ cc-hits*) body)
+          (do (++ cc-hits*) bytes)
           (recache-comment c whence indent showpar showon key))
       (recache-comment c whence indent showpar showon key))))
 
 (def recache-comment (c whence indent showpar showon key)
-  (let body (tostring (gen-comment-body c whence t indent showpar showon))
-    (= (comment-cache* c!id) (list key body))
-    body))
+  (lets bytes (string->bytes (tostring (gen-comment-body c whence t indent showpar showon)))
+    (= (comment-cache* c!id) (list key bytes))))
 
 ; Cache for the remainder of the current minute, hour, or day.
 
